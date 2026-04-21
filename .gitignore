@@ -1,0 +1,35 @@
+# Personal / per-machine state
+.last-*
+.*-last
+.*-count
+.*-lock
+.autosave-stashes.log
+.notifications.jsonl
+mcp-memory.json
+mcp-needs-auth-cache.json
+
+# Transient
+cache/
+.stversions/
+.stfolder/
+file-history/
+paste-cache/
+sessions/
+session-env/
+shell-snapshots/
+debug/
+
+# Credentials / oauth (never)
+.credentials.json
+oauth_creds.json
+*.pem
+*.key
+id_rsa*
+id_ed25519*
+
+# Build / editor
+node_modules/
+__pycache__/
+*.pyc
+.vscode/
+.idea/
