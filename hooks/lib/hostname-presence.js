@@ -1,8 +1,8 @@
 // hostname-presence.js
 // Per-host presence filename + multi-host merged reader.
-// User runs macbook-pro-9-2 + ryzen-9950x3d. ~/.claude/cache/ may be Syncthing-synced,
-// in which case a single active-sessions-global.jsonl would merge-conflict and
-// confuse peer counts across hosts. Sharding by hostname avoids this.
+// When the same user runs Claude/Gemini on multiple hosts and ~/.claude/cache/
+// is Syncthing-synced, a single active-sessions-global.jsonl would merge-conflict
+// and confuse peer counts across hosts. Sharding by hostname avoids this.
 
 'use strict';
 
