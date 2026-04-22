@@ -13,7 +13,7 @@
 //
 // Disable: SKIP_SETTINGS_VALIDATOR=1
 //
-// Ref: 2026-04-16 hook-issue prevention after relative-path bug in [user]
+// Ref: 2026-04-16 hook-issue prevention after relative-path bug in fahlke
 
 const fs = require('fs');
 const path = require('path');
@@ -59,16 +59,35 @@ try {
 
   const issues = [];
 
+  const isClaude = filePath.includes('/.claude/');
+  const isGemini = filePath.includes('/.gemini/');
+  const isProjectLevel = !filePath.startsWith(os.homedir() + '/.claude/') && !filePath.startsWith(os.homedir() + '/.gemini/');
+
   // Check 1: cleanupPeriodDays should not be 0 (Claude Code v2.1.110 rejects)
   if (parsed.cleanupPeriodDays === 0) {
     issues.push('cleanupPeriodDays is 0 — Claude Code v2.1.110+ rejects this. Set to a positive value (recommended: 365) or omit.');
   }
 
+  // Check 1b: Schema drift — catch managed-only keys / deprecated / unknown BEFORE write
+  // (Claude-side only — Gemini has its own schema)
+  if (isClaude || filePath.endsWith('/.claude/settings.json')) {
+    try {
+      const { findDrift } = require('./lib/settings-schema.js');
+      const drift = findDrift(parsed);
+      if (drift.managedOnly.length > 0) {
+        issues.push(`Managed-only keys in user settings (triggers Claude Code schema error): ${drift.managedOnly.join(', ')}. These only work in managed-settings files.`);
+      }
+      if (drift.deprecated.length > 0) {
+        issues.push(`Deprecated keys: ${drift.deprecated.join(', ')}. Remove or replace per current docs.`);
+      }
+      if (drift.unknown.length > 5) {
+        issues.push(`${drift.unknown.length} unknown keys (may be typos or future-version): ${drift.unknown.slice(0, 5).join(', ')}${drift.unknown.length > 5 ? '...' : ''}`);
+      }
+    } catch {}
+  }
+
   // Check 2: hook command paths
   const hooks = parsed.hooks || {};
-  const isClaude = filePath.includes('/.claude/');
-  const isGemini = filePath.includes('/.gemini/');
-  const isProjectLevel = !filePath.startsWith(os.homedir() + '/.claude/') && !filePath.startsWith(os.homedir() + '/.gemini/');
 
   for (const [event, groups] of Object.entries(hooks)) {
     if (!Array.isArray(groups)) continue;
