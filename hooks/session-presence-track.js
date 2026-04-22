@@ -17,11 +17,14 @@ try {
 
   if (!sessionId) { process.stdout.write('{"continue":true}'); process.exit(0); }
 
+  const host = require('os').hostname();
+
   if ((toolName === 'Write' || toolName === 'Edit' || toolName === 'MultiEdit') && toolInput.file_path) {
     p.appendToAll(cwd, {
       ts: new Date().toISOString(),
       event: 'file_touch',
       sid: sessionId,
+      host,
       tool: toolName,
       file: toolInput.file_path,
     });
@@ -33,6 +36,7 @@ try {
       ts: new Date().toISOString(),
       event: 'heartbeat',
       sid: sessionId,
+      host,
       tool_count: count,
     });
   }

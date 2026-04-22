@@ -18,6 +18,7 @@ try {
     ts: new Date().toISOString(),
     event: 'end',
     sid: sessionId,
+    host: require('os').hostname(),
     reason: input.reason || 'stop',
   });
 

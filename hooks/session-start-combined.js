@@ -345,15 +345,39 @@ try {
     try { lastVersion = fs.readFileSync(versionFile, 'utf8').trim(); } catch {}
 
     if (lastVersion && lastVersion !== currentVersion) {
-      // Version changed — log event and prompt research
+      // Version changed — auto-fetch release notes, write dated memory, surface breaking-hook signals
+      let signals = [];
+      let memPath = null;
+      try {
+        const { diffReleaseNotes } = require('./lib/release-notes-cache.js');
+        const diff = diffReleaseNotes(lastVersion, currentVersion);
+        if (diff) {
+          signals = diff.breakingHookSignals || [];
+          const today = new Date().toISOString().slice(0, 10);
+          memPath = path.join(home, '.ai-context', 'memory',
+            `project_${today}_claude-code-v${currentVersion}.md`);
+          const description = signals.length > 0
+            ? `Upgrade notes ${lastVersion}→${currentVersion} — ${signals.length} potential breaking-hook signal(s) detected`
+            : `Upgrade notes ${lastVersion}→${currentVersion} — non-breaking for hooks`;
+          const frontmatter = `---\nname: Claude Code ${lastVersion}→${currentVersion} upgrade notes\ndescription: ${description}\ntype: project\n---\n\n`;
+          const signalsBlock = signals.length > 0
+            ? signals.map(s => `- ${s}`).join('\n')
+            : '_none detected_';
+          const bodyBlock = `# Upgrade ${lastVersion} → ${currentVersion}\n\nPublished: ${diff.publishedAt || 'unknown'}\n\n## Breaking hook signals (auto-detected)\n\n${signalsBlock}\n\n## Full release notes\n\n${diff.body || '_notes unavailable_'}\n`;
+          try { fs.writeFileSync(memPath, frontmatter + bodyBlock); } catch {}
+        }
+      } catch {}
       try {
         require('./lib/observability-logger.js').logEvent(projectDir, {
           type: 'version_change',
           source: 'session-start-combined',
-          meta: { from: lastVersion, to: currentVersion }
+          meta: { from: lastVersion, to: currentVersion, signals: signals.length }
         });
       } catch {}
-      messages.push(`[version-change] Claude Code updated: ${lastVersion} -> ${currentVersion}. Run a background research agent to investigate changelog differences between these versions. Focus on: breaking changes to hooks/skills/settings, new hook events, new tools, memory subsystem changes. Write findings to a dated memory file.`);
+      const signalNote = signals.length > 0
+        ? ` — ${signals.length} potential breaking-hook signal(s), review ${memPath}`
+        : (memPath ? ` — notes saved to ${memPath}` : '');
+      messages.push(`[version-change] Claude Code ${lastVersion} → ${currentVersion}${signalNote}`);
     }
 
     // Always update version file (creates on first run)
@@ -387,6 +411,47 @@ try {
   }
 } catch (e) {
   errors.push({ section: 'research-session-counter', error: e.message, stack: e.stack?.split('\n')[1]?.trim() });
+}
+
+// ── 11. Settings schema drift detection ──
+try {
+  const settingsPath = path.join(claudeDir, 'settings.json');
+  if (fs.existsSync(settingsPath)) {
+    const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+    const { findDrift } = require('./lib/settings-schema.js');
+    const drift = findDrift(settings);
+    const issues = [];
+    if (drift.managedOnly.length > 0) {
+      issues.push(`managed-only keys in user settings (will trigger schema error): ${drift.managedOnly.join(', ')}`);
+    }
+    if (drift.deprecated.length > 0) {
+      issues.push(`deprecated: ${drift.deprecated.join(', ')}`);
+    }
+    if (drift.unknown.length > 3) {
+      issues.push(`${drift.unknown.length} unknown keys (review for current version): ${drift.unknown.slice(0, 5).join(', ')}${drift.unknown.length > 5 ? '...' : ''}`);
+    }
+    if (issues.length > 0) {
+      messages.push(`[settings-drift] ${issues.join(' | ')}`);
+    }
+  }
+} catch (e) {
+  errors.push({ section: 'settings-drift', error: e.message, stack: e.stack?.split('\n')[1]?.trim() });
+}
+
+// ── 10. Symlink integrity (merged from validate-symlinks.js) ──
+try {
+  const audit = require('./lib/symlink-audit.js');
+  const report = audit.auditAll();
+  const broken = report.broken_live || [];
+  const loops = report.loops || [];
+  if (broken.length > 0 || loops.length > 0) {
+    const summary = [];
+    if (broken.length > 0) summary.push(`${broken.length} broken live symlink(s): ${broken.slice(0, 3).map(b => b.path).join(', ')}${broken.length > 3 ? '...' : ''}`);
+    if (loops.length > 0) summary.push(`${loops.length} loop(s)`);
+    messages.push(`[symlink-integrity] ${summary.join('; ')}. Run 'node ~/.claude/hooks/lib/symlink-audit.js' for full list.`);
+  }
+} catch (e) {
+  errors.push({ section: 'symlink-integrity', error: e.message, stack: e.stack?.split('\n')[1]?.trim() });
 }
 
 // ── Error aggregation (SF-001: surface ANY error, not just 3+) ──

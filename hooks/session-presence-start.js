@@ -19,6 +19,7 @@ try {
     event: 'start',
     sid: sessionId,
     agent: __dirname.includes('/.gemini/') ? 'gemini' : 'claude',
+    host: require('os').hostname(),
     pid: process.pid,
     tmux: process.env.TMUX_PANE || '',
     cwd,
@@ -26,9 +27,11 @@ try {
 
   p.appendToAll(cwd, record);
 
-  // Peer awareness (5-min window)
+  // Peer awareness (5-min window) — merged across all per-host presence files.
   const fiveMinAgo = Date.now() - 5 * 60 * 1000;
-  const globalPeers = p.readActiveSessions(p.globalPresencePath(), fiveMinAgo)
+  const globalPeers = (p.readActiveSessionsAllHosts
+    ? p.readActiveSessionsAllHosts(fiveMinAgo)
+    : p.readActiveSessions(p.globalPresencePath(), fiveMinAgo))
     .filter(s => s.sid !== sessionId);
   const projectPath = p.projectPresencePath(cwd);
   const projectPeers = projectPath

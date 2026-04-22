@@ -21,7 +21,14 @@ function findCanonicalDir(cwd) {
 }
 
 function globalPresencePath() {
-  return path.join(os.homedir(), '.claude', 'cache', 'active-sessions-global.jsonl');
+  // Per-host shard — avoids Syncthing merge-conflicts across machines.
+  const { perHostPresencePath } = require('./hostname-presence.js');
+  return perHostPresencePath();
+}
+
+function readActiveSessionsAllHosts(sinceMs) {
+  const { readAllHostSessions } = require('./hostname-presence.js');
+  return readAllHostSessions(sinceMs, readActiveSessions);
 }
 
 function projectPresencePath(cwd) {
@@ -107,5 +114,5 @@ module.exports = {
   RETAIN_LIVE_LINES, ROTATE_THRESHOLD, HEARTBEAT_INTERVAL,
   findCanonicalDir, globalPresencePath, projectPresencePath,
   appendJsonl, appendToAll, bumpCounter, clearCounter,
-  readActiveSessions,
+  readActiveSessions, readActiveSessionsAllHosts,
 };
