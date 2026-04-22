@@ -393,6 +393,17 @@ const TOOLS = {
       required: ['title', 'symptom', 'severity'],
     },
     handler: ({ cwd, title, symptom, fix_approach, severity, workaround }) => {
+      // Enforce schema-required fields explicitly — MCP arg validation varies by client.
+      const missing = [];
+      if (!title || typeof title !== 'string') missing.push('title');
+      if (!symptom || typeof symptom !== 'string') missing.push('symptom');
+      if (!severity || !['P0', 'P1', 'P2', 'P3'].includes(severity)) missing.push('severity (P0|P1|P2|P3)');
+      if (missing.length > 0) {
+        return {
+          content: [{ type: 'text', text: `add_debt: missing required field(s): ${missing.join(', ')}` }],
+          isError: true,
+        };
+      }
       let debtPath = findRepoDebt(cwd);
       if (!debtPath) {
         // Create at canonical dir or cwd
