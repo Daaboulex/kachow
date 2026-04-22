@@ -12,10 +12,20 @@
 
 $ErrorActionPreference = 'Stop'
 
+# Resolve user home via env fallback chain — PowerShell's $HOME automatic
+# variable is cached at process start and ignores $env:HOME overrides used
+# by CI smoke tests. Always check env vars first.
+function Get-UserHome {
+  if ($env:HOME)        { return $env:HOME }
+  if ($env:USERPROFILE) { return $env:USERPROFILE }
+  return $HOME
+}
+$USER_HOME = Get-UserHome
+
 $AI_CONTEXT =
   if     ($env:AI_CONTEXT) { $env:AI_CONTEXT }
   elseif ($PSScriptRoot)   { Split-Path $PSScriptRoot -Parent }
-  else                     { Join-Path $HOME '.ai-context' }
+  else                     { Join-Path $USER_HOME '.ai-context' }
 $CANONICAL = Join-Path $AI_CONTEXT 'AGENTS.md'
 
 if (-not (Test-Path $CANONICAL)) {
@@ -24,14 +34,14 @@ if (-not (Test-Path $CANONICAL)) {
 }
 
 $targets = [ordered]@{
-  claude   = Join-Path $HOME '.claude/CLAUDE.md'
-  gemini   = Join-Path $HOME '.gemini/GEMINI.md'
-  codex    = Join-Path $HOME '.codex/AGENTS.md'
-  opencode = Join-Path $HOME '.config/opencode/AGENTS.md'
-  aider    = Join-Path $HOME '.config/aider/AGENTS.md'
+  claude   = Join-Path $USER_HOME '.claude/CLAUDE.md'
+  gemini   = Join-Path $USER_HOME '.gemini/GEMINI.md'
+  codex    = Join-Path $USER_HOME '.codex/AGENTS.md'
+  opencode = Join-Path $USER_HOME '.config/opencode/AGENTS.md'
+  aider    = Join-Path $USER_HOME '.config/aider/AGENTS.md'
 }
 $optional = [ordered]@{
-  'windsurf-global' = Join-Path $HOME '.codeium/windsurf/memories/global_rules.md'
+  'windsurf-global' = Join-Path $USER_HOME '.codeium/windsurf/memories/global_rules.md'
 }
 
 # Detect whether symlinks can be created without admin (Developer Mode enabled).

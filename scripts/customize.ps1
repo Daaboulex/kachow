@@ -8,7 +8,18 @@
 #>
 
 $ErrorActionPreference = 'Stop'
-$AI = if ($env:AI) { $env:AI } else { Join-Path $HOME '.ai-context' }
+
+# Resolve user home via env fallback chain — PowerShell's $HOME automatic
+# variable is cached at process start and ignores $env:HOME overrides used
+# by CI smoke tests. Always check env vars first.
+function Get-UserHome {
+  if ($env:HOME)        { return $env:HOME }
+  if ($env:USERPROFILE) { return $env:USERPROFILE }
+  return $HOME
+}
+$USER_HOME = Get-UserHome
+
+$AI = if ($env:AI) { $env:AI } else { Join-Path $USER_HOME '.ai-context' }
 if (-not (Test-Path $AI)) { Write-Error "$AI not found — clone first"; exit 1 }
 Set-Location $AI
 
@@ -91,11 +102,11 @@ if ((Test-Path AGENTS.md) -and (Yn "write starter identity block into USER SECTI
 # 4. Which AI tools?
 Say "Which AI tools should I wire?"
 $tools = @(
-  @{ key='claude';   label='Claude Code (~/.claude)';            path=(Join-Path $HOME '.claude') },
-  @{ key='gemini';   label='Gemini CLI (~/.gemini)';             path=(Join-Path $HOME '.gemini') },
-  @{ key='codex';    label='Codex CLI (~/.codex)';               path=(Join-Path $HOME '.codex') },
-  @{ key='opencode'; label='OpenCode (~/.config/opencode)';      path=(Join-Path $HOME '.config/opencode') },
-  @{ key='aider';    label='Aider (~/.config/aider)';            path=(Join-Path $HOME '.config/aider') }
+  @{ key='claude';   label='Claude Code (~/.claude)';            path=(Join-Path $USER_HOME '.claude') },
+  @{ key='gemini';   label='Gemini CLI (~/.gemini)';             path=(Join-Path $USER_HOME '.gemini') },
+  @{ key='codex';    label='Codex CLI (~/.codex)';               path=(Join-Path $USER_HOME '.codex') },
+  @{ key='opencode'; label='OpenCode (~/.config/opencode)';      path=(Join-Path $USER_HOME '.config/opencode') },
+  @{ key='aider';    label='Aider (~/.config/aider)';            path=(Join-Path $USER_HOME '.config/aider') }
 )
 $selected = @()
 foreach ($t in $tools) {
@@ -117,7 +128,7 @@ Say "Apply settings templates"
 foreach ($tool in $selected) {
   switch ($tool) {
     'claude' {
-      $dst = Join-Path $HOME '.claude/settings.json'
+      $dst = Join-Path $USER_HOME '.claude/settings.json'
       if ((Test-Path settings.template.json) -and -not (Test-Path $dst)) {
         New-Item -ItemType Directory -Force (Split-Path $dst -Parent) | Out-Null
         Copy-Item settings.template.json $dst
@@ -127,7 +138,7 @@ foreach ($tool in $selected) {
       }
     }
     'gemini' {
-      $dst = Join-Path $HOME '.gemini/settings.json'
+      $dst = Join-Path $USER_HOME '.gemini/settings.json'
       if ((Test-Path settings.gemini.template.json) -and -not (Test-Path $dst)) {
         New-Item -ItemType Directory -Force (Split-Path $dst -Parent) | Out-Null
         Copy-Item settings.gemini.template.json $dst

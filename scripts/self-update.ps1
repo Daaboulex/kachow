@@ -21,7 +21,18 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$AI = if ($env:AI_CONTEXT) { $env:AI_CONTEXT } else { Join-Path $HOME '.ai-context' }
+
+# Resolve user home via env fallback chain — PowerShell's $HOME automatic
+# variable is cached at process start and ignores $env:HOME overrides used
+# by CI smoke tests. Always check env vars first.
+function Get-UserHome {
+  if ($env:HOME)        { return $env:HOME }
+  if ($env:USERPROFILE) { return $env:USERPROFILE }
+  return $HOME
+}
+$USER_HOME = Get-UserHome
+
+$AI = if ($env:AI_CONTEXT) { $env:AI_CONTEXT } else { Join-Path $USER_HOME '.ai-context' }
 Set-Location $AI
 if (-not (Test-Path .git)) { Write-Error "$AI is not a git repo"; exit 1 }
 

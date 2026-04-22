@@ -8,7 +8,7 @@ $ErrorActionPreference = 'Continue'
 $AI =
   if     ($env:AI_CONTEXT) { $env:AI_CONTEXT }
   elseif ($PSScriptRoot)   { Split-Path $PSScriptRoot -Parent }
-  else                     { Join-Path $HOME '.ai-context' }
+  else                     { Join-Path $USER_HOME '.ai-context' }
 $fails = 0
 
 function Pass { param($m); Write-Host ('  ✓ ' + $m) -ForegroundColor Green }
@@ -38,7 +38,7 @@ foreach ($kv in @{
   '.config/opencode/AGENTS.md'   = 'AGENTS.md'
   '.config/aider/AGENTS.md'      = 'AGENTS.md'
 }.GetEnumerator()) {
-  $p = Join-Path $HOME $kv.Key
+  $p = Join-Path $USER_HOME $kv.Key
   if (Test-Path $p) {
     $i = Get-Item $p -Force
     if ($i.LinkType -eq 'SymbolicLink' -and $i.Target -eq (Join-Path $AI 'AGENTS.md')) {
@@ -54,7 +54,7 @@ foreach ($kv in @{
 Write-Host ""
 Write-Host "── Settings JSON validity ──"
 foreach ($f in @('.claude/settings.json', '.gemini/settings.json', '.claude.json')) {
-  $p = Join-Path $HOME $f
+  $p = Join-Path $USER_HOME $f
   if (Test-Path $p) {
     try {
       Get-Content $p -Raw | ConvertFrom-Json | Out-Null

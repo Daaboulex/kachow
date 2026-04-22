@@ -10,10 +10,21 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
+# Resolve user home via env fallback chain — PowerShell's $HOME automatic
+# variable is cached at process start and ignores $env:HOME overrides used
+# by CI smoke tests. Always check env vars first.
+function Get-UserHome {
+  if ($env:HOME)        { return $env:HOME }
+  if ($env:USERPROFILE) { return $env:USERPROFILE }
+  return $HOME
+}
+$USER_HOME = Get-UserHome
+
 $AI =
   if     ($env:AI_CONTEXT) { $env:AI_CONTEXT }
   elseif ($PSScriptRoot)   { Split-Path $PSScriptRoot -Parent }
-  else                     { Join-Path $HOME '.ai-context' }
+  else                     { Join-Path $USER_HOME '.ai-context' }
 
 if (-not (Test-Path (Join-Path $AI '.git'))) {
   Write-Host "initializing git repo..."

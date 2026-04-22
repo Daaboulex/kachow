@@ -11,9 +11,9 @@ $ErrorActionPreference = 'Continue'
 # Default roots: the three AI-context dirs shipped by this framework.
 # Add extra roots via env var: $env:RESOLVE_EXTRA_ROOTS="path1;path2"
 $roots = @(
-  (Join-Path $HOME '.ai-context'),
-  (Join-Path $HOME '.claude'),
-  (Join-Path $HOME '.gemini')
+  (Join-Path $USER_HOME '.ai-context'),
+  (Join-Path $USER_HOME '.claude'),
+  (Join-Path $USER_HOME '.gemini')
 )
 if ($env:RESOLVE_EXTRA_ROOTS) {
   $roots += ($env:RESOLVE_EXTRA_ROOTS -split ';' | Where-Object { $_ })

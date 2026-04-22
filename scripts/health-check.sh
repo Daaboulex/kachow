@@ -96,12 +96,30 @@ if command -v node >/dev/null 2>&1; then
   # macOS ships without GNU `timeout`. Rely on EOF — server exits when stdin
   # closes after the three requests. Use the server's supported protocol
   # version (2025-06-18) rather than the older 2025-11-05 string.
+  # Robust probe: scan ALL response lines for one with result.tools.
+  # Handles server stderr-warmup lines, protocol-version mismatches, and CI
+  # line-ordering differences.
   RESPONSE=$(printf '%s\n%s\n%s\n' \
     '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"healthcheck","version":"1"}}}' \
     '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
     '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
-    | node "$AI_CONTEXT/mcp/personal-context/server.js" 2>/dev/null | tail -n +2 | head -1)
-  TOOLS_COUNT=$(echo "$RESPONSE" | python3 -c "import json,sys; d=json.loads(sys.stdin.read() or '{}'); print(len(d.get('result',{}).get('tools',[])))" 2>/dev/null || echo 0)
+    | node "$AI_CONTEXT/mcp/personal-context/server.js" 2>/dev/null)
+  TOOLS_COUNT=$(printf '%s\n' "$RESPONSE" | python3 -c "
+import json, sys
+n = 0
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    try:
+        d = json.loads(line)
+    except Exception:
+        continue
+    tools = d.get('result', {}).get('tools')
+    if tools is not None:
+        n = len(tools)
+        break
+print(n)
+" 2>/dev/null || echo 0)
   if [ "$TOOLS_COUNT" -gt 0 ]; then
     green "  ✓ MCP server responds ($TOOLS_COUNT tools)"
   else
