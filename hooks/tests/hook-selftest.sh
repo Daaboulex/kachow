@@ -3,7 +3,9 @@
 # Invokes each SessionStart hook with a minimal fake JSON stdin, asserts exit 0 and stdout JSON shape.
 set -eu
 
-HOOKS_DIR="${HOME}/.claude/hooks"
+# Auto-detect platform from script location — supports ~/.claude/hooks, ~/.gemini/hooks, etc.
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+HOOKS_DIR="$(dirname "$SCRIPT_DIR")"
 FAKE_INPUT='{"cwd":"/tmp","session_id":"selftest-001","hook_event_name":"SessionStart"}'
 
 pass=0

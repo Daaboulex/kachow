@@ -9,6 +9,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
+const TIMER_START = process.hrtime.bigint();
 const home = os.homedir();
 const claudeDir = path.join(home, '.claude');
 const geminiDir = path.join(home, '.gemini');
@@ -464,6 +465,20 @@ if (errors.length > 0) {
   // so silent failures become visible. Users can mute via settings if noisy.
   messages.push(`[hook-error-aggregation] ${errors.length} sub-function(s) failed in session-start-combined: ${errors.map(e => e.section).join(', ')}`);
 }
+
+// ── Hook timing telemetry ──
+try {
+  const total_ms = Number(process.hrtime.bigint() - TIMER_START) / 1e6;
+  require('./lib/observability-logger.js').logEvent(projectDir, {
+    type: 'hook_timing',
+    source: 'session-start-combined',
+    meta: {
+      total_ms: +total_ms.toFixed(3),
+      error_count: errors.length,
+      message_count: messages.length,
+    },
+  });
+} catch {}
 
 // ── Output ──
 if (messages.length > 0) {
