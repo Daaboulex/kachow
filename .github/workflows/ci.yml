@@ -163,3 +163,34 @@ jobs:
             exit 1
           fi
           echo "scrub-gate OK"
+
+      - name: Lib unit tests
+        shell: bash
+        if: runner.os != 'Windows'
+        run: |
+          if [ -f hooks/tests/lib-unit-tests.js ]; then
+            node hooks/tests/lib-unit-tests.js
+          else
+            echo "lib-unit-tests.js not present — skipping"
+          fi
+
+      - name: Lib unit tests (Windows)
+        shell: pwsh
+        if: runner.os == 'Windows'
+        run: |
+          if (Test-Path hooks/tests/lib-unit-tests.js) {
+            node hooks/tests/lib-unit-tests.js
+            if ($LASTEXITCODE -ne 0) { exit 1 }
+          } else {
+            Write-Host "lib-unit-tests.js not present — skipping"
+          }
+
+      - name: Regression fixtures
+        shell: bash
+        if: runner.os != 'Windows'
+        run: |
+          if [ -x hooks/tests/run-regressions.sh ]; then
+            bash hooks/tests/run-regressions.sh
+          else
+            echo "run-regressions.sh not present — skipping"
+          fi
