@@ -1,6 +1,6 @@
 # Hook Interaction Map
-Generated 2026-04-22T09:13:45.956Z
-Source: `/home/user/.kachow-release/hooks`
+Generated 2026-04-22T09:26:08.603Z
+Source: `~/.kachow-release/hooks`
 Total: 36 hooks
 
 ## Registrations
@@ -285,10 +285,11 @@ Total: 36 hooks
 - `SessionStart` matcher=`*` (async) timeout=5
 **Reads:** <dyn: claudeMd>, <dyn: geminiMd>
 
-### validate-settings-on-write (126 LOC)
+### validate-settings-on-write (145 LOC)
 **Registered:**
 - `PreToolUse` matcher=`Write` timeout=3
 **Reads:** <dyn: 0>
+**Lib deps:** ./lib/settings-schema.js
 
 ### validate-symlinks (90 LOC)
 **Registered:**

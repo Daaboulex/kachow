@@ -142,11 +142,21 @@ function buildMap(hooksDir, settingsPath) {
   };
 }
 
-function renderMarkdown(map) {
+function sanitizePath(p) {
+  // Replace absolute user paths with a placeholder so generated docs are safe
+  // to commit to public repos.
+  return String(p || '')
+    .replace(/\/home\/[^/]+/, '~')
+    .replace(/\/Users\/[^/]+/, '~')
+    .replace(/[A-Z]:\\Users\\[^\\]+/i, '~');
+}
+
+function renderMarkdown(map, opts = {}) {
+  const sanitize = opts.sanitize !== false; // default on
   const out = [];
   out.push(`# Hook Interaction Map`);
   out.push(`Generated ${map.generated}`);
-  out.push(`Source: \`${map.hooksDir}\``);
+  out.push(`Source: \`${sanitize ? sanitizePath(map.hooksDir) : map.hooksDir}\``);
   out.push(`Total: ${map.count} hooks\n`);
 
   // Summary: event → hooks

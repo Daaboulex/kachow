@@ -13,7 +13,7 @@
 //
 // Disable: SKIP_SETTINGS_VALIDATOR=1
 //
-// Ref: 2026-04-16 hook-issue prevention after relative-path bug in fahlke
+// Ref: 2026-04-16 hook-issue prevention after relative-path bug observed in practice
 
 const fs = require('fs');
 const path = require('path');
