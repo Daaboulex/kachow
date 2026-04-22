@@ -60,6 +60,16 @@ echo
 echo "── Installing AGENTS.md adapters ──"
 bash "$AI_CONTEXT/scripts/install-adapters.sh"
 
+# ── 3b. Hooks ──
+echo
+echo "── Installing hooks ──"
+bash "$AI_CONTEXT/scripts/install-hooks.sh"
+
+# ── 3c. Slash commands ──
+echo
+echo "── Installing slash commands ──"
+bash "$AI_CONTEXT/scripts/install-commands.sh"
+
 # ── 4. MCP registration ──
 echo
 echo "── Registering MCP server ──"

@@ -12,8 +12,12 @@ if [ ! -f "$SERVER" ]; then
 fi
 
 # ─── Claude Code ─── uses ~/.claude.json → mcpServers
-if [ -f "$HOME/.claude.json" ]; then
-  node - <<NODE
+# Create minimal ~/.claude.json if missing (health-check expects it to parse).
+if [ ! -f "$HOME/.claude.json" ]; then
+  echo '{}' > "$HOME/.claude.json"
+  echo "  + created minimal ~/.claude.json"
+fi
+node - <<NODE
 const fs = require('fs');
 const p = '$HOME/.claude.json';
 const d = JSON.parse(fs.readFileSync(p, 'utf8'));
@@ -26,13 +30,15 @@ d.mcpServers['personal-context'] = {
 fs.writeFileSync(p, JSON.stringify(d, null, 2));
 console.log('✓ Claude Code');
 NODE
-else
-  echo "- Claude Code: ~/.claude.json missing — run 'claude' once to create"
-fi
 
 # ─── Gemini CLI ─── uses ~/.gemini/settings.json → mcpServers
-if [ -f "$HOME/.gemini/settings.json" ]; then
-  node - <<NODE
+# Create minimal settings.json if missing.
+mkdir -p "$HOME/.gemini"
+if [ ! -f "$HOME/.gemini/settings.json" ]; then
+  echo '{}' > "$HOME/.gemini/settings.json"
+  echo "  + created minimal ~/.gemini/settings.json"
+fi
+node - <<NODE
 const fs = require('fs');
 const p = '$HOME/.gemini/settings.json';
 const d = JSON.parse(fs.readFileSync(p, 'utf8'));
@@ -44,7 +50,6 @@ d.mcpServers['personal-context'] = {
 fs.writeFileSync(p, JSON.stringify(d, null, 2));
 console.log('✓ Gemini CLI');
 NODE
-fi
 
 # ─── Codex CLI ─── uses ~/.codex/config.toml (TOML)
 mkdir -p "$HOME/.codex"
