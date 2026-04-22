@@ -1,0 +1,362 @@
+{
+  "_": "Template settings — run scripts/customize.sh to populate env/allow/hooks for your stack. Add optional add-ons from settings.embedded.json.example / settings.nix.json.example / etc.",
+  "security": {
+    "auth": {
+      "selectedType": "oauth-personal"
+    }
+  },
+  "ide": {
+    "hasSeenNudge": true,
+    "enabled": true
+  },
+  "general": {
+    "sessionRetention": {
+      "warningAcknowledged": true,
+      "enabled": true,
+      "maxAge": "30d"
+    },
+    "preferredEditor": "vscodium"
+  },
+  "experimental": {
+    "enableAgents": true
+  },
+  "telemetry": {
+    "enabled": false,
+    "logPrompts": false
+  },
+  "privacy": {
+    "usageStatisticsEnabled": false
+  },
+  "mcpServers": {},
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "name": "auto-pull-global",
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/auto-pull-global.js\"",
+            "timeout": 20000
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "name": "session-start-combined",
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/session-start-combined.js\"",
+            "timeout": 10000
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "name": "skill-upstream-checker",
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/skill-upstream-checker.js\"",
+            "timeout": 10000
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "name": "plugin-update-checker",
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/plugin-update-checker.js\"",
+            "timeout": 10000
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "name": "session-presence-start",
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/session-presence-start.js\"",
+            "timeout": 3000
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "name": "validate-instructions-sync",
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/validate-instructions-sync.js\"",
+            "timeout": 5000
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "name": "validate-symlinks",
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/validate-symlinks.js\"",
+            "timeout": 3000
+          }
+        ]
+      }
+    ],
+    "BeforeTool": [
+      {
+        "hooks": [
+          {
+            "name": "block-subagent-writes",
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/block-subagent-writes.js\"",
+            "timeout": 3000
+          },
+          {
+            "name": "autosave-before-destructive",
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/autosave-before-destructive.js\"",
+            "timeout": 8000
+          }
+        ],
+        "matcher": "run_shell_command"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/halt-condition-validator.js\"",
+            "timeout": 3000
+          }
+        ],
+        "matcher": "activate_skill"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/doc-shard-resolver.js\"",
+            "timeout": 3000
+          }
+        ],
+        "matcher": "read_file"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/validate-settings-on-write.js\"",
+            "timeout": 3000
+          }
+        ],
+        "matcher": "write_file|replace"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/verifiedby-gate.js\"",
+            "timeout": 3000
+          }
+        ],
+        "matcher": "write_todos"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/prefer-editing-nudge.js\"",
+            "timeout": 3000
+          }
+        ],
+        "matcher": "write_file"
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "name": "session-presence-end",
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/session-presence-end.js\"",
+            "timeout": 3000
+          },
+          {
+            "name": "todowrite-persist",
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/todowrite-persist.js\"",
+            "timeout": 5000
+          },
+          {
+            "name": "auto-consolidate-memory",
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/dream-auto.js\"",
+            "timeout": 5000
+          },
+          {
+            "name": "auto-push-global",
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/auto-push-global.js\"",
+            "timeout": 20000,
+            "async": true
+          },
+          {
+            "name": "track-skill-usage",
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/track-skill-usage.js\"",
+            "timeout": 5000,
+            "async": true
+          },
+          {
+            "name": "stop-sleep-consolidator",
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/stop-sleep-consolidator.js\"",
+            "timeout": 5000,
+            "async": true
+          },
+          {
+            "name": "meta-system-stop",
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/meta-system-stop.js\"",
+            "timeout": 15000
+          }
+        ],
+        "matcher": "exit"
+      },
+      {
+        "hooks": [
+          {
+            "name": "memory-rotate",
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/memory-rotate.js\"",
+            "timeout": 10000,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "PreCompress": [
+      {
+        "hooks": [
+          {
+            "name": "reflect-precompact",
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/reflect-precompact.js\"",
+            "timeout": 5000
+          }
+        ]
+      }
+    ],
+    "AfterTool": [
+      {
+        "hooks": [
+          {
+            "name": "session-presence-track",
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/session-presence-track.js\"",
+            "timeout": 3000
+          }
+        ],
+        "matcher": "write_file|replace|run_shell_command|read_file|search_file_content|glob"
+      },
+      {
+        "hooks": [
+          {
+            "name": "todowrite-mirror",
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/todowrite-mirror.js\"",
+            "timeout": 3000
+          }
+        ],
+        "matcher": "write_todos"
+      },
+      {
+        "hooks": [
+          {
+            "name": "context-pressure-enforce",
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/context-pressure-enforce.js\"",
+            "timeout": 3000
+          }
+        ],
+        "matcher": "write_file|replace|run_shell_command"
+      },
+      {
+        "hooks": [
+          {
+            "name": "dead-hook-detector",
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/dead-hook-detector.js\"",
+            "timeout": 3000
+          }
+        ],
+        "matcher": "write_file|replace"
+      },
+      {
+        "hooks": [
+          {
+            "name": "skill-invocation-logger",
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/skill-invocation-logger.js\"",
+            "timeout": 3000
+          }
+        ],
+        "matcher": "activate_skill"
+      },
+      {
+        "hooks": [
+          {
+            "name": "task-verification-gate",
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/task-verification-gate.js\"",
+            "timeout": 3000
+          }
+        ],
+        "matcher": "complete_task|write_todos"
+      },
+      {
+        "hooks": [
+          {
+            "name": "hook-doc-drift-detector",
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/hook-doc-drift-detector.js\"",
+            "timeout": 5000
+          }
+        ],
+        "matcher": "write_file|replace"
+      },
+      {
+        "hooks": [
+          {
+            "name": "memory-retrieval-logger",
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/memory-retrieval-logger.js\"",
+            "timeout": 3000
+          }
+        ],
+        "matcher": "read_file"
+      },
+      {
+        "hooks": [
+          {
+            "name": "research-lint",
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/research-lint.js\"",
+            "timeout": 3000
+          }
+        ],
+        "matcher": "write_file|replace"
+      }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "name": "notify-with-fallback",
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/notify-with-fallback.js\"",
+            "timeout": 5000
+          }
+        ]
+      }
+    ]
+  }
+}

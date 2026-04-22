@@ -1,0 +1,196 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Syntax check all hooks
+        shell: bash
+        run: |
+          set -e
+          for f in hooks/*.js hooks/lib/*.js; do
+            [ -f "$f" ] && node -c "$f"
+          done
+
+      - name: Hook selftest
+        shell: bash
+        # Some shipped hooks (research-lint, etc.) rely on POSIX utilities that
+        # Git-Bash on Windows handles differently — surface real issues via the
+        # Linux + macOS matrix, which is where maintainers run these hooks.
+        if: runner.os != 'Windows'
+        run: |
+          mkdir -p "$HOME/.claude/hooks/lib"
+          cp -r hooks/* "$HOME/.claude/hooks/"
+          node hooks/lib/hook-selftest.js
+
+      - name: Bash script syntax (Linux/macOS only)
+        if: runner.os != 'Windows'
+        run: |
+          for f in scripts/*.sh; do
+            bash -n "$f"
+          done
+
+      - name: PowerShell script syntax (Windows + macOS + Linux via pwsh)
+        shell: pwsh
+        run: |
+          Get-ChildItem scripts/*.ps1 | ForEach-Object {
+            try {
+              [scriptblock]::Create((Get-Content -Raw $_.FullName)) | Out-Null
+              Write-Host "OK: $($_.Name)"
+            } catch {
+              Write-Error "PARSE FAIL: $($_.Name)  $($_.Exception.Message)"
+              exit 1
+            }
+          }
+
+      - name: MCP server smoke test
+        shell: bash
+        if: runner.os != 'Windows'
+        run: |
+          # Pipe initialize + tools/list, expect >=10 tools. macOS doesn't have
+          # GNU `timeout` by default, so we rely on EOF to terminate the server
+          # (printf closes stdin after the two requests; server exits cleanly).
+          RESPONSE=$(
+            printf '%s\n%s\n' \
+              '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ci","version":"0"}}}' \
+              '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
+            | node mcp/personal-context/server.js 2>/dev/null \
+            | tail -1
+          )
+          echo "$RESPONSE" | python3 -c "
+          import json, sys
+          d = json.loads(sys.stdin.read())
+          n = len(d.get('result', {}).get('tools', []))
+          assert n >= 10, f'expected >=10 tools, got {n}'
+          print(f'MCP smoke OK: {n} tools')
+          "
+
+      - name: Bootstrap smoke (Linux + macOS)
+        shell: bash
+        if: runner.os != 'Windows'
+        run: |
+          # Simulate a fresh-machine install in an isolated HOME. Health-check
+          # parses BOTH ~/.claude/settings.json AND ~/.claude.json, so seed both.
+          export HOME=$(mktemp -d)
+          mkdir -p "$HOME/.claude" "$HOME/.gemini"
+          echo '{}' > "$HOME/.claude/settings.json"
+          echo '{}' > "$HOME/.gemini/settings.json"
+          echo '{}' > "$HOME/.claude.json"
+          cp -r "$GITHUB_WORKSPACE" "$HOME/.ai-context"
+          bash "$HOME/.ai-context/scripts/bootstrap.sh"
+          echo "bootstrap smoke OK"
+
+      - name: Bootstrap smoke (Windows)
+        shell: pwsh
+        if: runner.os == 'Windows'
+        run: |
+          $fakeHome = Join-Path $env:RUNNER_TEMP ("ai-ctx-smoke-" + [guid]::NewGuid())
+          New-Item -ItemType Directory -Path $fakeHome | Out-Null
+          New-Item -ItemType Directory -Path (Join-Path $fakeHome '.claude') | Out-Null
+          New-Item -ItemType Directory -Path (Join-Path $fakeHome '.gemini') | Out-Null
+          Set-Content (Join-Path $fakeHome '.claude/settings.json') '{}'
+          Set-Content (Join-Path $fakeHome '.gemini/settings.json') '{}'
+          Set-Content (Join-Path $fakeHome '.claude.json') '{}'
+          Copy-Item $env:GITHUB_WORKSPACE -Destination (Join-Path $fakeHome '.ai-context') -Recurse
+          $env:HOME = $fakeHome
+          $env:USERPROFILE = $fakeHome
+          & (Join-Path $fakeHome '.ai-context/scripts/bootstrap.ps1')
+          Write-Host "bootstrap smoke OK (Windows)"
+
+      - name: Validate skills
+        shell: bash
+        if: runner.os != 'Windows'
+        run: |
+          node scripts/validate-skills.js --dir skills
+          # Windows parity runs in PowerShell block below.
+
+      - name: Validate skills (Windows)
+        shell: pwsh
+        if: runner.os == 'Windows'
+        run: |
+          node scripts/validate-skills.js --dir skills
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - name: Scrub-gate (no personal tokens in public repo)
+        shell: bash
+        run: |
+          # Public repo should never contain personal tokens outside docs/ / *.example.
+          # Token list is assembled from individual parts so the workflow file itself
+          # does not match its own pattern.
+          tokens=()
+          tokens+=("$(printf 'f%sa%sh%sl%sk%se' '' '' '' '' '')")          # ident1
+          tokens+=("$(printf 'F%sa%sh%sl%sk%se' '' '' '' '' '')")          # ident1-cap
+          tokens+=("$(printf 'D%sa%sa%sb%so%su%sl%se%sx' '' '' '' '' '' '' '')") # ident2
+          tokens+=("$(printf 'P%so%sr%st%sa%sb%sl%se%s-%sB%su%si%sl%sd%se%sr' '' '' '' '' '' '' '' '' '' '' '' '' '' '' '')") # proj
+          tokens+=("$(printf '/%sh%so%sm%se%s/%su%ss%se%sr' '' '' '' '' '' '' '' '' '')") # abs-home
+          tokens+=("$(printf 'k%si%sp%sp%se%sr%s_%se%sl%si%sx%si%sr%ss' '' '' '' '' '' '' '' '' '' '' '' '' '')") # email-local
+          PATTERN=$(IFS='|'; echo "${tokens[*]}")
+          HITS=$(
+            grep -rn -E "$PATTERN" . \
+              --include='*.md' --include='*.js' --include='*.json' \
+              --include='*.sh' --include='*.ps1' \
+              2>/dev/null \
+            | grep -v '^\./\.git/' \
+            | grep -v '/docs/' \
+            | grep -v '\.example\b' \
+            | grep -v '^\./README\.md' \
+            | grep -v '^\./LICENSE' \
+            | grep -v '^\./CONTRIBUTING\.md' \
+            | grep -v '^\./SECURITY\.md' \
+            | grep -v '^\./CHANGELOG\.md' \
+            | grep -v '^\./\.github/workflows/ci\.yml' \
+            || true
+          )
+          if [ -n "$HITS" ]; then
+            echo "⚠ personal tokens detected in public repo:"
+            echo "$HITS"
+            exit 1
+          fi
+          echo "scrub-gate OK"
+
+      - name: Lib unit tests
+        shell: bash
+        if: runner.os != 'Windows'
+        run: |
+          if [ -f hooks/tests/lib-unit-tests.js ]; then
+            node hooks/tests/lib-unit-tests.js
+          else
+            echo "lib-unit-tests.js not present — skipping"
+          fi
+
+      - name: Lib unit tests (Windows)
+        shell: pwsh
+        if: runner.os == 'Windows'
+        run: |
+          if (Test-Path hooks/tests/lib-unit-tests.js) {
+            node hooks/tests/lib-unit-tests.js
+            if ($LASTEXITCODE -ne 0) { exit 1 }
+          } else {
+            Write-Host "lib-unit-tests.js not present — skipping"
+          }
+
+      - name: Regression fixtures
+        shell: bash
+        if: runner.os != 'Windows'
+        run: |
+          if [ -x hooks/tests/run-regressions.sh ]; then
+            bash hooks/tests/run-regressions.sh
+          else
+            echo "run-regressions.sh not present — skipping"
+          fi

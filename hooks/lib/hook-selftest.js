@@ -1,0 +1,135 @@
+#!/usr/bin/env node
+// hook-selftest.js
+// Runtime verification runner for Claude Code hooks.
+//
+// Design: test specs live in this file (not in hook files). Hooks must
+// tolerate being run with synthetic stdin — but we do NOT `require()` them
+// (that would re-run top-level logic with side effects).
+//
+// Adding a new test: append to SPECS below.
+// Running: `node hook-selftest.js` or `node hook-selftest.js --hook=<name>`.
+
+const { spawnSync } = require('child_process');
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
+
+const HOME = os.homedir();
+const HOOKS = path.join(HOME, '.claude', 'hooks');
+const CACHE = path.join(HOME, '.claude', 'cache', 'hook-healthcheck-latest.json');
+
+const SPECS = [
+  {
+    hook: 'validate-symlinks.js',
+    event: 'SessionStart',
+    tests: [
+      { name: 'exits 0 with resolving symlinks', stdin: '{}', expect: { exit: 0 } },
+    ],
+  },
+  {
+    hook: 'research-lint.js',
+    event: 'PostToolUse',
+    matcher: 'Write|Edit',
+    tests: [
+      {
+        name: 'passes on non-research path',
+        stdin: JSON.stringify({ tool_name: 'Write', tool_input: { file_path: '/tmp/unrelated.md', content: 'from transcript\n' } }),
+        expect: { exit: 0 },
+      },
+      {
+        name: 'passes on research path with citation',
+        stdin: JSON.stringify({ tool_name: 'Write', tool_input: { file_path: `${HOME}/Documents/research/ok.md`, content: 'paper shows X (arxiv:2603.19461)\n' } }),
+        expect: { exit: 0 },
+      },
+      {
+        name: 'blocks on research path without citation',
+        stdin: JSON.stringify({ tool_name: 'Write', tool_input: { file_path: `${HOME}/Documents/research/bad.md`, content: 'from transcript: foo did a thing\n' } }),
+        expect: { exit: 2, stdoutMatch: 'unsourced' },
+      },
+      {
+        name: 'ignores non-Write tool',
+        stdin: JSON.stringify({ tool_name: 'Bash', tool_input: { command: 'ls' } }),
+        expect: { exit: 0 },
+      },
+    ],
+  },
+  {
+    hook: 'autosave-before-destructive.js',
+    event: 'PreToolUse',
+    matcher: 'Bash',
+    tests: [
+      { name: 'passthrough on ls', stdin: JSON.stringify({ tool_name: 'Bash', tool_input: { command: 'ls' } }), expect: { exit: 0 } },
+    ],
+  },
+  {
+    hook: 'block-subagent-writes.js',
+    event: 'PreToolUse',
+    matcher: 'Bash',
+    tests: [
+      { name: 'main-thread passthrough on git status', stdin: JSON.stringify({ tool_name: 'Bash', tool_input: { command: 'git status' } }), expect: { exit: 0 } },
+    ],
+  },
+  {
+    hook: 'memory-rotate.js',
+    event: 'Stop',
+    tests: [
+      { name: 'exits 0 with continue signal', stdin: '{}', expect: { exit: 0, stdoutMatch: 'continue' } },
+    ],
+  },
+  {
+    hook: 'verifiedby-gate.js',
+    event: 'PreToolUse',
+    matcher: 'TodoWrite',
+    tests: [
+      { name: 'passthrough on empty todo list', stdin: JSON.stringify({ tool_name: 'TodoWrite', tool_input: { todos: [] } }), expect: { exit: 0 } },
+    ],
+  },
+];
+
+function runCase(hookPath, testCase) {
+  const r = spawnSync('node', [hookPath], {
+    input: testCase.stdin || '',
+    timeout: 8000,
+    encoding: 'utf8',
+  });
+  const actualExit = r.status;
+  const actualStdout = (r.stdout || '') + (r.stderr || '');
+  const exp = testCase.expect || {};
+  const fails = [];
+  if ('exit' in exp && actualExit !== exp.exit) fails.push(`exit ${actualExit} vs ${exp.exit}`);
+  if (exp.stdoutMatch && !new RegExp(exp.stdoutMatch, 'i').test(actualStdout)) {
+    fails.push(`stdout missing /${exp.stdoutMatch}/i`);
+  }
+  return { name: testCase.name, ok: fails.length === 0, fails, actualExit, stdoutPrefix: actualStdout.slice(0, 200) };
+}
+
+function main() {
+  const report = { ts: new Date().toISOString(), hooks: [], summary: { tested: 0, passed: 0, failed: 0 } };
+  const argHook = (process.argv.find(a => a.startsWith('--hook=')) || '').split('=')[1];
+  for (const spec of SPECS) {
+    if (argHook && spec.hook !== argHook) continue;
+    const hp = path.join(HOOKS, spec.hook);
+    if (!fs.existsSync(hp)) {
+      report.hooks.push({ hook: spec.hook, status: 'missing' });
+      continue;
+    }
+    const cases = spec.tests.map(t => runCase(hp, t));
+    const ok = cases.every(c => c.ok);
+    report.hooks.push({ hook: spec.hook, event: spec.event, matcher: spec.matcher, status: ok ? 'pass' : 'fail', cases });
+    report.summary.tested++;
+    ok ? report.summary.passed++ : report.summary.failed++;
+  }
+  fs.mkdirSync(path.dirname(CACHE), { recursive: true });
+  fs.writeFileSync(CACHE, JSON.stringify(report, null, 2));
+  console.log(`hook-selftest: tested=${report.summary.tested} passed=${report.summary.passed} failed=${report.summary.failed}`);
+  for (const h of report.hooks) {
+    if (h.status === 'pass') continue;
+    if (h.status === 'missing') { console.log(`  MISSING: ${h.hook}`); continue; }
+    console.log(`  FAIL: ${h.hook}`);
+    for (const c of h.cases || []) if (!c.ok) console.log(`    - ${c.name}: ${c.fails.join('; ')}`);
+  }
+  process.exit(report.summary.failed > 0 ? 1 : 0);
+}
+
+if (require.main === module) main();
+module.exports = { main, SPECS };
