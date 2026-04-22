@@ -198,6 +198,7 @@ Full breakdown in [docs/LOCATIONS.md](./docs/LOCATIONS.md).
 
 | Doc | Read if you... |
 |---|---|
+| [INSTALL-PER-AI.md](./docs/INSTALL-PER-AI.md) | Are installing for a specific AI and want step-by-step instructions |
 | [ARCHITECTURE.md](./docs/ARCHITECTURE.md) | Want to see the actual per-event hook flow (real diagrams, not hand-waving) |
 | [HOOKS.md](./docs/HOOKS.md) | Want the full catalog of every hook + what it does |
 | [SKILLS.md](./docs/SKILLS.md) | Want to write a skill or understand per-AI skill format differences |
