@@ -1,7 +1,8 @@
 #!/usr/bin/env node
-// TaskCompleted hook: Enforce verification before tasks are marked done.
+// SubagentStop hook: Enforce verification before subagent tasks are marked done.
 // Checks if the task description suggests code changes were made,
 // and warns if no build/test command was run in the session.
+// (Claude Code has no TaskCompleted event — this hook fires on SubagentStop.)
 
 const fs = require('fs');
 
@@ -27,7 +28,7 @@ try {
   process.stdout.write(JSON.stringify({
     continue: true,
     hookSpecificOutput: {
-      hookEventName: 'TaskCompleted',
+      hookEventName: 'SubagentStop',
       additionalContext: `Task "${subject}" marked complete. Reminder: verify with a build/test command before considering this done. Per project rules, NEVER claim done without running a real verification command.`
     }
   }));

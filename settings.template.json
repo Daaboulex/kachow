@@ -366,8 +366,18 @@
         "hooks": [
           {
             "type": "command",
+            "command": "node \"$HOME/.claude/hooks/session-context-loader.js\"",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
             "command": "node \"$HOME/.claude/hooks/skill-upstream-checker.js\"",
-            "timeout": 10
+            "timeout": 10,
+            "async": true
           }
         ]
       },
@@ -389,15 +399,6 @@
             "async": true
           }
         ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/validate-symlinks.js\"",
-            "timeout": 3
-          }
-        ]
       }
     ],
     "PostToolUse": [
@@ -411,6 +412,27 @@
           }
         ],
         "matcher": "Write|Edit|MultiEdit|Bash|Read|Grep|Glob|TodoWrite"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/bandaid-loop-detector.js\"",
+            "timeout": 3
+          }
+        ],
+        "matcher": "Write|Edit|MultiEdit"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/skill-drift-guard.js\"",
+            "timeout": 3,
+            "async": true
+          }
+        ],
+        "matcher": "Bash|Edit|Write|Read|Grep|Glob"
       },
       {
         "hooks": [
@@ -560,11 +582,26 @@
           },
           {
             "type": "command",
+            "command": "node \"$HOME/.claude/hooks/pre-write-combined-guard.js\"",
+            "timeout": 3
+          },
+          {
+            "type": "command",
             "command": "node \"$HOME/.claude/hooks/autosave-before-destructive.js\"",
             "timeout": 8
           }
         ],
         "matcher": "Bash"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/pre-write-combined-guard.js\"",
+            "timeout": 5
+          }
+        ],
+        "matcher": "Write|Edit|MultiEdit"
       },
       {
         "hooks": [
@@ -587,9 +624,25 @@
         "matcher": "Read"
       }
     ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/subagent-harness-inject.js\"",
+            "timeout": 3
+          }
+        ]
+      }
+    ],
     "SubagentStop": [
       {
         "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/subagent-quality-gate.js\"",
+            "timeout": 3
+          },
           {
             "type": "command",
             "command": "node \"$HOME/.claude/hooks/task-verification-gate.js\"",

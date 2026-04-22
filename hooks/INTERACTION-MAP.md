@@ -1,7 +1,7 @@
 # Hook Interaction Map
-Generated 2026-04-22T09:26:08.603Z
+Generated 2026-04-22T10:58:19.853Z
 Source: `~/.kachow-release/hooks`
-Total: 36 hooks
+Total: 42 hooks
 
 ## Registrations
 
@@ -80,6 +80,15 @@ Total: 36 hooks
 ### statusLine|*
 - enhanced-statusline
 
+## Orphans (on disk, no registration)
+
+- bandaid-loop-detector.js (75 LOC)
+- pre-write-combined-guard.js (214 LOC)
+- session-context-loader.js (699 LOC)
+- skill-drift-guard.js (121 LOC)
+- subagent-harness-inject.js (91 LOC)
+- subagent-quality-gate.js (105 LOC)
+
 ## Per-hook detail
 
 ### auto-pull-global (120 LOC)
@@ -102,6 +111,11 @@ Total: 36 hooks
 **Reads:** <dyn: 0>
 **Writes:** <dyn: logFile>
 **Shell:** git rev-parse --show-toplevel, git rev-parse --git-dir, git status --porcelain, git stash list, git stash push -u -m , git rev-parse stash@{0}, git stash pop --quiet
+
+### bandaid-loop-detector (75 LOC)
+**Not registered** — likely standalone CLI or dead
+**Reads:** <dyn: 0>, <dyn: historyFile>, <dyn: warnFile>
+**Writes:** <dyn: historyFile>, <dyn: warnFile>
 
 ### block-subagent-writes (94 LOC)
 **Registered:**
@@ -186,6 +200,11 @@ Total: 36 hooks
 **Writes:** <dyn: geminiPath>, <dyn: d>, path.join(skillDir
 **Lib deps:** ./lib/platform-map, ./lib/observability-logger.js
 
+### pre-write-combined-guard (214 LOC)
+**Not registered** — likely standalone CLI or dead
+**Reads:** <dyn: 0>, <dyn: configPath>
+**Lib deps:** ./lib/project-identity.js, ./lib/observability-logger.js
+
 ### prefer-editing-nudge (83 LOC)
 **Registered:**
 - `PreToolUse` matcher=`Write` timeout=3
@@ -209,6 +228,12 @@ Total: 36 hooks
 **Registered:**
 - `PostToolUse` matcher=`Write|Edit` timeout=3
 **Reads:** <dyn: 0>
+
+### session-context-loader (699 LOC)
+**Not registered** — likely standalone CLI or dead
+**Reads:** <dyn: 0>, <dyn: tasksPath>, <dyn: progPath>, <dyn: h.path>, <dyn: handoffPath>, <dyn: memPath>, <dyn: fp>, path.join(semDir (+5)
+**Shell:** git log --no-merges --since=, gh pr view --json number,title,state,isDraft,reviewDecision,mergeable 2>/dev/null, git rev-parse --abbrev-ref HEAD, git rev-list --left-right --count HEAD...@{upstream} 2>/dev/null, git status --porcelain -u
+**Lib deps:** ./lib/project-identity.js, ./lib/self-improvement/queue.js, ./lib/stale-process-detector.js, ./lib/handoff-progress.js
 
 ### session-presence-end (32 LOC)
 **Registered:**
@@ -236,6 +261,12 @@ Total: 36 hooks
 **Shell:** claude --version 2>/dev/null
 **Lib deps:** ./lib/observability-logger.js, ./lib/constants.js, ./lib/atomic-counter.js, ./lib/release-notes-cache.js, ./lib/settings-schema.js, ./lib/symlink-audit.js
 
+### skill-drift-guard (121 LOC)
+**Not registered** — likely standalone CLI or dead
+**Reads:** <dyn: 0>, <dyn: counterFile>, path.join(cwd, <dyn: rulesFile>
+**Writes:** <dyn: tmp>
+**Lib deps:** ./lib/observability-logger.js
+
 ### skill-invocation-logger (52 LOC)
 **Registered:**
 - `PostToolUse` matcher=`Skill` (async) timeout=3
@@ -256,7 +287,17 @@ Total: 36 hooks
 **Writes:** <dyn: lockFile>, <dyn: logFile>
 **Lib deps:** ./lib/constants.js, ./lib/atomic-counter.js, ./lib/observability-logger.js
 
-### task-verification-gate (38 LOC)
+### subagent-harness-inject (91 LOC)
+**Not registered** — likely standalone CLI or dead
+**Reads:** <dyn: 0>
+**Writes:** path.join(markerDir
+
+### subagent-quality-gate (105 LOC)
+**Not registered** — likely standalone CLI or dead
+**Reads:** <dyn: 0>, <dyn: p>
+**Writes:** <dyn: p>
+
+### task-verification-gate (39 LOC)
 **Registered:**
 - `SubagentStop` matcher=`*` timeout=3
 **Reads:** <dyn: 0>
