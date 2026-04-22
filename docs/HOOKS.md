@@ -1,6 +1,6 @@
 # Hooks catalog
 
-36 shipped hooks + 14 library helpers. Every one is pure Node with no external deps; runs identically on Linux, macOS, and Windows (where the host AI CLI supports hooks).
+36 shipped hooks + 19 library helpers. Every one is pure Node (stdlib only); runs identically on Linux, macOS, and Windows (where the host AI CLI supports hooks).
 
 Registered under `hooks.<event>[].hooks[]` in the tool's settings JSON. See `settings.template.json` for the wiring.
 
@@ -102,6 +102,13 @@ Not registered as hooks. Required by the hooks above.
 | `statusline-renderer.js` | `enhanced-statusline` | Renders model / git / GSD task / context bar / tokens. |
 | `symlink-audit.js` | `validate-symlinks` | Recursive symlink scanner with classification (OK / BROKEN / LOOP / ARCHIVED). |
 | `tier3-consolidation.js` | `/consolidate-memory deep` | Tier-3 semantic summary generation. |
+| `handoff-progress.js` | `session-context-loader` | Parses handoff markdown for `- [ ]` / `- [x]` checkboxes + numbered items under action sections. Surfaces completion % badge at SessionStart. |
+| `hook-interaction-map.js` | CLI + manual | Static-analyzes every hook: reads/writes/execs/requires/network/exits. Outputs Markdown map. `sanitizePath()` scrubs user paths from generated docs. |
+| `hook-timer.js` | opt-in per hook | hrtime wrapper that logs `{section, duration_ms, ok}` via observability-logger. Surfaces slowest hooks over time. |
+| `hostname-presence.js` | `presence.js` | Per-host presence filename sharding + cross-host merged reader — makes `active-sessions-global.jsonl` Syncthing-safe across machines. |
+| `release-notes-cache.js` | `session-start-combined` | `gh`-CLI-backed release-notes fetcher. On version bump, auto-writes a dated memory file and flags breaking-hook signals. |
+| `settings-schema.js` | `validate-settings-on-write` + `session-start-combined` | Claude Code v2.1.x schema table. Flags `deprecated`, `managedOnly`, `unknown` keys before write-time AND at SessionStart. |
+| `stale-process-detector.js` | `session-context-loader` + `scripts/cleanup-stale.sh` | Scans `/tmp/claude-<uid>/` for stale `.output` files + abandoned zsh child processes. Surfaces `⚠ stale processes` badge; cleanup via script. |
 
 ## Writing your own hook
 

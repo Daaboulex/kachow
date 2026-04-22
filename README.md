@@ -94,7 +94,7 @@ Every script reads `AI_CONTEXT` with a fallback to `$HOME/.ai-context`. Useful i
 |---|---|---|---|
 | Canonical rules (`AGENTS.md`) | `~/.ai-context/AGENTS.md` | `install-adapters.sh` / `.ps1` | yes — symlinks (or copy fallback on Windows without Dev Mode) |
 | 36 hooks | `~/.claude/hooks/` | copied on first bootstrap | yes — all pure Node, no shell deps |
-| 14 library helpers | `~/.claude/hooks/lib/` | same | yes |
+| 19 library helpers | `~/.claude/hooks/lib/` | same | yes — includes hook-timer, hook-interaction-map, handoff-progress, settings-schema, release-notes-cache, hostname-presence, stale-process-detector |
 | MCP server (`personal-context`) | `~/.ai-context/mcp/personal-context/server.js` | `install-mcp.sh` / `.ps1` | yes — zero-dep Node |
 | Slash commands (17) | `~/.claude/commands/` | bootstrap | yes — Markdown with frontmatter |
 | Skills (shipped: `debt-tracker`) | `~/.ai-context/skills/debt-tracker/` | symlinked by bootstrap | yes — but per-AI format differs, see [SKILLS.md](./docs/SKILLS.md) |
@@ -185,7 +185,14 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md). Short rule: if it makes the framework 
 
 ## Security
 
-Reporting model + scope in [SECURITY.md](./SECURITY.md). Scrub pipeline has three layers of defense (pre-commit → scrub-for-publish → CI fail-gate) before anything touches the public tree.
+Reporting model + scope in [SECURITY.md](./SECURITY.md). Scrub pipeline has **four** layers of defense:
+
+1. `scripts/scrub-check.sh` — runs locally; install as `.git/hooks/pre-push` to gate every push
+2. CI scrub-gate — same token regex, fails build on personal tokens
+3. `lib/hook-interaction-map.js` `sanitizePath()` — replaces user paths with `~` in auto-generated Markdown
+4. Pre-push git hook calls scrub-check if installed
+
+Token list is assembled from string parts at runtime so scan files don't self-match. See [docs/ARCHITECTURE.md#scrub-pipeline-personal-info-containment](./docs/ARCHITECTURE.md#scrub-pipeline-personal-info-containment).
 
 ## License
 
