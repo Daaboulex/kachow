@@ -4,6 +4,36 @@ All notable changes to this framework. See [Semantic Versioning](https://semver.
 
 > *"I eat losers for breakfast."* — Lightning McQueen, while your hooks pass selftest at 0.4s
 
+## [0.2.0] — 2026-04-23 (security + measurement release)
+
+**BREAKING — security fixes.** Upstream `SKIP_SUBAGENT_BLOCK=1` env-var override is removed; any subagent bypass workflow relying on it must be migrated to running the command in parent context instead.
+
+### Security
+- **SEC-1** `get_skill` MCP handler: added path-traversal containment. Prior handler constructed `path.join(SKILLS_DIR, String(name), 'SKILL.md')` with no `..` guard. Exploit: `get_skill({name: "../../.ssh/id_ed25519"})` escaped `SKILLS_DIR`. Fix: apply `slugifyName` + `path.resolve` containment before `readFileSync`.
+- **SEC-2** `read_debt`, `read_handoff`, `list_handoffs`, `search_handoffs`: added caller-supplied `cwd` canonicalization. New `canonicalizeCwd()` runs `fs.realpathSync` and restricts walk to approved roots (`~`, `~/.ai-context`). Prevents crafted `cwd` (e.g., `"/tmp/evil/../../root"`) from probing system paths.
+- **SEC-3** `add_memory` + `add_debt`: added subagent write gate. When any marker in `~/.claude/cache/subagent-active/` has mtime within 30-min TTL, MCP write handlers reject with `mcp_write_blocked: active subagent session`. Error text includes instruction to wait for subagent completion. Trade-off: parent MCP writes also blocked while any subagent runs. 30-min TTL bounds impact.
+- **SEC-4** `block-subagent-writes.js` (both Claude + Gemini): removed `SKIP_SUBAGENT_BLOCK=1` env-var override. Override was self-disclosed in block-reason, allowing a compromised subagent to prepend the env var to its next command and defeat the guard. **BREAKING.**
+- **SEC-5** `subagent-harness-inject.js` (both Claude + Gemini): safety-critical detection now walks up to nearest `.git`/`.envrc` boundary and checks `safetyDirs` at each level (was 1-level: `cwd` + `cwd/..`). Secondary content signal: grep `.c`/`.h` headers for `lpc43xx|IEC 61508|IEC 61511` markers. Deep subdirs like `Tests/Integration/Cases/` under safety-critical projects now correctly inject harness rules.
+
+### Added
+- `scripts/hook-stats.sh`: p95 column in timing table. Filters `ev.type === 'hook_timing'` before aggregating `meta.total_ms` (prevents future non-timing events with the field from contaminating the gate). Marks p95 with `*` when `n<10` (variance-dominated, not gate-eligible).
+- `hooks/session-start-combined.js`: permanent stale-marker sweep (deletes `~/.claude/cache/subagent-active/*.json` with mtime > 24h). Prevents SEC-3 false-blocks from abandoned subagents.
+- `hooks/lib/self-improvement/detectors.js`: **R15** (`session_start_p95_regression`) — SessionStart p95 > ceiling (default 9070ms, configurable via `SESSION_START_P95_CEILING_MS` env) → enqueues BLOCKER finding. **R17** (`skill_followed_by_bandaid_loop`) — lazy JOIN of `skill_invoke` events within 20min before `bandaid_loop` events in same session; counts per-skill; ≥3 occurrences in 14d → enqueues OBSERVE finding for manual triage. No thresholds on %; raw count only.
+- `hooks/bandaid-loop-detector.js`: emits `bandaid_loop` episodic event for R17 correlation. Message extended with `/systematic-debugging` nudge.
+- `hooks/skill-invocation-logger.js`: includes `session_id` on `skill_invoke` emissions for R17 correlation.
+
+### Removed
+- `hooks/halt-condition-validator.js` — zero signal in 14d of observability data; no feedback citing it.
+- `hooks/doc-shard-resolver.js` — zero signal in 14d; no feedback citing it.
+- Corresponding settings-template entries for both hooks.
+
+### Migration notes
+- Any automation relying on `SKIP_SUBAGENT_BLOCK=1` must be rewritten to run the command in parent context (no env bypass exists).
+- `get_skill` callers that relied on undocumented path-traversal behavior (there shouldn't be any) must use slugified names only.
+- R15 ceiling default 9070ms may be too low or high for your install. Tune via `SESSION_START_P95_CEILING_MS` env var or expect day-1 false-positives.
+
+[0.2.0]: https://github.com/Daaboulex/kachow/releases/tag/v0.2.0
+
 ## [0.1.0] — 2026-04-22 (initial public release)
 
 All changes below collapsed from pre-release iteration. Semver: 0.x → expect breaking changes in hook interface and settings-template shape until v1.0.0.
@@ -32,3 +62,4 @@ All changes below collapsed from pre-release iteration. Semver: 0.x → expect b
 - `hostname-presence.js`: scrubbed personal hostnames from comment header.
 
 [0.1.0]: https://github.com/Daaboulex/kachow/releases/tag/v0.1.0
+

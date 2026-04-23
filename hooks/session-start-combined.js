@@ -33,6 +33,19 @@ try {
   obs.logEvent(projectDir, { type: 'session_start', source: 'session-start-combined', agent: isGemini ? 'gemini' : 'claude' });
 } catch {}
 
+// Stale-marker sweep (v0.2.0 SEC-3 hygiene): delete subagent markers
+// older than 24h. Prevents SEC-3 MCP write gate from false-blocking on
+// abandoned subagents. Shared marker dir between Claude + Gemini.
+try {
+  const markerDir = path.join(home, '.claude', 'cache', 'subagent-active');
+  const cutoff = Date.now() - (24 * 60 * 60 * 1000);
+  for (const name of fs.readdirSync(markerDir)) {
+    if (!name.endsWith('.json')) continue;
+    const p = path.join(markerDir, name);
+    try { if (fs.statSync(p).mtimeMs < cutoff) fs.unlinkSync(p); } catch {}
+  }
+} catch {}
+
 // ── 1. Reflect-enabled (touch marker file) ──
 try {
   const enabledFile = path.join(configDir, '.reflect-enabled');

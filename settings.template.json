@@ -602,26 +602,6 @@
           }
         ],
         "matcher": "Write|Edit|MultiEdit"
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/halt-condition-validator.js\"",
-            "timeout": 3
-          }
-        ],
-        "matcher": "Skill"
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/doc-shard-resolver.js\"",
-            "timeout": 3
-          }
-        ],
-        "matcher": "Read"
       }
     ],
     "SubagentStart": [

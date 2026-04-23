@@ -67,11 +67,14 @@ function walk(dir) {
             const t = new Date(ev.ts).getTime();
             if (t < cutoff) continue;
             events[ev.type] = (events[ev.type] || 0) + 1;
-            if (ev.meta && typeof ev.meta.total_ms === 'number' && ev.source) {
-              if (!timings[ev.source]) timings[ev.source] = { n: 0, total: 0, max: 0 };
+            // v0.2.0: type-filter prevents future non-timing events with
+            // total_ms from silently contaminating the gate.
+            if (ev.type === 'hook_timing' && ev.meta && typeof ev.meta.total_ms === 'number' && ev.source) {
+              if (!timings[ev.source]) timings[ev.source] = { n: 0, total: 0, max: 0, samples: [] };
               timings[ev.source].n++;
               timings[ev.source].total += ev.meta.total_ms;
               timings[ev.source].max = Math.max(timings[ev.source].max, ev.meta.total_ms);
+              timings[ev.source].samples.push(ev.meta.total_ms);
             }
           } catch {}
         }
@@ -95,11 +98,16 @@ const tRows = Object.entries(timings).sort((a, b) => (b[1].total / b[1].n) - (a[
 if (tRows.length === 0) {
   console.log('  _no hook timing data — instrument hooks via lib/hook-timer.js_');
 } else {
-  console.log('  source                           n       avg       max');
+  console.log('  source                           n       avg       max       p95');
   for (const [src, v] of tRows) {
     const avg = (v.total / v.n).toFixed(1);
-    console.log(`  ${src.padEnd(30)} ${String(v.n).padStart(4)}  ${avg.padStart(6)}ms ${v.max.toFixed(1).padStart(7)}ms`);
+    const sorted = [...v.samples].sort((a, b) => a - b);
+    const idx = Math.min(sorted.length - 1, Math.ceil(0.95 * sorted.length) - 1);
+    const p95 = sorted.length ? sorted[Math.max(0, idx)].toFixed(1) : 'n/a';
+    const p95Mark = v.n < 10 ? `${p95}*` : p95;
+    console.log(`  ${src.padEnd(30)} ${String(v.n).padStart(4)}  ${avg.padStart(6)}ms ${v.max.toFixed(1).padStart(7)}ms ${p95Mark.padStart(8)}ms`);
   }
+  console.log('  * p95 with n<10 is variance-dominated; not gate-eligible');
 }
 
 // ── Orphan hooks check ──

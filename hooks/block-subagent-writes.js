@@ -13,10 +13,11 @@
 // no-ops and main conversation commits still work. Silent failure is logged
 // to stderr for observability.
 //
-// Override: SKIP_SUBAGENT_BLOCK=1 env var for cases where parent has
-// explicitly authorized subagent commits (rare).
-//
-// Ref: unified-tracking plan Wave 2.6 (2026-04-16)
+// SEC-4 (v0.2.0 2026-04-23): env-var override removed. Prior
+// SKIP_SUBAGENT_BLOCK=1 was self-disclosed in block-reason, allowing a
+// compromised subagent to prepend it to next command and bypass. No env
+// bypass exists. If a parent truly needs to authorize a subagent write,
+// run the command in parent context directly.
 
 const fs = require('fs');
 const path = require('path');
@@ -28,7 +29,7 @@ function passthrough() {
 }
 
 try {
-  if (process.env.SKIP_SUBAGENT_BLOCK === '1') passthrough();
+  // SEC-4 (v0.2.0): SKIP_SUBAGENT_BLOCK env var removed.
 
   let raw = '';
   try { raw = fs.readFileSync(0, 'utf8'); } catch { passthrough(); }
@@ -78,10 +79,7 @@ try {
               `but cannot commit, push, merge, rebase, reset, cherry-pick, revert, ` +
               `delete branches, force tags, or modify worktrees/submodules.\n\n` +
               `Parent conversation must handle all git state changes. Report your ` +
-              `file changes via your return value for parent review.\n\n` +
-              `Override: set SKIP_SUBAGENT_BLOCK=1 in the subagent's environment if ` +
-              `parent has explicitly authorized this operation (rare — usually indicates ` +
-              `a task that should run in parent context instead).`
+              `file changes via your return value for parent review.`
     }));
     process.exit(0);
   }

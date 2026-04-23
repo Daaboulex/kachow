@@ -73,8 +73,30 @@ function extractFrontmatter(content) {
   return { meta, body: content.slice(end + 3).trimStart() };
 }
 
+// SEC-2 (v0.2.0): caller-supplied cwd must canonicalize + fall inside
+// approved roots. Prevents crafted cwd escaping to system paths via .. segments.
+const APPROVED_CWD_ROOTS = [
+  os.homedir(),
+  AI_CONTEXT,
+];
+
+function canonicalizeCwd(cwd) {
+  const input = cwd || process.cwd();
+  let resolved;
+  try { resolved = fs.realpathSync(input); }
+  catch { try { resolved = path.resolve(input); } catch { return null; } }
+  const ok = APPROVED_CWD_ROOTS.some(root => {
+    try {
+      const rroot = fs.realpathSync(root);
+      return resolved === rroot || resolved.startsWith(rroot + path.sep);
+    } catch { return false; }
+  });
+  return ok ? resolved : null;
+}
+
 function findRepoDebt(cwd) {
-  let dir = cwd || process.cwd();
+  let dir = canonicalizeCwd(cwd);
+  if (!dir) return null;
   const root = path.parse(dir).root;
   while (dir && dir !== root) {
     const p = path.join(dir, 'DEBT.md');
@@ -87,7 +109,8 @@ function findRepoDebt(cwd) {
 }
 
 function findCanonicalDir(cwd) {
-  let dir = cwd || process.cwd();
+  let dir = canonicalizeCwd(cwd);
+  if (!dir) return null;
   const root = path.parse(dir).root;
   while (dir && dir !== root) {
     for (const candidate of ['.claude', '.ai-context']) {
@@ -105,6 +128,36 @@ function slugifyName(name) {
   return String(name).toLowerCase()
     .replace(/[^a-z0-9_-]+/g, '_')
     .replace(/^_+|_+$/g, '');
+}
+
+// SEC-1 (v0.2.0): get_skill name must stay inside SKILLS_DIR.
+function safeSkillName(name) {
+  const slug = slugifyName(name);
+  if (!slug) return null;
+  const target = path.resolve(SKILLS_DIR, slug, 'SKILL.md');
+  const root = path.resolve(SKILLS_DIR) + path.sep;
+  if (!target.startsWith(root)) return null;
+  return target;
+}
+
+// SEC-3 (v0.2.0): MCP write tools reject when any subagent marker <30min
+// old exists. MCP server has no caller session_id, so marker-dir presence
+// is proxy. Trade-off: while any subagent runs, parent writes blocked too.
+const SUBAGENT_MARKER_DIR = path.join(os.homedir(), '.claude', 'cache', 'subagent-active');
+const SUBAGENT_MARKER_TTL_MS = 30 * 60 * 1000;
+
+function activeSubagentPresent() {
+  try {
+    const now = Date.now();
+    for (const name of fs.readdirSync(SUBAGENT_MARKER_DIR)) {
+      if (!name.endsWith('.json')) continue;
+      try {
+        const st = fs.statSync(path.join(SUBAGENT_MARKER_DIR, name));
+        if ((now - st.mtimeMs) < SUBAGENT_MARKER_TTL_MS) return true;
+      } catch {}
+    }
+  } catch {}
+  return false;
 }
 
 // ───── MCP tools ─────
@@ -223,7 +276,8 @@ const TOOLS = {
       required: ['name'],
     },
     handler: ({ name }) => {
-      const skillMd = path.join(SKILLS_DIR, String(name), 'SKILL.md');
+      const skillMd = safeSkillName(name);
+      if (!skillMd) return { content: [{ type: 'text', text: `invalid skill name` }], isError: true };
       if (!fs.existsSync(skillMd)) return { content: [{ type: 'text', text: `skill "${name}" not found` }], isError: true };
       return { content: [{ type: 'text', text: fs.readFileSync(skillMd, 'utf8') }] };
     },
@@ -356,6 +410,9 @@ const TOOLS = {
       required: ['name', 'type', 'description', 'body'],
     },
     handler: ({ name, type, description, body }) => {
+      if (activeSubagentPresent()) {
+        return { content: [{ type: 'text', text: 'mcp_write_blocked: active subagent session — parent-only writes permitted. Wait for subagent completion.' }], isError: true };
+      }
       if (!name || !type || !description || !body) {
         return { content: [{ type: 'text', text: 'missing required field' }], isError: true };
       }
@@ -393,6 +450,9 @@ const TOOLS = {
       required: ['title', 'symptom', 'severity'],
     },
     handler: ({ cwd, title, symptom, fix_approach, severity, workaround }) => {
+      if (activeSubagentPresent()) {
+        return { content: [{ type: 'text', text: 'mcp_write_blocked: active subagent session — parent-only writes permitted. Wait for subagent completion.' }], isError: true };
+      }
       // Enforce schema-required fields explicitly — MCP arg validation varies by client.
       const missing = [];
       if (!title || typeof title !== 'string') missing.push('title');

@@ -66,6 +66,17 @@ try {
   warnState[filePath] = now;
   try { fs.writeFileSync(warnFile, JSON.stringify(warnState)); } catch {}
 
+  // R17 support (v0.2.0): emit bandaid_loop event for skill→loop correlation.
+  try {
+    const obs = require('./lib/observability-logger.js');
+    obs.logEvent(process.cwd(), {
+      type: 'bandaid_loop',
+      source: 'bandaid-loop-detector',
+      session_id: sid,
+      meta: { file: filePath, same_file_count: sameFileCount, window: WINDOW }
+    });
+  } catch {}
+
   const msg = `[bandaid-loop] ${path.basename(filePath)} edited ${sameFileCount}× in the last ${WINDOW} tool calls. Bandaid fixes are a common AI failure mode — pause and ask: is this a symptom or root cause? Read the surrounding logic, trace upstream callers, verify the premise before the next edit.`;
   process.stdout.write(JSON.stringify({ continue: true, systemMessage: msg }));
   process.exit(0);

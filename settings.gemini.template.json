@@ -123,26 +123,6 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$HOME/.gemini/hooks/halt-condition-validator.js\"",
-            "timeout": 3000
-          }
-        ],
-        "matcher": "activate_skill"
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.gemini/hooks/doc-shard-resolver.js\"",
-            "timeout": 3000
-          }
-        ],
-        "matcher": "read_file"
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
             "command": "node \"$HOME/.gemini/hooks/validate-settings-on-write.js\"",
             "timeout": 3000
           }

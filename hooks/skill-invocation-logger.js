@@ -42,8 +42,15 @@ try {
 
   fs.appendFileSync(logFile, entry);
 
-  // Observability: emit to episodic JSONL
-  try { require('./lib/observability-logger.js').logEvent(input.cwd || process.cwd(), { type: 'skill_invoke', source: 'skill-invocation-logger', meta: { skill: skillName } }); } catch {}
+  // R17 support (v0.2.0): session_id for skill→bandaid correlation at R17.
+  try {
+    require('./lib/observability-logger.js').logEvent(input.cwd || process.cwd(), {
+      type: 'skill_invoke',
+      source: 'skill-invocation-logger',
+      session_id: sessionId,
+      meta: { skill: skillName, followed_by_bandaid_loop: false }
+    });
+  } catch {}
 
   process.stdout.write('{"continue":true}');
 } catch {

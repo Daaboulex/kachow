@@ -595,6 +595,82 @@ function detectDeadLibModule(ctx) {
   return findings;
 }
 
+// ── R15: session_start_p95_regression (v0.2.0) ──
+// SessionStart p95 exceeds static ceiling. Configure CEILING_MS per install.
+function detectSessionStartP95Regression(ctx) {
+  const findings = [];
+  try {
+    const events = ctx.readEvents(ctx.cwd, 7, { eventTypes: ['hook_timing'] }) || [];
+    const samples = events
+      .filter(e => (e.source === 'session-start-combined') && e.meta && typeof e.meta.total_ms === 'number')
+      .map(e => e.meta.total_ms)
+      .sort((a, b) => a - b);
+    if (samples.length < 10) return findings;
+    const idx = Math.max(0, Math.ceil(0.95 * samples.length) - 1);
+    const p95 = samples[idx];
+    // Ceiling defaults to 9070ms (baseline 6977ms × 1.3 headroom) — adjust
+    // via SESSION_START_P95_CEILING_MS env var per installation.
+    const CEILING_MS = parseInt(process.env.SESSION_START_P95_CEILING_MS || '9070', 10);
+    if (p95 > CEILING_MS) {
+      findings.push({
+        rule: 'session_start_p95_regression',
+        tier: 'BLOCKER',
+        target: { type: 'hook', path: '~/.claude/hooks/session-start-combined.js' },
+        evidence: { p95_ms: +p95.toFixed(1), ceiling_ms: CEILING_MS, sample_n: samples.length },
+        proposal: `SessionStart p95=${p95.toFixed(0)}ms exceeds ${CEILING_MS}ms ceiling. Investigate via hook-stats.sh + observability episodic logs.`,
+        auto_applicable: false,
+        fingerprint_class: 'hook_perf'
+      });
+    }
+  } catch {}
+  return findings;
+}
+
+// ── R17: skill_followed_by_bandaid_loop (v0.2.0) ──
+// Lazy JOIN at query time: skill_invoke within 20min before bandaid_loop
+// in same session_id. Raw count — correlation ≠ causation.
+function detectSkillFollowedByBandaidLoop(ctx) {
+  const findings = [];
+  try {
+    const bandaids = ctx.readEvents(ctx.cwd, 14, { eventTypes: ['bandaid_loop'] }) || [];
+    if (bandaids.length === 0) return findings;
+    const skillInvokes = ctx.readEvents(ctx.cwd, 14, { eventTypes: ['skill_invoke'] }) || [];
+    const bySid = {};
+    for (const s of skillInvokes) {
+      const sid = s.session_id;
+      const skill = s.payload?.skill || s.meta?.skill;
+      if (!sid || !skill) continue;
+      (bySid[sid] = bySid[sid] || []).push({ ts: new Date(s.ts).getTime(), skill });
+    }
+    const LOOKBACK_MS = 20 * 60 * 1000;
+    const byName = {};
+    for (const b of bandaids) {
+      const sid = b.session_id;
+      if (!sid || !bySid[sid]) continue;
+      const bandaidTs = new Date(b.ts).getTime();
+      for (const s of bySid[sid]) {
+        if (s.ts < bandaidTs && (bandaidTs - s.ts) <= LOOKBACK_MS) {
+          byName[s.skill] = (byName[s.skill] || 0) + 1;
+        }
+      }
+    }
+    for (const [skill, count] of Object.entries(byName)) {
+      if (count >= 3) {
+        findings.push({
+          rule: 'skill_followed_by_bandaid_loop',
+          tier: 'OBSERVE',
+          target: { type: 'skill', path: skill },
+          evidence: { loop_follow_count: count, window_days: 14, lookback_min: 20 },
+          proposal: `Skill '${skill}' was invoked within 20min before a bandaid-loop ${count} times in 14d. May indicate the skill triggers unproductive edit loops. Manual triage needed — correlation ≠ causation.`,
+          auto_applicable: false,
+          fingerprint_class: 'skill_outcome'
+        });
+      }
+    }
+  } catch {}
+  return findings;
+}
+
 function runAllDetectors(ctx) {
   const allFindings = [];
   const detectors = [
@@ -611,7 +687,10 @@ function runAllDetectors(ctx) {
     { name: 'R11', fn: detectMemoryColdByRetrieval },
     { name: 'R12', fn: detectMemoryHotForPromotion },
     { name: 'R13', fn: detectMemoryFactExpired },
-    { name: 'R14', fn: detectMemoryActiveForgetting }
+    { name: 'R14', fn: detectMemoryActiveForgetting },
+    { name: 'R15', fn: detectSessionStartP95Regression },
+    // R16 reserved (skill-coverage drop) — deferred until R15 proves pipeline
+    { name: 'R17', fn: detectSkillFollowedByBandaidLoop }
   ];
   for (const { name, fn } of detectors) {
     try { allFindings.push(...fn(ctx)); }
@@ -634,5 +713,7 @@ module.exports = {
   detectMemoryHotForPromotion,
   detectMemoryFactExpired,
   detectMemoryActiveForgetting,
+  detectSessionStartP95Regression,
+  detectSkillFollowedByBandaidLoop,
   runAllDetectors
 };

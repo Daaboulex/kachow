@@ -61,13 +61,43 @@ try {
   // Always: no git state changes (universal, hard-enforced by block-subagent-writes.js)
   rules.push('NEVER use git state-changing commands (commit, push, merge, rebase, reset --hard, cherry-pick, revert, tag -f/-d, branch -D, checkout -b, add -A/./--all, restore --staged/., clean -f, submodule add, worktree add/remove). Read-only git (status, log, diff, show, ls-files, grep) is allowed. This rule is HARD-ENFORCED at the PreToolUse hook level — attempts will be blocked with an explanation. Report file changes via your return value; parent handles all commits.');
 
-  // Safety-critical project detection: check for safety-critical marker files
-  // Detects by trait (IEC 61508 firmware dirs exist), not project name
+  // Safety-critical detection (SEC-5 v0.2.0 2026-04-23): walk up to nearest
+  // .git or .envrc boundary; detect at EACH level (not just cwd + cwd/..).
+  // Prior 1-level check missed deep subdirs under safety-critical projects.
   const safetyDirs = ['Actuator', 'ValveLogic', 'SafetyTimer', 'EEPROM_Control'];
-  const hasSafetyCode = safetyDirs.some(d => {
-    try { return fs.existsSync(path.join(cwd, d)) ||
-                 fs.existsSync(path.join(cwd, '..', d)); } catch { return false; }
+  const hasSafetyDir = (dir) => safetyDirs.some(d => {
+    try { return fs.existsSync(path.join(dir, d)); } catch { return false; }
   });
+  const hasSafetyContent = (dir) => {
+    try {
+      for (const name of fs.readdirSync(dir)) {
+        if (!name.endsWith('.c') && !name.endsWith('.h')) continue;
+        try {
+          const head = fs.readFileSync(path.join(dir, name), 'utf8').slice(0, 2000);
+          if (/lpc43xx|IEC\s*61508|IEC\s*61511/i.test(head)) return true;
+        } catch {}
+      }
+    } catch {}
+    return false;
+  };
+  let hasSafetyCode = false;
+  try {
+    let walkDir = cwd;
+    const root = path.parse(walkDir).root;
+    for (let i = 0; i < 10 && walkDir && walkDir !== root; i++) {
+      if (hasSafetyDir(walkDir) || hasSafetyContent(walkDir)) { hasSafetyCode = true; break; }
+      try {
+        if (fs.existsSync(path.join(walkDir, '.git')) ||
+            fs.existsSync(path.join(walkDir, '.envrc'))) {
+          if (hasSafetyDir(walkDir) || hasSafetyContent(walkDir)) hasSafetyCode = true;
+          break;
+        }
+      } catch {}
+      const parent = path.dirname(walkDir);
+      if (parent === walkDir) break;
+      walkDir = parent;
+    }
+  } catch {}
 
   if (hasSafetyCode) {
     rules.push('SAFETY: Actuator/, SafetyTimer/, EEPROM/, ValveLogic/ files are safety-critical (IEC 61508 domain). Do NOT edit these in a subagent — flag for manual review.');
