@@ -599,6 +599,11 @@
             "type": "command",
             "command": "node \"$HOME/.claude/hooks/pre-write-combined-guard.js\"",
             "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/scrub-sentinel.js\"",
+            "timeout": 3
           }
         ],
         "matcher": "Write|Edit|MultiEdit"
