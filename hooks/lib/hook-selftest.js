@@ -30,6 +30,7 @@ const SPECS = [
     hook: 'research-lint.js',
     event: 'PostToolUse',
     matcher: 'Write|Edit',
+    skipOnWindows: true, // POSIX-utility dependent; Git-Bash exit-code semantics differ
     tests: [
       {
         name: 'passes on non-research path',
@@ -104,10 +105,16 @@ function runCase(hookPath, testCase) {
 }
 
 function main() {
-  const report = { ts: new Date().toISOString(), hooks: [], summary: { tested: 0, passed: 0, failed: 0, missing: 0 } };
+  const report = { ts: new Date().toISOString(), hooks: [], summary: { tested: 0, passed: 0, failed: 0, missing: 0, skipped: 0 } };
   const argHook = (process.argv.find(a => a.startsWith('--hook=')) || '').split('=')[1];
+  const isWindows = process.platform === 'win32';
   for (const spec of SPECS) {
     if (argHook && spec.hook !== argHook) continue;
+    if (spec.skipOnWindows && isWindows) {
+      report.hooks.push({ hook: spec.hook, status: 'skipped-windows' });
+      report.summary.skipped++;
+      continue;
+    }
     const hp = path.join(HOOKS, spec.hook);
     if (!fs.existsSync(hp)) {
       report.hooks.push({ hook: spec.hook, status: 'missing' });
@@ -123,9 +130,11 @@ function main() {
   fs.mkdirSync(path.dirname(CACHE), { recursive: true });
   fs.writeFileSync(CACHE, JSON.stringify(report, null, 2));
   const missingSuffix = report.summary.missing > 0 ? ` missing=${report.summary.missing}` : '';
-  console.log(`hook-selftest: tested=${report.summary.tested} passed=${report.summary.passed} failed=${report.summary.failed}${missingSuffix}`);
+  const skippedSuffix = report.summary.skipped > 0 ? ` skipped=${report.summary.skipped}` : '';
+  console.log(`hook-selftest: tested=${report.summary.tested} passed=${report.summary.passed} failed=${report.summary.failed}${missingSuffix}${skippedSuffix}`);
   for (const h of report.hooks) {
     if (h.status === 'pass') continue;
+    if (h.status === 'skipped-windows') { console.log(`  SKIP (Windows): ${h.hook}`); continue; }
     if (h.status === 'missing') { console.log(`  MISSING: ${h.hook}`); continue; }
     console.log(`  FAIL: ${h.hook}`);
     for (const c of h.cases || []) if (!c.ok) console.log(`    - ${c.name}: ${c.fails.join('; ')}`);

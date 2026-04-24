@@ -102,7 +102,7 @@ if [ -x "$SCRUB" ]; then
   # shellcheck disable=SC2016
   printf 'console.log("hello f%sa%sh%sl%sk%se");\n' '' '' '' '' '' > "$TESTDIR/leak.js"
   cd "$TESTDIR" || exit 1
-  if "$TESTDIR/scripts/scrub-check.sh" --quiet 2>&1 | grep -q 'personal tokens detected'; then
+  if "$TESTDIR/scripts/scrub-check.sh" --quiet 2>&1 | grep -qE 'personal tokens (detected|in file content)'; then
     record_pass "scrub-check catches injected leak"
   else
     record_fail "scrub-gate-catches-leak" "expected detection, got no hit"
