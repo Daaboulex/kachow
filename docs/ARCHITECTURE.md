@@ -164,24 +164,33 @@ Every file in `memory/` has YAML frontmatter:
 ---
 name: Short human-readable title
 description: One-line description — specific, searchable
-type: user|feedback|project|reference
+type: user | feedback | project | reference | procedure
+created: 2026-04-21          # YYYY-MM-DD when added
+last_verified: 2026-04-21    # bumped when content re-checked against reality
+last_accessed: 2026-04-21    # auto-updated by memory-retrieval-logger
+ttl_days: permanent          # permanent | 180 | 90 | 30
+evidence: [file:/abs/path, url:..., commit:<sha>]
+status: active               # active | archived | deprecated
 # optional:
 superseded_by: new_file.md
-valid_until: 2026-06-01
 ---
 ```
 
-`type` determines shape:
-- **user** — who the user is / preferences / expertise
-- **feedback** — corrections + approvals (include **Why** + **How to apply**)
-- **project** — current work context
-- **reference** — pointer to external systems
+`type` determines shape + default TTL:
+- **user** — who the user is / preferences / expertise (permanent)
+- **feedback** — corrections + approvals (include **Why** + **How to apply**) (90d)
+- **project** — current work context (90d)
+- **reference** — pointer to external systems (permanent)
+- **procedure** — how-tos and runbooks (180d)
 
 `MEMORY.md` is a one-line-per-entry index — always loaded; truncated after line 200.
 
-**TTL rotation:** `memory-rotate.js` (Stop hook, 7-day cooldown) moves
-`valid_until`-expired or `superseded_by`-chained files to `memory/archive/`.
-Archive is never deleted — audit trail survives.
+**TTL rotation:** `memory-rotate.js` (Stop hook, 7-day cooldown) moves a file
+to `memory/archive/` when `now - last_verified > ttl_days` and `ttl_days != permanent`. Archive is never deleted — audit trail survives.
+
+**v1 backward compat:** older memories with just `name`/`description`/`type` plus
+optional `superseded_by`/`valid_until` still load. Run
+`node hooks/lib/memory-migrate.js --migrate-to-v2` to upgrade in place.
 
 ## Scrub pipeline (personal info containment)
 

@@ -1,6 +1,6 @@
 # Hooks catalog
 
-42 shipped hooks + 20 library helpers. Every one is pure Node (stdlib only); runs identically on Linux, macOS, and Windows (where the host AI CLI supports hooks).
+42 shipped hooks + 21 library helpers (19 top-level + 2 under `lib/self-improvement/`). Every one is pure Node (stdlib only); runs identically on Linux, macOS, and Windows (where the host AI CLI supports hooks).
 
 Registered under `hooks.<event>[].hooks[]` in the tool's settings JSON. See `settings.template.json` (Claude) and `settings.gemini.template.json` (Gemini) for the wiring.
 

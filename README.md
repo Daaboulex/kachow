@@ -191,7 +191,7 @@ Three top-level directories:
 - **`~/.claude/`** — Claude-specific (hooks master, commands, settings). Mostly populated by bootstrap.
 - **`~/.gemini/`** — Gemini-specific (settings, hooks mirrored from Claude). Mostly populated by bootstrap.
 
-Codex, OpenCode, Aider, Cursor all read `AGENTS.md` through a symlink — no per-tool duplication.
+Codex, OpenCode, and Aider all read `~/.ai-context/AGENTS.md` through a global symlink — no per-tool duplication. Cursor reads `AGENTS.md` at the project root (it has no user-global AGENTS.md concept); bootstrap installs the MCP server for Cursor via `~/.cursor/mcp.json` and you point project-level `.cursor/rules/*.mdc` at the canonical `AGENTS.md` as needed.
 
 Full breakdown in [docs/LOCATIONS.md](./docs/LOCATIONS.md).
 
@@ -280,24 +280,20 @@ Inspired-by, not forked: kachow's hooks, commands, skills, and memory schema are
 
 ## Roadmap
 
-### v0.2.0 — portability + polish
-- [ ] Per-tool skill adapters (auto-rewrite skill descriptions for Gemini's semantic retrieval)
+### v0.3.0 — portability + self-maintenance
+- [ ] Per-tool skill adapters (auto-rewrite skill descriptions for Gemini's semantic retrieval + Cursor `.mdc` generation)
 - [ ] Node-native publish pipeline so Windows maintainers don't need bash
-- [ ] Prune slash commands > 200 LOC (`consolidate-memory`, `wrap-up`, `platform-audit`, `reflect`)
-- [ ] Instrument the rest of the Stop chain with `lib/hook-timer.js` (currently only 5 of 11 hooks report timing)
-- [ ] Expand skill tracker beyond `Skill` tool invocations (current coverage 3.1% of sessions)
-- [ ] CI: extend bootstrap-smoke to exercise the real Claude Code binary on a throwaway HOME
-
-### v0.3.0 — self-maintenance
-- [ ] Scheduled CI job detecting Claude Code / Gemini CLI version drift, opens a release-prep issue
-- [ ] Auto-consolidate 4 Stop-chain consolidation hooks (`reflect-stop`, `meta-system-stop`, `dream-auto`, `stop-sleep-consolidator`) into one dispatcher — saves 3 Node spawns per session
-- [ ] Sharable `ai-snapshot-stop` that doesn't hard-code personal filesystem paths
+- [ ] Prune oversize slash commands (`consolidate-memory`, `wrap-up`, `platform-audit`, `reflect`) via `/distill`
+- [ ] Expand skill tracker beyond `Skill` tool invocations — join `slash_invoke` + `skill_invoke` events for true usage coverage
+- [ ] Auto-consolidate 4 Stop-chain consolidation hooks (`reflect-stop`, `meta-system-stop`, `dream-auto`, `stop-sleep-consolidator`) into one dispatcher
+- [ ] Sharable `ai-snapshot-stop` hook without personal filesystem paths
+- [ ] CI: bootstrap-smoke that exercises the real Claude Code binary on a throwaway `$HOME`
 
 ### v1.0.0 — stable promise
 - [ ] Frozen hook interface: stdin JSON shape, stdout envelope, event names
 - [ ] Frozen `settings.template.json` shape
 - [ ] Documented MCP tool contract (names, args, return shapes, error model)
-- [ ] Upgrade path from v0.x — tested by CI
+- [ ] Tested upgrade path from every v0.x
 
 ## Contributing
 

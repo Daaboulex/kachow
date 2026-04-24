@@ -28,7 +28,7 @@ Every Stop hook runs in a known order (see `settings.template.json → hooks.Sto
 |---|---|---|---|
 | `auto-push-global` | `~/.claude/` + `~/.gemini/` (+ `~/.ai-context/` opt-in) | Commits locally always; pushes every 5 min or when commits pile up. | 5 min (push only) |
 
-Upstream framework maintainers typically also run a private mirror hook that scrubs `~/.ai-context/` + `~/.claude/` + `~/.gemini/` into a separate release tree, deep-verifies the output, and pushes to the public repo on a cooldown. That hook is **not shipped in the public framework** — every maintainer's publishing tree is personal. Build your own (see `scripts/scrub-check.sh` + `scripts/scrub-sanitize.js` for the building blocks), or publish manually with `bump-version.sh` + `scrub-check.sh` + `git push` as covered below.
+Upstream framework maintainers typically also run a private mirror hook that scrubs `~/.ai-context/` + `~/.claude/` + `~/.gemini/` into a separate release tree, deep-verifies the output, and pushes to the public repo on a cooldown. That hook is **not shipped in the public framework** — every maintainer's publishing tree is personal. The public framework ships `scripts/scrub-check.sh` as the fast pre-push gate; publish manually with `bump-version` + `scrub-check` + `git push` as covered below.
 
 ## Machine scenarios
 
@@ -64,8 +64,7 @@ If Developer Mode is off, symlinks fall back to plain file copies — you just h
 The shipped release helpers are:
 
 - `scripts/bump-version.sh` / `scripts/bump-version.ps1` — semver bump from Conventional Commits; writes `VERSION` + updates `CHANGELOG.md`.
-- `scripts/scrub-check.sh` — fast pre-push scrub verifier.
-- `scripts/scrub-sanitize.js` — runs the full sanitizer on a target tree.
+- `scripts/scrub-check.sh` — fast pre-push scrub verifier; install as `.git/hooks/pre-push` for automatic enforcement.
 
 Typical release flow (cross-platform):
 

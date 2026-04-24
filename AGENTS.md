@@ -184,7 +184,7 @@ All supported tools read from this single source:
 | Windsurf | `~/.codeium/windsurf/memories/global_rules.md` | symlink if installed; native AGENTS.md Cascade support Wave 8+ |
 | Copilot (cloud) | `AGENTS.md` + `.github/copilot-instructions.md` | native read |
 | Cline / Continue.dev | per-tool rules + MCP | MCP auto-registered |
-| Any MCP-capable | MCP tools `search_memory`, `list_skills`, `get_rule`, `read_debt`, `list_tasks`, `read_handoff`, etc. | via `personal-context-mcp` server |
+| Any MCP-capable | MCP tools `search_memory`, `list_skills`, `get_rule`, `read_debt`, `list_tasks`, `read_handoff`, etc. | via `personal-context` server |
 
 **How to apply changes:** edit `~/.ai-context/AGENTS.md` → every tool picks it up on next session. No regeneration step.
 
