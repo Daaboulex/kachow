@@ -1,8 +1,46 @@
 ---
-description: Analyze session for corrections and approvals, update project context files (CLAUDE.md, memories, rules, skills). Self-improving AI context.
+description: Reflect on session, manage auto-reflect setting. Args: on | off | status | (empty = run reflection)
 ---
 
-# Session Reflection
+# /reflect
+
+If `$ARGUMENTS` is non-empty, dispatch to the matching mode and stop. Otherwise fall through to the full Session Reflection workflow below.
+
+## Mode: `on` — enable Stop-hook auto-reflect
+
+```bash
+touch ~/.claude/.reflect-enabled
+```
+
+Confirm: `Auto-reflect enabled. Sessions will automatically capture learnings on exit.`
+
+## Mode: `off` — disable Stop-hook auto-reflect
+
+```bash
+rm -f ~/.claude/.reflect-enabled
+```
+
+Confirm: `Auto-reflect disabled. Use /reflect manually to capture learnings.`
+
+## Mode: `status` — report current state
+
+```bash
+if [ -f ~/.claude/.reflect-enabled ]; then
+  echo "Auto-reflect: ON"
+  echo "Sessions will automatically capture learnings on exit."
+  echo "Disable with: /reflect off"
+else
+  echo "Auto-reflect: OFF"
+  echo "Use /reflect manually to capture learnings."
+  echo "Enable with: /reflect on"
+fi
+```
+
+---
+
+`$ARGUMENTS`
+
+# Session Reflection (no-args mode)
 
 Analyze the current conversation to extract learnings and update context files.
 
@@ -26,7 +64,7 @@ ls .gemini/skills/ .gemini/rules/ .gemini/memory/ 2>/dev/null
 | **NixOS variant** | `.ai-context/.claude/` (symlinked) | `.ai-context/.gemini/` (symlinked) | This repo |
 | **Claude global memory** | `~/.claude/projects/<path-encoded>/memory/` | — | This project, persists across sessions |
 
-Note the project memory directory path for Claude global memory — it encodes the project path (e.g., `~/.claude/projects/-home-user-[project-dir]/memory/`).
+Note the project memory directory path for Claude global memory — it encodes the project path (e.g., `~/.claude/projects/-home-user-Documents-fahlke-monorepo/memory/`).
 
 ## Phase 2: Scan for Signals
 
@@ -80,7 +118,7 @@ A hook is appropriate when the learning is a **deterministic, repeatable action*
 → **HOOK** (`~/.claude/hooks/<name>.js` + register in `settings.json`)
 Examples:
 - "After editing .claude/AI-tasks.json, also copy to .gemini/" → PostToolUse hook
-- "When editing [safety-module]/ files, warn about safety" → PreToolUse hook
+- "When editing Actuator/ files, warn about safety" → PreToolUse hook
 - "At session start, show active tasks and git status" → SessionStart hook
 - "At session end, clean up stale completed tasks" → SessionStart hook
 
@@ -105,7 +143,7 @@ Examples: "When adding a new protocol message, follow these 8 steps across 2 pla
 A rule is appropriate when the learning is a **code pattern that must ALWAYS be followed** when touching files matching a specific path glob. Rules are auto-loaded by path scope.
 
 → **RULE** (`.claude/rules/<scope>.md`) — path-scoped, always loaded for matching files
-Examples: "ESP32 WiFi files must use [rtos] dual-core pattern", "Dotnet V2 uses Avalonia not WinForms"
+Examples: "ESP32 WiFi files must use FreeRTOS dual-core pattern", "Dotnet V2 uses Avalonia not WinForms"
 
 When creating rules, check existing rules first:
 ```bash
@@ -300,7 +338,7 @@ type: user | feedback | project | reference
 If the session modified `~/.claude/hooks/`, `~/.claude/commands/`, or global skills:
 - `auto-push-global.js` hook auto-commits+pushes `~/.claude/` and `~/.gemini/` on session end
 - Shared hooks are auto-synced Claude→Gemini by the same hook
-- Both dirs are git repos ([claude-repo], [gemini-repo])
+- Both dirs are git repos (claude-global, gemini-global)
 
 ## Hard Rules
 
