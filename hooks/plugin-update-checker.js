@@ -24,14 +24,17 @@ function output(updates) {
   }
 }
 
-// Only check once per day — silent on cache hit to save tokens
+// Only hit the network once per day (git fetch is slow). But we STILL surface
+// any cached pending updates every session — otherwise the hook detects
+// updates once, writes the cache, and the user never sees them until they
+// manually rerun with a stale cache. Previous behavior: silent on cache-hit
+// → user shipped for 5 days with 5 pending plugin updates invisible.
 try {
   if (fs.existsSync(cacheFile)) {
     const cache = JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
     const age = Date.now() - (cache.checked_at || 0);
     if (age < 86400000) { // 24 hours
-      // Don't re-emit stale updates — only notify on fresh checks
-      output(null);
+      output(cache.updates || []);
       process.exit(0);
     }
   }
