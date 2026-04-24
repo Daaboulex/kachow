@@ -12,6 +12,10 @@ permissions:
 
 jobs:
   check-drift:
+    # Suppress phantom "failure" runs on push events (workflow only triggers on
+    # schedule/workflow_dispatch, but GitHub still records a workflow_run when
+    # the workflow file is modified in a push). This guard returns success.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
