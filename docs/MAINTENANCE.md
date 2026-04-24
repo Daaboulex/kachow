@@ -96,6 +96,20 @@ git push origin main
 
 Users running `auto-pull-global` pick up the revert on the next session start. Because the scrub pipeline is deterministic, re-running `publish.sh --set-version <patch>` from a known-good source state produces the same output as a fresh clone.
 
+## Branch protection
+
+Branch protection on `main` is configured by `scripts/setup-branch-protection.sh`.
+Idempotent — safe to re-run.
+
+```bash
+./scripts/setup-branch-protection.sh OWNER/REPO
+```
+
+Required status checks: CI on ubuntu+macos+windows. Force-pushes blocked. Linear
+history required. Conversation resolution required.
+
+Run once after creating your fork's public repo.
+
 ## Quick health check
 
 ```bash
