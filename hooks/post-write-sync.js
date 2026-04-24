@@ -8,14 +8,29 @@
 //   3. .claude/agents/*.md → .gemini/agents/*.md (with frontmatter translation)
 //   4. AI-tasks.json / AI-progress.json bidirectional sync
 
+const TIMER_START = process.hrtime.bigint();
 const fs = require('fs');
 const path = require('path');
+
+function emitTiming(errCount, syncMessage, toolDurationMs) {
+  try {
+    const total_ms = Number(process.hrtime.bigint() - TIMER_START) / 1e6;
+    const meta = { total_ms: +total_ms.toFixed(3), error_count: errCount || 0, has_message: !!syncMessage };
+    if (typeof toolDurationMs === 'number') meta.tool_duration_ms = +toolDurationMs.toFixed(3);
+    require('./lib/observability-logger.js').logEvent(process.cwd(), {
+      type: 'hook_timing',
+      source: 'post-write-sync',
+      meta,
+    });
+  } catch {}
+}
 
 let raw = '';
 try { raw = fs.readFileSync(0, 'utf8'); } catch { raw = '{}'; }
 
 try {
   const input = JSON.parse(raw);
+  const toolDurationMs = typeof input.duration_ms === 'number' ? input.duration_ms : undefined;
   const filePath = input.tool_input?.file_path || input.tool_response?.filePath || '';
   if (!filePath) {
     process.stdout.write('{"continue":true}');
@@ -268,6 +283,7 @@ try {
       obs.logEvent(process.cwd(), { type: 'hook_errors', source: 'post-write-sync', errors, severity: errors.some(e => e.critical) ? 'critical' : (errors.length > 2 ? 'warning' : 'info') });
     } catch {}
     // Previously only surfaced if critical OR count > 2. Now always surface so silent failures become visible.
+    emitTiming(errors.length, true, toolDurationMs);
     process.stdout.write(JSON.stringify({
       continue: true,
       systemMessage: `[hook-error-aggregation] ${errors.length} sub-function(s) failed in post-write-sync: ${errors.map(e => e.section).join(', ')}`
@@ -275,8 +291,10 @@ try {
     process.exit(0);
   }
 
+  emitTiming(errors.length, false, toolDurationMs);
   process.stdout.write('{"continue":true}');
 } catch (e) {
   process.stderr.write('post-write-sync: ' + e.message + '\n');
+  emitTiming(1, false);
   process.stdout.write('{"continue":true}');
 }

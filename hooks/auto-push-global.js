@@ -7,6 +7,19 @@
 // Non-blocking: offline or conflict = local commit preserved, user notified.
 // Cross-platform (Linux, macOS, Windows) — no shell pipes, no /dev/null.
 
+
+const TIMER_START = process.hrtime.bigint();
+function __emitTiming(errCount) {
+  try {
+    const total_ms = Number(process.hrtime.bigint() - TIMER_START) / 1e6;
+    require('./lib/observability-logger.js').logEvent(process.cwd(), {
+      type: 'hook_timing',
+      source: 'auto-push-global',
+      meta: { total_ms: +total_ms.toFixed(3), error_count: errCount || 0 },
+    });
+  } catch {}
+}
+
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
@@ -157,14 +170,14 @@ try {
   try { require('./lib/observability-logger.js').logEvent(process.cwd(), { type: 'auto_push', source: 'auto-push-global', success: warnings.length === 0, meta: { claudeCommitted, geminiCommitted, aiContextCommitted, pushed: shouldPush, warnings } }); } catch {}
 
   if (warnings.length > 0) {
-    process.stdout.write(JSON.stringify({
+    __emitTiming(0); process.stdout.write(JSON.stringify({
       continue: true,
       systemMessage: '[auto-push] ' + warnings.join('; ')
     }));
   } else {
-    process.stdout.write('{"continue":true}');
+    __emitTiming(0); process.stdout.write('{"continue":true}');
   }
 } catch (e) {
   process.stderr.write('auto-push-global: ' + e.message + '\n');
-  process.stdout.write('{"continue":true}');
+  __emitTiming(0); process.stdout.write('{"continue":true}');
 }

@@ -20,12 +20,24 @@
 // Platform detection: script path (.claude vs .gemini) determines which binary to spawn.
 // Windows: spawn with shell:true to pick up .cmd wrappers.
 
+const TIMER_START = process.hrtime.bigint();
+function __emitTiming(errCount) {
+  try {
+    const total_ms = Number(process.hrtime.bigint() - TIMER_START) / 1e6;
+    require('./lib/observability-logger.js').logEvent(process.cwd(), {
+      type: 'hook_timing',
+      source: 'stop-sleep-consolidator',
+      meta: { total_ms: +total_ms.toFixed(3), error_count: errCount || 0 },
+    });
+  } catch {}
+}
+
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { spawn } = require('child_process');
 
-function passthrough() { process.stdout.write('{"continue":true}'); process.exit(0); }
+function passthrough() { __emitTiming(0); process.stdout.write('{"continue":true}'); process.exit(0); }
 
 try {
   if (process.env.SKIP_SLEEP_CONSOLIDATOR === '1') passthrough();

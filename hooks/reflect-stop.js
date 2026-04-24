@@ -4,6 +4,19 @@
 // Falls back to silent timestamp if cooldown hasn't elapsed.
 // Cross-platform (Linux, macOS, Windows)
 
+
+const TIMER_START = process.hrtime.bigint();
+function __emitTiming(errCount) {
+  try {
+    const total_ms = Number(process.hrtime.bigint() - TIMER_START) / 1e6;
+    require('./lib/observability-logger.js').logEvent(process.cwd(), {
+      type: 'hook_timing',
+      source: 'reflect-stop',
+      meta: { total_ms: +total_ms.toFixed(3), error_count: errCount || 0 },
+    });
+  } catch {}
+}
+
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
@@ -26,7 +39,7 @@ try {
   const elapsed = Date.now() - lastTime;
 
   if (elapsed < COOLDOWN_MS) {
-    process.stdout.write('{"continue":true}');
+    __emitTiming(0); process.stdout.write('{"continue":true}');
     process.exit(0);
   }
 
@@ -40,7 +53,7 @@ try {
 
   if (wrapUpRecent) {
     // Wrap-up was run — just continue silently
-    process.stdout.write('{"continue":true}');
+    __emitTiming(0); process.stdout.write('{"continue":true}');
     process.exit(0);
   }
 
@@ -84,13 +97,13 @@ try {
   try { require('./lib/observability-logger.js').logEvent(cwd, { type: 'session_end', source: 'reflect-stop', meta: { claudeChanged, geminiChanged, wrapUpRecent } }); } catch {}
 
   if (claudeChanged || geminiChanged) {
-    process.stdout.write(JSON.stringify({
+    __emitTiming(0); process.stdout.write(JSON.stringify({
       continue: true,
       systemMessage: '[session-end] Changes detected. Run /wrap-up (comprehensive) or /handoff (fast) to capture state and learnings before this session ends. Without either, only a timestamp is saved — session context and learnings are lost.'
     }));
   } else {
-    process.stdout.write('{"continue":true}');
+    __emitTiming(0); process.stdout.write('{"continue":true}');
   }
 } catch {
-  process.stdout.write('{"continue":true}');
+  __emitTiming(0); process.stdout.write('{"continue":true}');
 }

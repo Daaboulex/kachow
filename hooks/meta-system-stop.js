@@ -3,6 +3,19 @@
 // Phase 8 REQ-08-02, REQ-08-03
 // Advisory only — writes findings to semantic files, never auto-modifies.
 
+
+const TIMER_START = process.hrtime.bigint();
+function __emitTiming(errCount) {
+  try {
+    const total_ms = Number(process.hrtime.bigint() - TIMER_START) / 1e6;
+    require('./lib/observability-logger.js').logEvent(process.cwd(), {
+      type: 'hook_timing',
+      source: 'meta-system-stop',
+      meta: { total_ms: +total_ms.toFixed(3), error_count: errCount || 0 },
+    });
+  } catch {}
+}
+
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
@@ -162,7 +175,8 @@ try {
 
 // --- Output ---
 if (messages.length > 0) {
-  process.stdout.write(JSON.stringify({ continue: true, systemMessage: messages.join('\n') }));
+  __emitTiming(0); process.stdout.write(JSON.stringify({
+      continue: true, systemMessage: messages.join('\n') }));
 } else {
-  process.stdout.write('{"continue":true}');
+  __emitTiming(0); process.stdout.write('{"continue":true}');
 }
