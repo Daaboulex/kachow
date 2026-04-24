@@ -23,17 +23,31 @@ fi
 
 echo "Applying branch protection to ${REPO}/main..."
 
+# gh CLI typing: -f sends strings, -F sends typed (bool/int/null) values.
+# GitHub's branch-protection API rejects string "true" for boolean fields.
 gh api -X PUT "repos/${REPO}/branches/main/protection" \
-  -f required_status_checks.strict=true \
-  -f required_status_checks.contexts[]='test (ubuntu-latest)' \
-  -f required_status_checks.contexts[]='test (macos-latest)' \
-  -f required_status_checks.contexts[]='test (windows-latest)' \
-  -f enforce_admins=false \
-  -f required_pull_request_reviews.required_approving_review_count=0 \
-  -F restrictions=null \
-  -f allow_force_pushes=false \
-  -f allow_deletions=false \
-  -f required_linear_history=true \
-  -f required_conversation_resolution=true
+  --input - <<JSON
+{
+  "required_status_checks": {
+    "strict": true,
+    "contexts": [
+      "test (ubuntu-latest)",
+      "test (macos-latest)",
+      "test (windows-latest)"
+    ]
+  },
+  "enforce_admins": false,
+  "required_pull_request_reviews": {
+    "required_approving_review_count": 0,
+    "dismiss_stale_reviews": false,
+    "require_code_owner_reviews": false
+  },
+  "restrictions": null,
+  "allow_force_pushes": false,
+  "allow_deletions": false,
+  "required_linear_history": true,
+  "required_conversation_resolution": true
+}
+JSON
 
 echo "Branch protection applied. Verify at https://github.com/${REPO}/settings/branches"
