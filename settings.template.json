@@ -728,6 +728,18 @@
           }
         ]
       }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "name": "slash-command-logger",
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/slash-command-logger.js\"",
+            "timeout": 3
+          }
+        ]
+      }
     ]
   }
 }
