@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(__dirname + "/lib/emit-simple-timing.js").start(__filename);
 // Stop hook: Track which skills were invoked during the session.
 // Writes to ~/.claude/skill-usage.json — consumed by /consolidate-memory for staleness analysis.
 // Lightweight: only reads stdin for session context, appends one entry.

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(__dirname + "/lib/emit-simple-timing.js").start(__filename);
 // SessionStart hook: Auto-display AI-tasks + AI-progress + git status summary.
 // Replaces LLM spending turns reading these files manually at session start.
 // Outputs a systemMessage with the key state so the LLM has it immediately.

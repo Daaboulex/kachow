@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(__dirname + "/lib/emit-simple-timing.js").start(__filename);
 // gsd-hook-version: 1.29.0
 // Plugin Update Checker - runs on SessionStart
 // Checks if installed plugins have newer versions in their marketplaces

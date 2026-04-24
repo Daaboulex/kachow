@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(__dirname + "/lib/emit-simple-timing.js").start(__filename);
 // SessionStart hook: pull latest config from remote before session begins.
 // Safety: stash once, pull with rebase, restore stash. On conflict, warn + skip.
 // Self-healing: if local branch diverged, attempts rebase. If that fails, warns.

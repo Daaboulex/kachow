@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(__dirname + "/lib/emit-simple-timing.js").start(__filename);
 // SubagentStop hook: Enforce verification before subagent tasks are marked done.
 // Checks if the task description suggests code changes were made,
 // and warns if no build/test command was run in the session.

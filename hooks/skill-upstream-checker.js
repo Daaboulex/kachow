@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(__dirname + "/lib/emit-simple-timing.js").start(__filename);
 // SessionStart hook: check upstream skill repos for updates (7-day cooldown)
 // Non-blocking: network failure = silent skip
 // Cross-platform: uses Node.js https instead of curl

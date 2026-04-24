@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(__dirname + "/lib/emit-simple-timing.js").start(__filename);
 // PostToolUse hook: When a hook file (~/.claude/hooks/*.js or ~/.gemini/hooks/*.js)
 // is modified, check if it's registered in settings.json or referenced by a combined
 // hook. Warn about potential orphans.

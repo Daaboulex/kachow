@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(__dirname + "/lib/emit-simple-timing.js").start(__filename);
 // validate-symlinks.js
 // SessionStart hook. Runs recursive symlink audit across every AI-tool surface.
 // Non-fatal (always exits 0), but emits a warning banner + JSONL event if any

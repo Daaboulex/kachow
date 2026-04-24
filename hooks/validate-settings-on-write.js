@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(__dirname + "/lib/emit-simple-timing.js").start(__filename);
 // PreToolUse hook: Validate settings.json edits BEFORE they're written.
 // Prevents the "relative path" hook bug where commands like
 // `node .claude/hooks/X.js` fail when cwd is a subdirectory.

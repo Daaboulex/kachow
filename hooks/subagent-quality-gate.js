@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(__dirname + "/lib/emit-simple-timing.js").start(__filename);
 // SubagentStop hook: Quality gate — check subagent output before accepting.
 // Warns if subagent touched safety-critical files or produced empty output.
 // Also removes the subagent-active marker file (counterpart to the write in

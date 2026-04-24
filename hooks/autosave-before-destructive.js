@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(__dirname + "/lib/emit-simple-timing.js").start(__filename);
 // PreToolUse hook: Auto-git-stash before destructive bash commands.
 //
 // Enforces the rule in CLAUDE.md: "Autosave FIRST, then act. No exceptions."

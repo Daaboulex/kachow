@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(__dirname + "/lib/emit-simple-timing.js").start(__filename);
 // PostToolUse hook: detect when agent edits the same file 3+ times within N tool calls.
 // Signals a "bandaid loop" — iterating on symptoms instead of identifying root cause.
 //

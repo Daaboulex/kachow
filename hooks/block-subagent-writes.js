@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(__dirname + "/lib/emit-simple-timing.js").start(__filename);
 // PreToolUse hook: Block subagents from git state-changing commands.
 // Universal — applies to every project, not just safety-critical.
 //

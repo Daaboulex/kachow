@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(__dirname + "/lib/emit-simple-timing.js").start(__filename);
 // Notification hook: tries notify-send (desktop), falls back to JSONL for SSH/headless.
 //
 // Prior hook: `notify-send ... || true` — silently dropped messages in headless sessions.

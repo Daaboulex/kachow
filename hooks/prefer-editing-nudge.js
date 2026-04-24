@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(__dirname + "/lib/emit-simple-timing.js").start(__filename);
 // PreToolUse hook: nudge when Write creates a new file that could logically be an Edit.
 // Enforces CLAUDE.md: "Prefer editing existing files over creating new ones."
 //

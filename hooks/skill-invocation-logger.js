@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(__dirname + "/lib/emit-simple-timing.js").start(__filename);
 // PostToolUse hook: log Skill tool invocations to a session-local temp file
 // This is the REAL-TIME skill tracking that track-skill-usage.js reads at session end.
 // Without this, skill usage is never captured (the Stop hook can't see the transcript).

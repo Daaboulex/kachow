@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(__dirname + "/lib/emit-simple-timing.js").start(__filename);
 // PostToolUse/AfterTool hook — Task 2 per 2026-04-14-memory-architecture-v2.md Phase 3 (Rule M9)
 // Logs memory-file Reads to per-machine retrieval log. Feeds detectors R11 (cold) + R12 (hot).
 //

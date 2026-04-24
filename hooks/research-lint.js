@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(__dirname + "/lib/emit-simple-timing.js").start(__filename);
 // research-lint.js
 // PostToolUse Write|Edit hook. Runs on any write under ~/Documents/research/.
 // Scans for principle-style claims without citations and warns.

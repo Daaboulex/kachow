@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(__dirname + "/lib/emit-simple-timing.js").start(__filename);
 // Stop hook: auto-consolidate-memory with dual-gate trigger (time + session count)
 // Consolidates memories periodically — merges duplicates, resolves contradictions,
 // prunes stale data, converts dates, tightens index.

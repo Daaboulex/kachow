@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(__dirname + "/lib/emit-simple-timing.js").start(__filename);
 // PreToolUse hook: Catch personal tokens in Write tool content BEFORE they land
 // in a public-shareable directory. Works as a runtime scrub sentinel — CI
 // + pre-push still run as defense-in-depth.

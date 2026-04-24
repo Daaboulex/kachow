@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(__dirname + "/lib/emit-simple-timing.js").start(__filename);
 // PostToolUse hook: Enforces context pressure thresholds documented in CLAUDE.md.
 //
 // gsd-context-monitor.js WARNS at 35%/25% remaining. This hook ENFORCES

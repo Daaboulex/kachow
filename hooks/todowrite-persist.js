@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(__dirname + "/lib/emit-simple-timing.js").start(__filename);
 // Stop hook: Promote in-progress + blocked todos from session cache into
 // AI-tasks.json at the project canonical location. Done todos go into
 // completed_log (rotating cap 50). Pending todos are dropped (ephemeral).

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(__dirname + "/lib/emit-simple-timing.js").start(__filename);
 // PostToolUse hook: Track file touches + emit heartbeat every HEARTBEAT_INTERVAL tool calls.
 // Core logic lives in lib/presence.js.
 

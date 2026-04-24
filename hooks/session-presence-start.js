@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(__dirname + "/lib/emit-simple-timing.js").start(__filename);
 // SessionStart hook: register session in presence files, report active peers.
 // Core helpers live in lib/presence.js.
 

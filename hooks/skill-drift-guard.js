@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(__dirname + "/lib/emit-simple-timing.js").start(__filename);
 // PostToolUse/AfterTool hook — Task 3: re-inject critical project rules every N tool calls.
 //
 // Rationale (handoff 2026-04-14): long sessions drift from rules established at SessionStart.

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(__dirname + "/lib/emit-simple-timing.js").start(__filename);
 // PostToolUse hook for TodoWrite: cache the todo list per-session so Stop hook
 // (todowrite-persist.js) can promote remaining in-progress/blocked tasks to
 // AI-tasks.json at the project canonical location.

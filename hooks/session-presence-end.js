@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(__dirname + "/lib/emit-simple-timing.js").start(__filename);
 // Stop hook: mark session ended + clean counter.
 // Core helpers live in lib/presence.js.
 

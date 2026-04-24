@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(__dirname + "/lib/emit-simple-timing.js").start(__filename);
 // PreCompact hook: Trigger /handoff before context compression
 // Replaces the vague "write a session anchor" with a structured state dump.
 // This fires when auto-compact is about to run — the agent's last chance to save state.

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(__dirname + "/lib/emit-simple-timing.js").start(__filename);
 // memory-rotate.js
 // Stop hook. Cooldown-gated (7d). Rotates expired memories to archive/
 // and rebuilds the MEMORY.md index. No LLM work — purely mechanical.

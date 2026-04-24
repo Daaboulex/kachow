@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(__dirname + "/lib/emit-simple-timing.js").start(__filename);
 // PreToolUse hook: block TodoWrite that marks a task done with empty verifiedBy.
 // Enforces CLAUDE.md rule: "NEVER mark a task as done without running a real verification command."
 //

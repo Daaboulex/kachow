@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(__dirname + "/lib/emit-simple-timing.js").start(__filename);
 // Combined PreToolUse guard for Write|Edit|MultiEdit|Bash operations.
 // Merges guards into 1 process: saves Node spawns per tool call.
 //

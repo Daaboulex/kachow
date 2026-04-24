@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(__dirname + "/lib/emit-simple-timing.js").start(__filename);
 // InstructionsLoaded hook: validate CLAUDE.md ↔ GEMINI.md sync
 // Fires when CLAUDE.md or .claude/rules/*.md are loaded into context.
 // Catches drift from manual edits, git operations, submodule updates,

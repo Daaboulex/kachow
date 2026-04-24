@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(__dirname + "/lib/emit-simple-timing.js").start(__filename);
 // Claude-native enhanced statusline hook
 // Shows: model | git branch+status | GSD task | context bar | elapsed | tokens
 // Uses shared renderer: require('./lib/statusline-renderer')

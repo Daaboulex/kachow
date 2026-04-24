@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(__dirname + "/lib/emit-simple-timing.js").start(__filename);
 // SubagentStart hook: Auto-inject harness rules into every subagent +
 // write subagent-active marker for PreToolUse commit-block enforcement.
 // This replaces the model needing to REMEMBER to consult agent-harness skill.

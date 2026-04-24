@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(__dirname + "/lib/emit-simple-timing.js").start(__filename);
 // PostToolUse hook: When a global hook file (~/.claude/hooks/*.js) is modified,
 // scan project CLAUDE.md files for references to that hook and warn about
 // potential documentation drift.
