@@ -199,6 +199,7 @@ Full breakdown in [docs/LOCATIONS.md](./docs/LOCATIONS.md).
 
 | Doc | Read if you... |
 |---|---|
+| [TUTORIAL.md](./docs/TUTORIAL.md) | Want an end-to-end walkthrough — fresh install on Linux/macOS/Windows, symlinks explained, every AI wired in, plus maintenance and opt-out |
 | [INSTALL-PER-AI.md](./docs/INSTALL-PER-AI.md) | Are installing for a specific AI and want step-by-step instructions |
 | [ARCHITECTURE.md](./docs/ARCHITECTURE.md) | Want to see the actual per-event hook flow (real diagrams, not hand-waving) |
 | [HOOKS.md](./docs/HOOKS.md) | Want the full catalog of every hook + what it does |
