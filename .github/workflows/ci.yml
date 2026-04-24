@@ -39,6 +39,43 @@ jobs:
           cp -r hooks/* "$HOME/.claude/hooks/"
           node hooks/lib/hook-selftest.js
 
+      - name: Orphan hook file detector
+        shell: bash
+        if: runner.os != 'Windows'
+        run: |
+          set -e
+          REGISTERED=$(node -e '
+            const s = JSON.parse(require("fs").readFileSync("settings.template.json","utf8"));
+            const names = new Set();
+            for (const ev of Object.values(s.hooks||{})) {
+              for (const block of ev) {
+                for (const h of block.hooks||[]) {
+                  const m = (h.command||"").match(/hooks\/([^\s"\\]+\.js)/);
+                  if (m) names.add(m[1]);
+                }
+              }
+            }
+            console.log([...names].join("\n"));
+          ')
+          FAIL=0
+          for f in hooks/*.js; do
+            base=$(basename "$f")
+            if ! echo "$REGISTERED" | grep -qx "$base"; then
+              # Allowlist: documented standalone CLIs
+              case "$base" in
+                validate-symlinks.js)
+                  echo "ALLOWED orphan: $base (standalone CLI)"
+                  ;;
+                *)
+                  echo "::error::orphan hook $base — present in hooks/ but not registered in settings.template.json"
+                  FAIL=1
+                  ;;
+              esac
+            fi
+          done
+          if [ $FAIL -eq 1 ]; then exit 1; fi
+          echo "All hook files registered (or whitelisted)."
+
       - name: Bash script syntax (Linux/macOS only)
         if: runner.os != 'Windows'
         run: |
