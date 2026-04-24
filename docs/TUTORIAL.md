@@ -295,6 +295,12 @@ kachow auto-wires whichever tools are installed. This section documents what kac
 - Skills in `~/.gemini/skills/` adapted to Gemini's semantic-retrieval format (descriptions are the activation signal, so install rewrites terse descriptions).
 - `personal-context` MCP server in `~/.gemini/settings.json` → `mcpServers`.
 
+**Verify:** open Gemini CLI. If rules loaded, the session-start banner reflects your AGENTS.md content. From any Gemini session, invoke `activate_skill` with a description — if your skills appear as candidates, MCP + skill dir wiring is correct.
+
+**Disable specific hooks:** edit `~/.gemini/settings.json` and remove entries from `hooks.<event>`. Gemini event names: `BeforeTool`, `AfterTool`, `SessionStart`, `SessionEnd`, `PreCompress`, `Notification` (no UserPromptSubmit, SubagentStart, SubagentStop, statusLine — those are Claude-only).
+
+**Rollback:** `rm -rf ~/.gemini/hooks` + restore from `*.bak-*` if present.
+
 **Gotcha:** Gemini doesn't invoke skills by slash command. It selects by matching `description:` frontmatter against user intent. If you write a skill with a terse description (`"Format dates"`), Gemini won't fire it. Rewrite: `"When the user asks for a date rendered as RFC 3339, UTC or localized, produce exactly this output format."`
 
 ### Codex CLI
@@ -303,13 +309,23 @@ kachow auto-wires whichever tools are installed. This section documents what kac
 - `~/.codex/AGENTS.md` → symlinked.
 - `personal-context` MCP server in `~/.codex/config.toml` under `[mcp_servers.personal-context]`.
 
-**What Codex doesn't support:** no hook interface (yet). The rules apply; automation does not.
+**Verify:** `grep '\[mcp_servers.personal-context\]' ~/.codex/config.toml` should print one line. Open Codex and query `search_memory` or `list_skills` via MCP — if they respond, wiring is correct.
+
+**Disable:** Codex has no hook interface yet, so nothing to disable on that front. To remove the MCP integration, delete the `[mcp_servers.personal-context]` block from `~/.codex/config.toml`.
+
+**Rollback:** `rm ~/.codex/AGENTS.md` (restores whatever was there before bootstrap via the `*.pre-ai-context-bak-*` file next to it).
 
 ### OpenCode
 
 **What bootstrap installed:**
 - `~/.config/opencode/AGENTS.md` → symlinked.
-- `personal-context` MCP server in `~/.config/opencode/config.json` → `mcp`.
+- `personal-context` MCP server in `~/.config/opencode/config.json` → `mcp.personal-context`.
+
+**Verify:** `node -e "console.log(Object.keys(require('./.config/opencode/config.json').mcp||{}))"` from your home dir — should include `personal-context`. Launch OpenCode, check the MCP server appears in the active-servers list.
+
+**Disable:** remove the `mcp.personal-context` key from `~/.config/opencode/config.json`. OpenCode doesn't support per-hook disable (there are no hooks on OpenCode).
+
+**Rollback:** `rm ~/.config/opencode/AGENTS.md` + restore from backup if present.
 
 ### Aider
 
@@ -328,6 +344,12 @@ Or permanently in `.aider.conf.yml`:
 read:
   - ~/.config/aider/AGENTS.md
 ```
+
+**Verify:** `readlink ~/.config/aider/AGENTS.md` should resolve to `~/.ai-context/AGENTS.md`. Launch Aider with `--read` and check the first few lines of the system prompt (Aider echoes what it loaded at startup).
+
+**Disable:** remove the `read:` entry from `.aider.conf.yml` (or don't pass `--read`). The symlink stays harmlessly.
+
+**Rollback:** `rm ~/.config/aider/AGENTS.md`.
 
 ### Cursor
 
@@ -352,6 +374,12 @@ read:
    ---
    @~/.ai-context/AGENTS.md
    ```
+
+**Verify:** in Cursor, open any file in the project. The right-panel context section should show the rule loaded. `grep -A3 personal-context ~/.cursor/mcp.json` confirms MCP registration.
+
+**Disable:** remove the per-project symlink OR the `.mdc` file. To remove MCP, drop the `personal-context` entry from `~/.cursor/mcp.json`.
+
+**Rollback:** `rm ./AGENTS.md` (project-local) or `rm ./.cursor/rules/kachow.mdc`. Cursor has no cache to purge.
 
 ### Cline / Continue.dev / Zed / Windsurf / Copilot Workspace / any MCP-capable client
 

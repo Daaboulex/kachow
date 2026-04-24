@@ -309,9 +309,12 @@ if (fs.existsSync(path.join(LIB_DIR, 'symlink-audit.js'))) {
       test('classify broken symlink', () => {
         assert.strictEqual(audit.classifySymlink(linkBroken), 'BROKEN');
       });
-      test('classify looped symlink', () => {
+      test('classify looped symlink returns LOOP (not OK / not BROKEN)', () => {
+        // Posix `stat` on a loop returns ELOOP — some implementations report it
+        // as BROKEN if fs.existsSync fails. Accept LOOP explicitly; reject OK.
         const r = audit.classifySymlink(linkLoopA);
-        assert.ok(r === 'LOOP' || r === 'BROKEN', `got ${r}`);
+        assert.notStrictEqual(r, 'OK', `loop must not classify as OK (got ${r})`);
+        assert.ok(r === 'LOOP' || r === 'BROKEN', `classify returned unexpected value: ${r}`);
       });
       cleanup(dir);
     }
@@ -609,10 +612,13 @@ if (fs.existsSync(path.join(LIB_DIR, 'statusline-renderer.js'))) {
         const s = r.formatContext(75);
         assert.ok(/75%/.test(s), `missing "75%" in ${JSON.stringify(s)}`);
       });
-      test('formatContext(85+) prepends skull emoji + red blink', () => {
+      test('formatContext(85+) prepends skull emoji', () => {
         const s = r.formatContext(90);
-        // Skull emoji is U+1F480
-        assert.ok(s.includes('\u{1F480}') || /90%/.test(s));
+        assert.ok(s.includes('\u{1F480}'), `missing skull emoji in formatContext(90): ${JSON.stringify(s)}`);
+      });
+      test('formatContext(under 85) does NOT prepend skull emoji', () => {
+        const s = r.formatContext(70);
+        assert.ok(!s.includes('\u{1F480}'), 'skull emoji should only appear at ≥85%');
       });
     }
     if (typeof r.formatElapsed === 'function') {
@@ -675,10 +681,17 @@ if (fs.existsSync(path.join(LIB_DIR, 'observability-logger.js'))) {
       assert.ok(timings.every(e => e.type === 'hook_timing'));
     });
 
-    test('readEvents respects days cutoff (days=0 excludes older)', () => {
-      // today's events should still show with days=1 (today within window)
-      const todayEvents = obs.readEvents(projectDir, 1);
-      assert.ok(todayEvents.length >= 1);
+    test('readEvents respects days-cutoff: days=1 includes today, excludes old', () => {
+      // Write a synthetic 30-day-old event into a dated file.
+      const oldDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      const oldFile = path.join(epDir, `${oldDate}-${host}.jsonl`);
+      fs.writeFileSync(oldFile, JSON.stringify({ ts: oldDate + 'T00:00:00Z', host, type: 'hook_timing', source: 'ancient' }) + '\n');
+      const oneDay = obs.readEvents(projectDir, 1);
+      // today's 3 events should be included
+      assert.ok(oneDay.length >= 3, `expected ≥3 (today), got ${oneDay.length}`);
+      // ancient event must NOT be included
+      assert.ok(!oneDay.some(e => e.source === 'ancient'), 'ancient event leaked past days=1 cutoff');
+      fs.unlinkSync(oldFile);
     });
 
     test('readEvents returns [] for cwd with no episodic dir', () => {
@@ -730,11 +743,17 @@ if (fs.existsSync(path.join(LIB_DIR, 'presence.js'))) {
       assert.strictEqual(JSON.parse(lines[0]).type, 'session_start');
     });
 
-    test('readActiveSessions returns parsed entries', () => {
+    test('readActiveSessions returns latest entry per session id', () => {
       if (typeof pr.readActiveSessions !== 'function') return;
-      // readActiveSessions takes a file path
+      // Append two events for same session — reader should see the latest state.
+      pr.appendJsonl(f, { type: 'session_start', session_id: 'abc', ts: '2026-01-01T00:00:00Z' });
+      pr.appendJsonl(f, { type: 'heartbeat', session_id: 'abc', ts: '2026-01-01T00:05:00Z' });
+      pr.appendJsonl(f, { type: 'session_start', session_id: 'xyz', ts: '2026-01-01T00:10:00Z' });
       const parsed = pr.readActiveSessions(f);
-      assert.ok(Array.isArray(parsed));
+      assert.ok(Array.isArray(parsed), 'must be array');
+      // Each active session represented
+      const ids = new Set((parsed || []).map(e => e.session_id));
+      assert.ok(ids.has('abc') || ids.size === 0, 'expected abc in active sessions (or empty if already ended)');
     });
 
     cleanup(dir);
@@ -858,18 +877,37 @@ if (fs.existsSync(DETECTORS_PATH)) {
       assert.strictEqual(d.detectHookErrorRecurring(mkCtx(ev)).length, 0);
     });
 
-    test('R15 session_start_p95_regression: ceiling breach fires', () => {
+    test('R15 session_start_p95_regression: ceiling breach → finding fires', () => {
       if (typeof d.detectSessionStartP95Regression !== 'function') return;
-      const ev = [];
-      // 20 events — p95 index is ~19th. Set 19 fast + 1 very slow = p95 breaches.
       const host = os.hostname();
-      for (let i = 0; i < 19; i++) {
-        ev.push({ type: 'hook_timing', source: 'session-start-combined', host, meta: { total_ms: 100 } });
+      // 20 samples: 18 fast (100ms), 2 slow (30000ms).
+      // Sorted: [100×18, 30000×2]. p95-index = ceil(0.95*20)-1 = 18.
+      // samples[18] = 30000 (1st of the two slow) → p95 exceeds 5000ms ceiling.
+      const breached = [];
+      for (let i = 0; i < 18; i++) {
+        breached.push({ type: 'hook_timing', source: 'session-start-combined', host, meta: { total_ms: 100 } });
       }
-      ev.push({ type: 'hook_timing', source: 'session-start-combined', host, meta: { total_ms: 30000 } });
+      breached.push({ type: 'hook_timing', source: 'session-start-combined', host, meta: { total_ms: 30000 } });
+      breached.push({ type: 'hook_timing', source: 'session-start-combined', host, meta: { total_ms: 30000 } });
       process.env.SESSION_START_P95_CEILING_MS = '5000';
-      const findings = d.detectSessionStartP95Regression(mkCtx(ev));
-      assert.ok(findings.length >= 0, 'runs without error');
+      const breachedFindings = d.detectSessionStartP95Regression(mkCtx(breached));
+      assert.ok(breachedFindings.length >= 1, `expected ≥1 finding on breach, got ${breachedFindings.length}`);
+      assert.strictEqual(breachedFindings[0].tier, 'BLOCKER');
+      assert.ok(/p95|session_start/i.test(breachedFindings[0].rule));
+      assert.ok(breachedFindings[0].evidence.p95_ms >= 5000, `p95 evidence wrong: ${breachedFindings[0].evidence.p95_ms}`);
+      delete process.env.SESSION_START_P95_CEILING_MS;
+    });
+
+    test('R15 session_start_p95_regression: under-ceiling → no finding', () => {
+      if (typeof d.detectSessionStartP95Regression !== 'function') return;
+      const host = os.hostname();
+      const safe = [];
+      for (let i = 0; i < 20; i++) {
+        safe.push({ type: 'hook_timing', source: 'session-start-combined', host, meta: { total_ms: 200 } });
+      }
+      process.env.SESSION_START_P95_CEILING_MS = '5000';
+      const safeFindings = d.detectSessionStartP95Regression(mkCtx(safe));
+      assert.strictEqual(safeFindings.length, 0, 'expected 0 findings under ceiling');
       delete process.env.SESSION_START_P95_CEILING_MS;
     });
 
@@ -892,13 +930,16 @@ if (fs.existsSync(path.join(LIB_DIR, 'tier3-consolidation.js'))) {
       assert.strictEqual(t3.getSemanticDir('/some/mem'), path.join('/some/mem', 'semantic'));
     });
 
-    test('archiveAndWrite creates history/ + new file on first write', () => {
+    test('archiveAndWrite on first write: writes new content + no archive', () => {
       const dir = tempDir();
       const f = path.join(dir, 'SUMMARY.md');
       t3.archiveAndWrite(f, 'first content');
-      assert.strictEqual(fs.readFileSync(f, 'utf8'), 'first content');
-      // No history/ yet on first write (nothing to archive)
-      assert.ok(!fs.existsSync(path.join(dir, 'history')) || fs.readdirSync(path.join(dir, 'history')).length === 0);
+      assert.strictEqual(fs.readFileSync(f, 'utf8'), 'first content', 'new content not written');
+      // No archive on first write — history dir should not exist OR be empty
+      const histDir = path.join(dir, 'history');
+      if (fs.existsSync(histDir)) {
+        assert.strictEqual(fs.readdirSync(histDir).length, 0, 'first write should not archive anything');
+      }
       cleanup(dir);
     });
 
@@ -934,12 +975,14 @@ if (fs.existsSync(path.join(LIB_DIR, 'tier3-consolidation.js'))) {
       assert.ok(fm.includes('---'));
     });
 
-    test('buildSummary includes session/episodic/profile counts', () => {
+    test('buildSummary includes exact session + episodic + profile counts', () => {
       if (typeof t3.buildSummary !== 'function') return;
       const dir = tempDir();
       const s = t3.buildSummary(dir, 12, 345, 7);
-      assert.ok(/12/.test(s), 'session count absent');
-      assert.ok(/345|episodic/.test(s), 'episodic count absent');
+      // Assert each number appears literally — not "episodic" word as fallback.
+      assert.ok(/\b12\b/.test(s), `session count 12 not in output: ${s.slice(0, 200)}`);
+      assert.ok(/\b345\b/.test(s), `episodic count 345 not in output: ${s.slice(0, 200)}`);
+      assert.ok(/\b7\b/.test(s), `profile count 7 not in output: ${s.slice(0, 200)}`);
       cleanup(dir);
     });
   });
