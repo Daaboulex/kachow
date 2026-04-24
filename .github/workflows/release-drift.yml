@@ -11,11 +11,17 @@ permissions:
   issues: write
 
 jobs:
+  # No-op job: GitHub creates a workflow_run record when the workflow file is
+  # modified in a push, even if no on.push trigger exists. Without at least
+  # one runnable job, the run reports as failure (0 jobs). This passes silently.
+  noop-on-push:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Drift watch only runs on schedule/workflow_dispatch. Push event skipped."
+
   check-drift:
-    # Suppress phantom "failure" runs on push events (workflow only triggers on
-    # schedule/workflow_dispatch, but GitHub still records a workflow_run when
-    # the workflow file is modified in a push). This guard returns success.
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    if: github.event_name != 'push'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
