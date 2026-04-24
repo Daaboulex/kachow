@@ -67,6 +67,13 @@ function translateFrontmatter(content, map, stripFields, mMap) {
   let frontmatter = match[1];
   const body = content.slice(match[0].length);
 
+  // Direction detection: toolMap has 'Read' key (Claude→Gemini), reverseToolMap has 'read_file' (Gemini→Claude).
+  // This determines the required tools-field SHAPE for the target platform.
+  //   - Claude accepts both `tools: X, Y` and `tools:\n  - X\n  - Y` forms
+  //   - Gemini 0.39+ REQUIRES array form; inline-string fails schema validation
+  // So Claude→Gemini must convert inline-string → array; Gemini→Claude keeps either.
+  const isToGemini = map.Read !== undefined;
+
   // Translate tool names in YAML list format (- ToolName)
   frontmatter = frontmatter.replace(/^(\s*-\s+)(\S+)\s*\r?$/gm, (line, prefix, toolName) => {
     return prefix + (map[toolName] || toolName);
@@ -76,8 +83,12 @@ function translateFrontmatter(content, map, stripFields, mMap) {
   frontmatter = frontmatter.replace(/^(tools:\s*)(.+?)\s*\r?$/m, (line, prefix, toolList) => {
     // Skip if it's just a blank (YAML list follows on next lines)
     if (!toolList.trim()) return line;
-    const translated = toolList.split(/,\s*/).map(t => map[t.trim()] || t.trim()).join(', ');
-    return prefix + translated;
+    const names = toolList.split(/,\s*/).map(t => map[t.trim()] || t.trim());
+    if (isToGemini) {
+      // Gemini schema requires array form — convert inline string to YAML list
+      return `tools:\n  - ${names.join('\n  - ')}`;
+    }
+    return prefix + names.join(', ');
   });
 
   // Translate model: field
@@ -89,6 +100,10 @@ function translateFrontmatter(content, map, stripFields, mMap) {
   for (const field of stripFields) {
     frontmatter = frontmatter.replace(new RegExp(`^${field}:.*\\r?$\\n?`, 'm'), '');
   }
+
+  // Strip trailing whitespace/newlines left by field stripping or tools-shape conversion,
+  // so the closing --- doesn't get a phantom blank line in front of it.
+  frontmatter = frontmatter.replace(/\s+$/, '');
 
   return `---\n${frontmatter}\n---${body}`;
 }

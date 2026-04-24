@@ -552,7 +552,9 @@ body
       assert.ok(!out.includes('- Write'));
     });
 
-    test('translateFrontmatter rewrites inline comma tools', () => {
+    test('translateFrontmatter converts Claude inline comma tools to Gemini YAML array', () => {
+      // Claude uses `tools: X, Y` inline; Gemini 0.39+ REQUIRES array form.
+      // Translating Claude→Gemini must convert shape AND rename tool tokens.
       const input = `---
 tools: Read, Write, Bash
 ---
@@ -560,7 +562,27 @@ tools: Read, Write, Bash
 body
 `;
       const out = pm.translateFrontmatter(input, pm.toolMap, pm.claudeOnlyFields, pm.modelMap);
-      assert.ok(out.includes('read_file, write_file, run_shell_command'));
+      assert.ok(out.includes('- read_file'), 'converts to array + renames Read');
+      assert.ok(out.includes('- write_file'), 'renames Write');
+      assert.ok(out.includes('- run_shell_command'), 'renames Bash');
+      assert.ok(!out.includes('Read, Write'), 'no inline string form remains');
+      assert.ok(!out.includes('read_file, write_file'), 'no inline Gemini string either');
+    });
+
+    test('translateFrontmatter keeps YAML array going Gemini→Claude', () => {
+      const input = `---
+tools:
+  - read_file
+  - write_file
+  - run_shell_command
+---
+
+body
+`;
+      const out = pm.translateFrontmatter(input, pm.reverseToolMap, [], pm.reverseModelMap);
+      assert.ok(out.includes('- Read'), 'renames read_file→Read');
+      assert.ok(out.includes('- Write'), 'renames write_file→Write');
+      assert.ok(out.includes('- Bash'), 'renames run_shell_command→Bash');
     });
 
     test('translateFrontmatter strips Claude-only fields going to Gemini', () => {
