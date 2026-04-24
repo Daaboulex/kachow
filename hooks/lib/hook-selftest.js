@@ -23,7 +23,9 @@ const SPECS = [
     hook: 'validate-symlinks.js',
     event: 'SessionStart',
     tests: [
-      { name: 'exits 0 with resolving symlinks', stdin: '{}', expect: { exit: 0 } },
+      // Silent-when-healthy design: assert no crash/fatal marker leaked to stderr.
+      // Detects case where the hook crashed but swallowed the error (exit=0 hides it).
+      { name: 'exits 0 with resolving symlinks and no fatal marker', stdin: '{}', expect: { exit: 0, stdoutNotMatch: 'fatal|TypeError|ReferenceError|ENOENT' } },
     ],
   },
   {
@@ -59,7 +61,9 @@ const SPECS = [
     event: 'PreToolUse',
     matcher: 'Bash',
     tests: [
-      { name: 'passthrough on ls', stdin: JSON.stringify({ tool_name: 'Bash', tool_input: { command: 'ls' } }), expect: { exit: 0 } },
+      // Passthrough MUST emit `{"continue":true}` — a silent exit=0 (e.g. crash before write)
+      // would otherwise look identical to success.
+      { name: 'passthrough on ls emits continue signal', stdin: JSON.stringify({ tool_name: 'Bash', tool_input: { command: 'ls' } }), expect: { exit: 0, stdoutMatch: 'continue' } },
     ],
   },
   {
@@ -67,7 +71,7 @@ const SPECS = [
     event: 'PreToolUse',
     matcher: 'Bash',
     tests: [
-      { name: 'main-thread passthrough on git status', stdin: JSON.stringify({ tool_name: 'Bash', tool_input: { command: 'git status' } }), expect: { exit: 0 } },
+      { name: 'main-thread passthrough on git status emits continue', stdin: JSON.stringify({ tool_name: 'Bash', tool_input: { command: 'git status' } }), expect: { exit: 0, stdoutMatch: 'continue' } },
     ],
   },
   {
@@ -82,7 +86,7 @@ const SPECS = [
     event: 'PreToolUse',
     matcher: 'TodoWrite',
     tests: [
-      { name: 'passthrough on empty todo list', stdin: JSON.stringify({ tool_name: 'TodoWrite', tool_input: { todos: [] } }), expect: { exit: 0 } },
+      { name: 'passthrough on empty todo list emits continue', stdin: JSON.stringify({ tool_name: 'TodoWrite', tool_input: { todos: [] } }), expect: { exit: 0, stdoutMatch: 'continue' } },
     ],
   },
 ];
@@ -100,6 +104,9 @@ function runCase(hookPath, testCase) {
   if ('exit' in exp && actualExit !== exp.exit) fails.push(`exit ${actualExit} vs ${exp.exit}`);
   if (exp.stdoutMatch && !new RegExp(exp.stdoutMatch, 'i').test(actualStdout)) {
     fails.push(`stdout missing /${exp.stdoutMatch}/i`);
+  }
+  if (exp.stdoutNotMatch && new RegExp(exp.stdoutNotMatch, 'i').test(actualStdout)) {
+    fails.push(`stdout contains /${exp.stdoutNotMatch}/i (should not)`);
   }
   return { name: testCase.name, ok: fails.length === 0, fails, actualExit, stdoutPrefix: actualStdout.slice(0, 200) };
 }
