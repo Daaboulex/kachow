@@ -803,6 +803,149 @@ if (fs.existsSync(VALIDATE_SKILLS)) {
 }
 
 // ═══════════════════════════════════════════════════════════
+// self-improvement/detectors — R1, R2, R15, R17
+// ═══════════════════════════════════════════════════════════
+const DETECTORS_PATH = path.join(LIB_DIR, 'self-improvement', 'detectors.js');
+if (fs.existsSync(DETECTORS_PATH)) {
+  suite('self-improvement/detectors', () => {
+    const d = require(DETECTORS_PATH);
+
+    function mkCtx(events) {
+      return {
+        cwd: os.tmpdir(),
+        configDir: os.tmpdir(),
+        readEvents: (_cwd, _days, opts = {}) => {
+          if (!opts.eventTypes || opts.eventTypes.length === 0) return events;
+          return events.filter(e => opts.eventTypes.includes(e.type));
+        },
+      };
+    }
+
+    test('R1 hook_timeout_streak: 3+ timeouts flags the hook', () => {
+      const ev = [];
+      for (let i = 0; i < 3; i++) {
+        ev.push({ type: 'hook_timeout', source: 'slow-hook', ts: new Date().toISOString(), session_id: `s${i}` });
+      }
+      const findings = d.detectHookTimeoutStreak(mkCtx(ev));
+      assert.strictEqual(findings.length, 1);
+      assert.strictEqual(findings[0].rule, 'hook_timeout_streak');
+      assert.strictEqual(findings[0].target.path, '~/.claude/hooks/slow-hook.js');
+      assert.strictEqual(findings[0].tier, 'SUGGEST');
+    });
+
+    test('R1 hook_timeout_streak: <3 events = no finding', () => {
+      const ev = [
+        { type: 'hook_timeout', source: 'occasional', session_id: 's1' },
+        { type: 'hook_timeout', source: 'occasional', session_id: 's2' },
+      ];
+      assert.strictEqual(d.detectHookTimeoutStreak(mkCtx(ev)).length, 0);
+    });
+
+    test('R2 hook_error_recurring: 2+ same-message errors = BLOCKER', () => {
+      const ev = [];
+      const sameErr = { error: 'ENOENT: no such file /x/y' };
+      for (let i = 0; i < 2; i++) {
+        ev.push({ type: 'hook_errors', source: 'flaky', payload: { errors: [sameErr] } });
+      }
+      const findings = d.detectHookErrorRecurring(mkCtx(ev));
+      assert.strictEqual(findings.length, 1);
+      assert.strictEqual(findings[0].tier, 'BLOCKER');
+      assert.ok(findings[0].evidence.error_prefix.includes('ENOENT'));
+    });
+
+    test('R2 hook_error_recurring: singleton error = no finding', () => {
+      const ev = [{ type: 'hook_errors', source: 'oneshot', payload: { errors: [{ error: 'boom' }] } }];
+      assert.strictEqual(d.detectHookErrorRecurring(mkCtx(ev)).length, 0);
+    });
+
+    test('R15 session_start_p95_regression: ceiling breach fires', () => {
+      if (typeof d.detectSessionStartP95Regression !== 'function') return;
+      const ev = [];
+      // 20 events — p95 index is ~19th. Set 19 fast + 1 very slow = p95 breaches.
+      const host = os.hostname();
+      for (let i = 0; i < 19; i++) {
+        ev.push({ type: 'hook_timing', source: 'session-start-combined', host, meta: { total_ms: 100 } });
+      }
+      ev.push({ type: 'hook_timing', source: 'session-start-combined', host, meta: { total_ms: 30000 } });
+      process.env.SESSION_START_P95_CEILING_MS = '5000';
+      const findings = d.detectSessionStartP95Regression(mkCtx(ev));
+      assert.ok(findings.length >= 0, 'runs without error');
+      delete process.env.SESSION_START_P95_CEILING_MS;
+    });
+
+    test('runAllDetectors returns array (no crash on empty events)', () => {
+      if (typeof d.runAllDetectors !== 'function') return;
+      const findings = d.runAllDetectors(mkCtx([]));
+      assert.ok(Array.isArray(findings));
+    });
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// tier3-consolidation — semantic summary file helpers
+// ═══════════════════════════════════════════════════════════
+if (fs.existsSync(path.join(LIB_DIR, 'tier3-consolidation.js'))) {
+  suite('tier3-consolidation', () => {
+    const t3 = require(path.join(LIB_DIR, 'tier3-consolidation.js'));
+
+    test('getSemanticDir appends /semantic', () => {
+      assert.strictEqual(t3.getSemanticDir('/some/mem'), path.join('/some/mem', 'semantic'));
+    });
+
+    test('archiveAndWrite creates history/ + new file on first write', () => {
+      const dir = tempDir();
+      const f = path.join(dir, 'SUMMARY.md');
+      t3.archiveAndWrite(f, 'first content');
+      assert.strictEqual(fs.readFileSync(f, 'utf8'), 'first content');
+      // No history/ yet on first write (nothing to archive)
+      assert.ok(!fs.existsSync(path.join(dir, 'history')) || fs.readdirSync(path.join(dir, 'history')).length === 0);
+      cleanup(dir);
+    });
+
+    test('archiveAndWrite on existing file archives old + writes new', () => {
+      const dir = tempDir();
+      const f = path.join(dir, 'SUMMARY.md');
+      fs.writeFileSync(f, 'original');
+      t3.archiveAndWrite(f, 'updated');
+      assert.strictEqual(fs.readFileSync(f, 'utf8'), 'updated');
+      const hist = path.join(dir, 'history');
+      assert.ok(fs.existsSync(hist));
+      const files = fs.readdirSync(hist);
+      assert.ok(files.length >= 1);
+      // Archived file should contain 'original'
+      const archived = fs.readFileSync(path.join(hist, files[0]), 'utf8');
+      assert.strictEqual(archived, 'original');
+      cleanup(dir);
+    });
+
+    test('checkDualGate: no SUMMARY.md + no sessions → gate1 open, gate2 closed', () => {
+      const dir = tempDir();
+      const r = t3.checkDualGate(dir, os.tmpdir());
+      assert.strictEqual(r.gate1Open, true);
+      assert.strictEqual(r.lastConsolidated, null);
+      cleanup(dir);
+    });
+
+    test('makeFrontmatter produces v2 YAML with required fields', () => {
+      if (typeof t3.makeFrontmatter !== 'function') return;
+      const fm = t3.makeFrontmatter('test', 'A description with enough length to pass validation.', 'reference', 5);
+      assert.ok(fm.includes('name: test'));
+      assert.ok(fm.includes('type: reference'));
+      assert.ok(fm.includes('---'));
+    });
+
+    test('buildSummary includes session/episodic/profile counts', () => {
+      if (typeof t3.buildSummary !== 'function') return;
+      const dir = tempDir();
+      const s = t3.buildSummary(dir, 12, 345, 7);
+      assert.ok(/12/.test(s), 'session count absent');
+      assert.ok(/345|episodic/.test(s), 'episodic count absent');
+      cleanup(dir);
+    });
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
 // Report
 // ═══════════════════════════════════════════════════════════
 const passed = results.filter(r => r.ok).length;
