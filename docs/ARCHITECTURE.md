@@ -54,7 +54,7 @@ in `settings.template.json`. Timings are measured on a mid-range Linux box.
 └─────────────────────────────────────────────────────────┘
   1. auto-pull-global        │ git fetch+rebase ~/.claude + ~/.gemini
   2. plugin-update-checker   │ async — checks plugin upstreams
-  3. session-start-combined  │ ~400ms — runs 12 sub-sections:
+  3. session-start-combined  │ ~400ms — runs 13 sub-sections:
      a. .reflect-enabled marker touch
      b. stale-lock cleanup (dream-lock, /tmp claude-ctx-*)
      c. consolidate-memory session counter (atomic)
@@ -102,8 +102,6 @@ Matcher=Bash:
   pre-write-combined-guard
   autosave-before-destructive ─ auto-stashes before rm -rf / reset --hard
 
-Matcher=Skill:    halt-condition-validator
-Matcher=Read:     doc-shard-resolver (transparently resolves sharded docs)
 Matcher=TodoWrite: verifiedby-gate (blocks done-task with empty verifiedBy)
 
           │ (tool runs if nothing blocked)
@@ -115,9 +113,9 @@ Matcher=TodoWrite: verifiedby-gate (blocks done-task with empty verifiedBy)
 Matcher=Write|Edit:
   post-write-sync         ─ AGENTS.md → tool configs mirroring
   dead-hook-detector      ─ catches hook file changes without settings update
-  repomap-refresh (async) ─ keeps repo overview fresh
-  research-lint           ─ source-citation drift under ~/Documents/research/
+  research-lint           ─ source-citation drift under research/ roots
   bandaid-loop-detector   ─ flags 3+ edits to same file → root-cause prompt
+  skill-drift-guard       ─ nudges toward existing skills on ad-hoc continuation
 
 Matcher=Skill:    skill-invocation-logger (feeds analytics)
 Matcher=Read:     memory-retrieval-logger
@@ -134,14 +132,13 @@ Stop chain (fires sequentially; slow ones marked async):
 
   1. session-presence-end     ─ remove from presence files
   2. todowrite-persist        ─ promote in-progress → AI-tasks.json
-  3. ai-snapshot-stop         ─ filesystem snapshot if user has SSD space
-  4. reflect-stop             ─ nudges /wrap-up if meaningful work done
-  5. dream-auto               ─ dual-gate /consolidate-memory trigger
-  6. memory-rotate (async)    ─ TTL rotation to memory/archive/
-  7. auto-push-global (async) ─ commit + push ~/.claude + ~/.gemini
-  8. track-skill-usage(async) ─ skill-usage.json append
-  9. meta-system-stop         ─ self-improvement detectors + queue
-  10. stop-sleep-consolidator ─ idle-box long-tail cleanup
+  3. reflect-stop             ─ nudges /wrap-up if meaningful work done
+  4. dream-auto               ─ dual-gate /consolidate-memory trigger
+  5. memory-rotate (async)    ─ TTL rotation to memory/archive/
+  6. auto-push-global (async) ─ commit + push ~/.claude + ~/.gemini
+  7. track-skill-usage(async) ─ skill-usage.json append
+  8. meta-system-stop         ─ self-improvement detectors + queue
+  9. stop-sleep-consolidator  ─ idle-box long-tail cleanup
 ```
 
 ## MCP server

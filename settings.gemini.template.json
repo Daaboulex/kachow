@@ -99,6 +99,16 @@
             "timeout": 3000
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "name": "session-context-loader",
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/session-context-loader.js\"",
+            "timeout": 5000
+          }
+        ]
       }
     ],
     "BeforeTool": [
@@ -115,6 +125,12 @@
             "type": "command",
             "command": "node \"$HOME/.gemini/hooks/autosave-before-destructive.js\"",
             "timeout": 8000
+          },
+          {
+            "name": "pre-write-combined-guard-bash",
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/pre-write-combined-guard.js\"",
+            "timeout": 3000
           }
         ],
         "matcher": "run_shell_command"
@@ -122,8 +138,21 @@
       {
         "hooks": [
           {
+            "name": "validate-settings-on-write",
             "type": "command",
             "command": "node \"$HOME/.gemini/hooks/validate-settings-on-write.js\"",
+            "timeout": 3000
+          },
+          {
+            "name": "pre-write-combined-guard",
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/pre-write-combined-guard.js\"",
+            "timeout": 5000
+          },
+          {
+            "name": "scrub-sentinel",
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/scrub-sentinel.js\"",
             "timeout": 3000
           }
         ],
@@ -320,6 +349,28 @@
             "name": "research-lint",
             "type": "command",
             "command": "node \"$HOME/.gemini/hooks/research-lint.js\"",
+            "timeout": 3000
+          }
+        ],
+        "matcher": "write_file|replace"
+      },
+      {
+        "hooks": [
+          {
+            "name": "skill-drift-guard",
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/skill-drift-guard.js\"",
+            "timeout": 3000
+          }
+        ],
+        "matcher": "run_shell_command|replace|write_file|read_file|search_file_content|glob"
+      },
+      {
+        "hooks": [
+          {
+            "name": "bandaid-loop-detector",
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/bandaid-loop-detector.js\"",
             "timeout": 3000
           }
         ],

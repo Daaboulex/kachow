@@ -55,7 +55,7 @@ All notable changes to this framework. See [Semantic Versioning](https://semver.
 ### Migration notes
 - Any automation relying on `SKIP_SUBAGENT_BLOCK=1` must be rewritten to run the command in parent context (no env bypass exists).
 - `get_skill` callers that relied on undocumented path-traversal behavior (there shouldn't be any) must use slugified names only.
-- R15 ceiling default 9070ms may be too low or high for your install. Tune via `SESSION_START_P95_CEILING_MS` env var or expect day-1 false-positives.
+- R15 ceiling default in v0.2.0 was 9070ms; **superseded in v0.2.1 → 5000ms**. Tune via `SESSION_START_P95_CEILING_MS` env var. Installs still on v0.2.0 should expect higher tolerance for day-1 false-positives until upgrading.
 
 [0.2.0]: https://github.com/Daaboulex/kachow/releases/tag/v0.2.0
 

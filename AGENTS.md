@@ -128,25 +128,36 @@ Uncomment and fill in your own expertise areas. The agent frames responses diffe
 
 ## Memory file format (for any agent writing memories)
 
-Every file in `memory/` should have YAML frontmatter:
+Every file in `memory/` has YAML frontmatter. The current schema (v2) drives `memory-rotate.js` and the `memory-retrieval-logger` observability loop.
+
 ```yaml
 ---
 name: Short human-readable title
 description: One-line searchable description — specific, not filler. Used in MEMORY.md index.
-type: user|feedback|project|reference
+type: user | feedback | project | reference | procedure
+created: 2026-04-21          # YYYY-MM-DD when added
+last_verified: 2026-04-21    # bumped when content re-checked against reality
+last_accessed: 2026-04-21    # auto-updated by memory-retrieval-logger
+ttl_days: permanent          # permanent | 180 | 90 | 30
+evidence: [file:/abs/path, url:..., commit:<sha>]
+status: active               # active | archived | deprecated
 # optional:
 superseded_by: new_file.md
-valid_until: 2026-06-01
 ---
 ```
 
 Rules for choosing `type`:
-- **user** — who the user is, their role, preferences, expertise
-- **feedback** — corrections + approvals. "Why:" + "How to apply:" lines required
-- **project** — current state of ongoing work: decisions, blockers, who/why/when
-- **reference** — pointers to external systems (Linear project, Slack channel, Grafana dashboard)
+- **user** — who the user is, their role, preferences, expertise (permanent)
+- **feedback** — corrections and approvals; must include "Why:" and "How to apply:" lines (90d)
+- **project** — current state of ongoing work: decisions, blockers, who/why/when (90d)
+- **reference** — pointers to external systems (Linear project, Slack channel, Grafana dashboard) (permanent)
+- **procedure** — how-tos and runbooks (180d)
 
-See `~/.ai-context/skills/debt-tracker/SKILL.md` for DEBT.md format.
+Rotation: `memory-rotate.js` (Stop hook, 7-day cooldown) moves a file to `memory/archive/` when `now - last_verified > ttl_days` and `ttl_days != permanent`. Files are archived, never deleted.
+
+Existing v1-frontmatter files (just `name` / `description` / `type` plus optional `superseded_by` / `valid_until`) still load — `memory-migrate.js --migrate-to-v2` upgrades them in place. Write new memories in v2 directly.
+
+See `skills/debt-tracker/SKILL.md` for the DEBT.md format.
 
 ## Portable Context Architecture (2026-04-20)
 

@@ -46,13 +46,14 @@ Edit ~/.ai-context/AGENTS.md  ← Every tool sees new rule on next session.
                                 symlinks. No manual sync, ever.
 ```
 
-And every session-start message includes something like:
+Once you've been using kachow for a while, session-start injects accumulated context automatically — for example:
 ```
-⚡ HANDOFF 3/5 (60%) — pending: finish CI fix · verify KDE clean
+⚡ HANDOFF 3/5 (60%) — pending: finish CI fix · re-run smoke tests
 ⚙ System: 2 SUGGEST pending self-improvement — run /review-improvements
 ⚠ stale processes: 2 orphan shells (oldest 1h) — run ~/.claude/scripts/cleanup-stale.sh
 memory: 14 entries (project:5, feedback:6, user:3), top-5 loaded
 ```
+(On first install the banner is empty — it fills in as handoffs, tasks, and memory accumulate.)
 
 ## Install
 
@@ -208,6 +209,74 @@ Full breakdown in [docs/LOCATIONS.md](./docs/LOCATIONS.md).
 | [CROSS-PLATFORM.md](./docs/CROSS-PLATFORM.md) | Want the bash ↔ pwsh parity conventions |
 | [DROP-IN.md](./docs/DROP-IN.md) | Already have an AI-tooling setup and want to know how kachow coexists |
 | [TROUBLESHOOTING.md](./docs/TROUBLESHOOTING.md) | Something broke |
+
+## Built-in skills & commands
+
+kachow ships a small set of skills and slash commands that survive across Claude Code, Gemini CLI, and other MCP-capable clients. Each is kept because it solves a recurring problem in multi-session AI workflows — not because a skill existed and needed a home.
+
+### Skills (description-activated)
+
+| Skill | Why | How |
+|---|---|---|
+| **debt-tracker** | Bugs mentioned in a session transcript get lost on `/clear`. DEBT.md keeps known tech debt, blocked work, and deferred bugs visible per repo. | Writes a structured `DEBT.md` at the repo root (or `.claude/DEBT.md`). Auto-invoked when you describe a bug you can't fix now, a hack that needs revisiting, or work blocked on hardware/info. |
+
+### Commands (slash-invoked on Claude; arg-dispatched elsewhere)
+
+**Memory & state**
+
+| Command | Why | How |
+|---|---|---|
+| `/memory <query>` | You accumulate dozens of memory files across projects; grep alone doesn't rank by project/feedback/reference type. | Pure grep across `.claude/memory/*.md` and `.ai-context/memory/` with frontmatter-aware scoring. Zero deps, works on Windows + Linux + macOS. |
+| `/handoff` | Multi-hour work hits the 70% context ceiling and degrades. A fast save-state is non-negotiable. | Emits `.session-handoff.md` with inlined state (no "see file X" references), a quick-reflect pass, and next-session instructions. |
+| `/wrap-up` | End-of-session is when learnings get lost. You want one command that runs reflect + verify-sync + ensure nothing is orphaned. | Orchestrates `/reflect` → `/verify-sync` → memory index refresh. Proactively fired by the Stop hook when meaningful work was done. |
+| `/reflect [on\|off\|status]` | Auto-reflection is useful but sometimes noisy. Needs per-session toggle + manual run. | Args: `on` / `off` / `status` / empty = run reflection now. Writes to per-cwd auto-memory. |
+| `/consolidate-memory [deep\|user\|all]` | Memory files drift as codebase evolves; Tier 1 (raw) needs rolling into Tier 3 (semantic summaries). | Runs the 3-tier maintenance pass: consolidate Tier 1, synthesize Tier 3, verify skills/rules/CLAUDE.md against codebase, check hooks. |
+| `/compress-memory` | MEMORY.md over 200 lines starts getting truncated at load; 40+ files adds token cost. | Compresses old/large memory files into summaries, inspired by AgentScope's memory compression. Keeps human-readable backup. |
+| `/review-improvements` | Self-improvement detectors find things (R15 false-positives, hook bloat, etc.); without triage they just pile up. | Groups findings by tier (BLOCKER/SUGGEST/OBSERVE), reads the queue at `~/.claude/self-improvements-pending-<host>.jsonl`, prompts accept/reject/defer per item. Rejects teach 90-day class suppression. |
+
+**Docs & content**
+
+| Command | Why | How |
+|---|---|---|
+| `/distill <path>` | Large spec/plan docs burn context on re-reads. Lossless compression to ~30% without losing any fact, decision, or constraint. | Chunk-parallel summarization with round-trip validation — if round-trip fact-check fails, keeps original. |
+| `/shard-doc <path>` | Oversize skill/command files (>500 lines) truncate during load. Splitting on H2 sections with an index restores full access. | Reads file, splits at `## ` headings, writes sibling directory with index + per-section files. `--reassemble` reverses. |
+| `/review-adversarial` | Standard reviews rubber-stamp. Enforced-minimum-findings prevents zero-issue flattery. | Minimum N findings (default 5); zero triggers re-analysis. Scope: files / phase / PR diff. |
+
+**System health**
+
+| Command | Why | How |
+|---|---|---|
+| `/platform-audit` | Monthly: check Claude Code + Gemini CLI releases, hook parity, settings drift, agent frontmatter validity. | Fetches latest releases, compares against pinned `VERSION-DEPS`, runs settings-template diff, validates all agent frontmatter, flags new features worth adopting. |
+| `/verify-sync` | Claude → Gemini one-way sync hooks can fail silently; rules/skills/commands diverge over time. | Diffs `.claude/` vs `.gemini/` for commands, skills, rules, hooks — reports drift without auto-fixing. |
+| `/sync-all` | After editing any single context artifact you shouldn't have to remember which 3 sync scripts to run. | One command sweeps hooks, skills, rules, memories, commands, settings between Claude and Gemini canonical locations. |
+| `/preview <path>` | Terminal image preview without reaching for a GUI. | Renders via `chafa` (NixOS / Linux / macOS). Opt-in, manual invocation. |
+
+Full command source lives in [`commands/`](./commands/). Skill source lives in [`skills/`](./skills/).
+
+## Credits & recommended companions
+
+kachow is one layer in a larger stack. Nothing below is bundled — each is its own plugin or project — but every one either influenced kachow's design or handles a concern kachow deliberately leaves alone. Install whichever match your workflow.
+
+### Companion plugins (Claude Code marketplace)
+
+| Project | Author | What it does |
+|---|---|---|
+| [**superpowers**](https://github.com/obra/superpowers) | Jesse Vincent ([@obra](https://github.com/obra)) | Brainstorming, subagent-driven development with built-in code review, systematic debugging, and red/green TDD skills. |
+| [**compound-engineering**](https://github.com/EveryInc/compound-engineering-plugin) | Kieran Klaassen ([@kieranklaassen](https://github.com/kieranklaassen)) / Every | Parallel persona reviewers (correctness, maintainability, testing, security, etc.), structured PR workflows, commit/plan/debug skills. |
+| [**impeccable**](https://github.com/pbakaus/impeccable) | Paul Bakaus ([@pbakaus](https://github.com/pbakaus)) | Design fluency for frontend work: a single `/impeccable` skill with 23 subcommands (polish, audit, critique, bolder, adapt, etc.) plus Live Mode browser element picker. |
+| [**caveman**](https://github.com/JuliusBrussee/caveman) | Julius Brussée ([@JuliusBrussee](https://github.com/JuliusBrussee)) | Ultra-compressed output mode — cuts roughly 75% of prose tokens while leaving code blocks, error messages, and paths verbatim. |
+| [**cli-anything**](https://github.com/HKUDS/CLI-Anything) | HKU Data Science Lab ([@HKUDS](https://github.com/HKUDS)) | Harness methodology for wrapping GUI applications in stateful, agent-friendly CLIs. |
+| [**skill-creator**](https://github.com/anthropics/claude-plugins-official) | Anthropic | Authoring tools for new skills plus evals and variance benchmarks to measure skill quality. |
+| [**clangd-lsp**](https://github.com/anthropics/claude-plugins-official) | Anthropic | C/C++ language server integration via clangd for Clang-based projects. |
+
+### Foundations kachow builds on
+
+- [**Claude Code**](https://github.com/anthropics/claude-code) — hook API, plugin marketplace, and the `SessionStart` / `PreToolUse` / `PostToolUse` / `Stop` contract kachow's automation layer sits on.
+- [**Gemini CLI**](https://github.com/google-gemini/gemini-cli) — parallel hook interface (`BeforeTool` / `AfterTool` / `SessionEnd`) plus `activate_skill`, which made multi-tool parity feasible.
+- [**AgentScope**](https://github.com/agentscope-ai/agentscope) — memory-compression patterns that inspired `/compress-memory`.
+- [**Model Context Protocol**](https://modelcontextprotocol.io/) — the shared substrate letting one MCP server serve memory / debt / handoff reads to every supported AI tool.
+
+Inspired-by, not forked: kachow's hooks, commands, skills, and memory schema are original code. The projects above set the direction.
 
 ## Roadmap
 
