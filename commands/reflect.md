@@ -64,7 +64,7 @@ ls .gemini/skills/ .gemini/rules/ .gemini/memory/ 2>/dev/null
 | **NixOS variant** | `.ai-context/.claude/` (symlinked) | `.ai-context/.gemini/` (symlinked) | This repo |
 | **Claude global memory** | `~/.claude/projects/<path-encoded>/memory/` | — | This project, persists across sessions |
 
-Note the project memory directory path for Claude global memory — it encodes the project path (e.g., `~/.claude/projects/-home-user-Documents-fahlke-monorepo/memory/`).
+Note the project memory directory path for Claude global memory — it encodes the project path (e.g., `~/.claude/projects/-home-user-Documents-[project]/memory/`).
 
 ## Phase 2: Scan for Signals
 

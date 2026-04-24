@@ -461,19 +461,6 @@ try {
     }
   } catch {}
 
-  // Repo-map pointer (v3 Phase E) — cwd-gated: only when DL2 firmware work visible
-  // Don't inject full map (141KB). Inject pointer so model reads on demand.
-  try {
-    const repomapPath = path.join(cwd, '.ai-context', 'repomap-dl2.md');
-    const dl2Dir = path.join(cwd, 'Development-DL2');
-    if (fs.existsSync(repomapPath) && fs.existsSync(dl2Dir)) {
-      const st = fs.statSync(repomapPath);
-      const sizeKb = Math.round(st.size / 1024);
-      const ageHours = Math.round((Date.now() - st.mtimeMs) / (3600 * 1000));
-      parts.push(`DL2 repo-map: .ai-context/repomap-dl2.md (${sizeKb}KB, age ${ageHours}h). Read when hunting a function/struct/enum by name — faster than grep+read.`);
-    }
-  } catch {}
-
   // Deferred work queue (added 2026-04-17): items user explicitly postponed.
   // Surfaces when trigger_after date passed or when cwd matches project.
   // File format: JSONL with {id, summary, trigger_after, trigger_cond, project, done}.

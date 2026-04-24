@@ -4,6 +4,31 @@ All notable changes to this framework. See [Semantic Versioning](https://semver.
 
 > *"I eat losers for breakfast."* — Lightning McQueen, while your hooks pass selftest at 0.4s
 
+## [0.2.1] — 2026-04-24 (parity + observability + v2.1.119 adoption)
+
+### Security
+- Register `scrub-sentinel` under Gemini BeforeTool (was offline orphan; personal-token leak guard now active on both Claude and Gemini sides). Per 2026-04-24 parity audit Gap #1.
+
+### Added
+- `scripts/setup-branch-protection.sh` — idempotent gh-api wrapper enforcing CI status checks + linear history + no-force-push on `main`. Run once after fork creation.
+- `.github/workflows/release-drift.yml` — weekly cron (Mon 12:00 UTC) checks `anthropics/claude-code` and `google-gemini/gemini-cli` latest releases vs pinned versions in `.github/VERSION-DEPS`. Opens labeled issue on drift; idempotent.
+- `.github/VERSION-DEPS` — pinned upstream versions (claude-code=2.1.119, gemini-cli=0.39.0).
+- `hooks/slash-command-logger.js` — UserPromptSubmit hook emitting `slash_invoke` episodic events (mirrors `skill_invoke` schema). Closes the slash-command-usage observability gap. Registered on Claude side; ships to Gemini for codebase parity (Gemini lacks UserPromptSubmit event).
+- Inline TIMER instrumentation in 5 hooks: `post-write-sync`, `meta-system-stop`, `reflect-stop`, `auto-push-global`, `stop-sleep-consolidator`. Was Claude-only per 2026-04-24 drift audit; now in both Gemini and kachow.
+- `tool_duration_ms` field in `post-write-sync` `hook_timing` events — ingests Claude Code v2.1.119's PostToolUse `duration_ms` for tool-perf signal distinct from hook-perf.
+- CI: orphan hook file detector — flags any `hooks/*.js` not registered in `settings.template.json` (allowlist for documented standalone CLIs).
+
+### Changed
+- Consolidated `reflect-{on,off,status}.md` (3 files) into single `/reflect on|off|status` command. Honest-review (Apr 22) action item #4.
+- `SESSION_START_P95_CEILING_MS=5000` set in default settings template (R15 detector tuning vs typical 400ms baseline; reduces false-positive risk).
+- PORTABLE_HOOKS whitelist updated: added `bandaid-loop-detector`, `pre-write-combined-guard`, `scrub-sentinel`, `session-context-loader`, `skill-drift-guard`, `slash-command-logger`, `subagent-harness-inject`, `subagent-quality-gate`. Removed obsolete `doc-shard-resolver`, `halt-condition-validator` (gone since v0.2.0).
+
+### Fixed
+- Removed orphan `hooks/post-write-sync.js` from Gemini side — was unregistered; one-way sync direction is Claude→Gemini per AGENTS.md.
+- `filesystem` MCP server registered on Gemini side for parity (was Claude-only). Per 2026-04-24 parity audit Gap #4.
+
+[0.2.1]: https://github.com/Daaboulex/kachow/releases/tag/v0.2.1
+
 ## [0.2.0] — 2026-04-23 (security + measurement release)
 
 **BREAKING — security fixes.** Upstream `SKIP_SUBAGENT_BLOCK=1` env-var override is removed; any subagent bypass workflow relying on it must be migrated to running the command in parent context instead.
