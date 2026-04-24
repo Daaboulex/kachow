@@ -53,11 +53,12 @@ cd "$REPO_ROOT"
 [ "$QUIET" -eq 0 ] && echo "=== scrub-check: $REPO_ROOT ==="
 
 HITS=$(grep -rn -E "$PATTERN" . \
-  --include='*.md' --include='*.js' --include='*.json' \
+  --include='*.md' --include='*.js' --include='*.mjs' --include='*.json' \
   --include='*.sh' --include='*.ps1' --include='*.yml' --include='*.yaml' \
+  --include='*.toml' --include='*.nix' --include='*.txt' \
   2>/dev/null \
   | grep -v '^\./\.git/' \
-  | grep -v '/docs/' \
+  | grep -vE '^\./docs/' \
   | grep -v '\.example\b' \
   | grep -v '^\./README\.md' \
   | grep -v '^\./LICENSE' \
@@ -68,11 +69,34 @@ HITS=$(grep -rn -E "$PATTERN" . \
   | grep -v '^\./scripts/scrub-check\.sh' \
   || true)
 
-if [ -n "$HITS" ]; then
-  echo "⚠ personal tokens detected:"
-  echo "$HITS"
+# Filename leak check — names matching a personal token ship untouched by
+# content-only scanners. Scan the file paths themselves.
+FILENAME_HITS=$(find . \
+  -path ./.git -prune -o \
+  -path ./docs -prune -o \
+  -type f -print 2>/dev/null \
+  | grep -E "$PATTERN" \
+  || true)
+
+# Credential/secret pattern sweep — zero coverage without this.
+SECRET_HITS=$(grep -rnE \
+  '(-----BEGIN (OPENSSH|RSA|DSA|EC|PGP) PRIVATE KEY-----|\bsk-ant-[a-z0-9-]{10,}|\bghp_[A-Za-z0-9]{30,}|\bgho_[A-Za-z0-9]{30,}|\bghs_[A-Za-z0-9]{30,}|\bAKIA[0-9A-Z]{16}\b|\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b)' \
+  . \
+  --include='*.md' --include='*.js' --include='*.mjs' --include='*.json' \
+  --include='*.sh' --include='*.ps1' --include='*.yml' --include='*.yaml' \
+  --include='*.toml' --include='*.nix' --include='*.txt' --include='*.env' \
+  2>/dev/null \
+  | grep -v '^\./\.git/' \
+  | grep -v '^\./hooks/scrub-sentinel\.js' \
+  | grep -v '^\./scripts/scrub-check\.sh' \
+  || true)
+
+if [ -n "$HITS" ] || [ -n "$FILENAME_HITS" ] || [ -n "$SECRET_HITS" ]; then
+  [ -n "$HITS" ]          && { echo "⚠ personal tokens in file content:"; echo "$HITS"; }
+  [ -n "$FILENAME_HITS" ] && { echo "⚠ personal tokens in filenames:";    echo "$FILENAME_HITS"; }
+  [ -n "$SECRET_HITS" ]   && { echo "⚠ credential/secret patterns:";      echo "$SECRET_HITS"; }
   exit 1
 fi
 
-[ "$QUIET" -eq 0 ] && echo "✓ scrub-check clean"
+[ "$QUIET" -eq 0 ] && echo "✓ scrub-check clean (content + filename + secret)"
 exit 0

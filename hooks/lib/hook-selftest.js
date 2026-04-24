@@ -15,7 +15,7 @@ const path = require('path');
 const os = require('os');
 
 const HOME = os.homedir();
-const HOOKS = path.join(HOME, '.claude', 'hooks');
+const HOOKS = process.env.HOOKS_DIR || path.join(HOME, '.claude', 'hooks');
 const CACHE = path.join(HOME, '.claude', 'cache', 'hook-healthcheck-latest.json');
 
 const SPECS = [
@@ -104,13 +104,14 @@ function runCase(hookPath, testCase) {
 }
 
 function main() {
-  const report = { ts: new Date().toISOString(), hooks: [], summary: { tested: 0, passed: 0, failed: 0 } };
+  const report = { ts: new Date().toISOString(), hooks: [], summary: { tested: 0, passed: 0, failed: 0, missing: 0 } };
   const argHook = (process.argv.find(a => a.startsWith('--hook=')) || '').split('=')[1];
   for (const spec of SPECS) {
     if (argHook && spec.hook !== argHook) continue;
     const hp = path.join(HOOKS, spec.hook);
     if (!fs.existsSync(hp)) {
       report.hooks.push({ hook: spec.hook, status: 'missing' });
+      report.summary.missing++;
       continue;
     }
     const cases = spec.tests.map(t => runCase(hp, t));
@@ -121,14 +122,20 @@ function main() {
   }
   fs.mkdirSync(path.dirname(CACHE), { recursive: true });
   fs.writeFileSync(CACHE, JSON.stringify(report, null, 2));
-  console.log(`hook-selftest: tested=${report.summary.tested} passed=${report.summary.passed} failed=${report.summary.failed}`);
+  const missingSuffix = report.summary.missing > 0 ? ` missing=${report.summary.missing}` : '';
+  console.log(`hook-selftest: tested=${report.summary.tested} passed=${report.summary.passed} failed=${report.summary.failed}${missingSuffix}`);
   for (const h of report.hooks) {
     if (h.status === 'pass') continue;
     if (h.status === 'missing') { console.log(`  MISSING: ${h.hook}`); continue; }
     console.log(`  FAIL: ${h.hook}`);
     for (const c of h.cases || []) if (!c.ok) console.log(`    - ${c.name}: ${c.fails.join('; ')}`);
   }
-  process.exit(report.summary.failed > 0 ? 1 : 0);
+  // Missing hooks are treated as failures — previously silent-passed when a
+  // hook file was deleted. Override with SELFTEST_ALLOW_MISSING=1 if you're
+  // intentionally running against a partial install.
+  const allowMissing = process.env.SELFTEST_ALLOW_MISSING === '1';
+  const hadProblems = report.summary.failed > 0 || (!allowMissing && report.summary.missing > 0);
+  process.exit(hadProblems ? 1 : 0);
 }
 
 if (require.main === module) main();

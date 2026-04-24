@@ -36,34 +36,38 @@ try {
   const filePath = (input.tool_input || {}).file_path || '';
   if (!filePath) passthrough();
 
-  // Doc-context allowlist: these files legitimately contain owner-identifier
-  // references (GitHub URLs, contributor names, licenses). Matches the same
-  // exclusions the CI scrub-gate + scripts/scrub-check.sh use.
-  const baseName = path.basename(filePath);
-  const DOC_ALLOWLIST = new Set([
-    'README.md', 'LICENSE', 'CONTRIBUTING.md', 'SECURITY.md',
-    'CHANGELOG.md', 'AUTHORS.md', 'MAINTAINERS.md', 'CODE_OF_CONDUCT.md',
-  ]);
-  if (DOC_ALLOWLIST.has(baseName)) passthrough();
-  // Also allow everything under docs/ (per scrub-check.sh convention)
-  if (filePath.includes('/docs/')) passthrough();
-  if (filePath.includes('/.github/workflows/')) passthrough();
-
   // Only gate public-shareable roots
   const home = os.homedir();
   const PUBLIC_ROOTS = [
     path.join(home, '.kachow-release'),
     path.join(home, '.kachow-mirror'),
   ];
-  const matchesRoot = PUBLIC_ROOTS.some(r => filePath.startsWith(r + path.sep) || filePath === r);
+  let activeRoot = PUBLIC_ROOTS.find(r => filePath.startsWith(r + path.sep) || filePath === r) || null;
   // Also check for a .public-ship marker in the path's parent chain
-  let hasMarker = false;
-  let walk = path.dirname(filePath);
-  for (let i = 0; i < 6 && walk !== path.dirname(walk); i++) {
-    if (fs.existsSync(path.join(walk, '.public-ship'))) { hasMarker = true; break; }
-    walk = path.dirname(walk);
+  if (!activeRoot) {
+    let walk = path.dirname(filePath);
+    for (let i = 0; i < 6 && walk !== path.dirname(walk); i++) {
+      if (fs.existsSync(path.join(walk, '.public-ship'))) { activeRoot = walk; break; }
+      walk = path.dirname(walk);
+    }
   }
-  if (!matchesRoot && !hasMarker) passthrough();
+  if (!activeRoot) passthrough();
+
+  // Doc-context allowlist: legitimate owner-identifier references (GitHub URLs,
+  // contributor names, licenses). Matches scripts/scrub-check.sh convention —
+  // allowlist applies ONLY at the public-root level, NOT nested inside subdirs
+  // (so hooks/README.md is still scanned; root README.md is not).
+  const DOC_ALLOWLIST = new Set([
+    'README.md', 'LICENSE', 'CONTRIBUTING.md', 'SECURITY.md',
+    'CHANGELOG.md', 'AUTHORS.md', 'MAINTAINERS.md', 'CODE_OF_CONDUCT.md',
+  ]);
+  const relFromRoot = path.relative(activeRoot, filePath);
+  const isRootDoc = !relFromRoot.includes(path.sep) && DOC_ALLOWLIST.has(path.basename(filePath));
+  if (isRootDoc) passthrough();
+  // docs/ directory at public root only
+  if (relFromRoot.split(path.sep)[0] === 'docs') passthrough();
+  // CI workflow files are structured, not prose — skip
+  if (relFromRoot.startsWith('.github' + path.sep + 'workflows' + path.sep)) passthrough();
 
   // Reconstruct new content
   let content = '';
@@ -97,12 +101,50 @@ try {
     p('f', 'a', 'h', 'l', 'k', 'e', '-', 'm', 'o', 'n', 'o', 'r', 'e', 'p', 'o'),
     p('f', 'a', 'h', 'l', 'k', 'e', '-', 'f', 'i', 'r', 'm', 'w', 'a', 'r', 'e'),
   ];
-  const re = new RegExp(`\\b(${tokens.join('|')})`, 'gi');
+  // Per-token word-boundary: \b only matches word↔non-word transitions.
+  // A token starting with a non-word character (like an absolute path) would
+  // fail to match when the previous char is also non-word (whitespace → slash).
+  // Decide per token whether each side needs \b based on its first/last char.
+  function wrap(tok) {
+    const starts = /^\w/.test(tok);
+    const ends   = /\w$/.test(tok);
+    const esc = tok.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
+    return (starts ? '\\b' : '') + esc + (ends ? '\\b' : '');
+  }
+  const re = new RegExp(`(${tokens.map(wrap).join('|')})`, 'gi');
   const hits = [];
   for (const line of content.split('\n')) {
     const m = line.match(re);
     if (m) hits.push({ line: line.slice(0, 120), match: m[0] });
     if (hits.length >= 5) break;
+  }
+
+  // Secondary credential/secret pattern sweep — zero-coverage gap before.
+  const SECRET_PATTERNS = [
+    { name: 'anthropic-api-key',      re: /\bsk-ant-[a-z0-9-]{10,}/i },
+    { name: 'openai-api-key',         re: /\bsk-[A-Za-z0-9]{20,}/ },
+    { name: 'github-pat',             re: /\bgh[pousr]_[A-Za-z0-9]{30,}/ },
+    { name: 'aws-access-key',         re: /\bAKIA[0-9A-Z]{16}\b/ },
+    { name: 'aws-secret-key',         re: /\baws_secret_access_key\s*[:=]\s*["']?[A-Za-z0-9/+=]{40}["']?/i },
+    { name: 'ssh-private-key-header', re: /-----BEGIN (?:OPENSSH|RSA|DSA|EC|PGP) PRIVATE KEY-----/ },
+    { name: 'generic-jwt',            re: /\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/ },
+  ];
+  for (const { name, re: sre } of SECRET_PATTERNS) {
+    const m = content.match(sre);
+    if (m) {
+      hits.push({ line: `[secret-pattern:${name}] ${m[0].slice(0, 60)}…`, match: name });
+      if (hits.length >= 5) break;
+    }
+  }
+
+  // Filename-based leak: personal tokens in the filename itself pass all
+  // content scans. Check the filename against the same token set.
+  const fileBase = path.basename(filePath).toLowerCase();
+  for (const tok of tokens) {
+    if (fileBase.includes(tok.toLowerCase())) {
+      hits.push({ line: `[filename] ${path.basename(filePath)}`, match: tok });
+      break;
+    }
   }
 
   if (hits.length > 0) {

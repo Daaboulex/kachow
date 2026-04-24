@@ -28,20 +28,27 @@ jobs:
             [ -f "$f" ] && node -c "$f"
           done
 
-      - name: Hook selftest
+      - name: Hook selftest (Linux/macOS)
         shell: bash
-        # Some shipped hooks (research-lint, etc.) rely on POSIX utilities that
-        # Git-Bash on Windows handles differently — surface real issues via the
-        # Linux + macOS matrix, which is where maintainers run these hooks.
         if: runner.os != 'Windows'
         run: |
           mkdir -p "$HOME/.claude/hooks/lib"
           cp -r hooks/* "$HOME/.claude/hooks/"
           node hooks/lib/hook-selftest.js
 
+      - name: Hook selftest (Windows — Git-Bash-safe subset)
+        shell: bash
+        if: runner.os == 'Windows'
+        run: |
+          # Windows runs the Node-based hooks. POSIX-only hooks (research-lint)
+          # may not apply; SELFTEST_ALLOW_MISSING=1 tolerates a partial-subset
+          # install while failing on real regressions in hooks that DO run.
+          mkdir -p "$HOME/.claude/hooks/lib"
+          cp -r hooks/* "$HOME/.claude/hooks/"
+          SELFTEST_ALLOW_MISSING=1 node hooks/lib/hook-selftest.js
+
       - name: Orphan hook file detector
         shell: bash
-        if: runner.os != 'Windows'
         run: |
           set -e
           REGISTERED=$(node -e '
@@ -103,25 +110,31 @@ jobs:
 
       - name: MCP server smoke test
         shell: bash
-        if: runner.os != 'Windows'
         run: |
-          # Pipe initialize + tools/list, expect >=10 tools. macOS doesn't have
-          # GNU `timeout` by default, so we rely on EOF to terminate the server
-          # (printf closes stdin after the two requests; server exits cleanly).
+          # Cross-platform smoke via Node (avoid python3 dep — not on Windows
+          # runners by default). Scans all response lines for result.tools.
           RESPONSE=$(
             printf '%s\n%s\n' \
               '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ci","version":"0"}}}' \
               '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
-            | node mcp/personal-context/server.js 2>/dev/null \
-            | tail -1
+            | node mcp/personal-context/server.js 2>/dev/null
           )
-          echo "$RESPONSE" | python3 -c "
-          import json, sys
-          d = json.loads(sys.stdin.read())
-          n = len(d.get('result', {}).get('tools', []))
-          assert n >= 10, f'expected >=10 tools, got {n}'
-          print(f'MCP smoke OK: {n} tools')
-          "
+          node -e '
+            let buf = "";
+            process.stdin.on("data", c => buf += c);
+            process.stdin.on("end", () => {
+              let n = 0;
+              for (const line of buf.split(/\r?\n/)) {
+                if (!line.trim()) continue;
+                try {
+                  const m = JSON.parse(line);
+                  if (m.result && Array.isArray(m.result.tools)) { n = m.result.tools.length; break; }
+                } catch {}
+              }
+              if (n < 10) { console.error("expected >=10 tools, got " + n); process.exit(1); }
+              console.log("MCP smoke OK: " + n + " tools");
+            });
+          ' <<< "$RESPONSE"
 
       - name: Bootstrap smoke (Linux + macOS)
         shell: bash
@@ -172,39 +185,10 @@ jobs:
       - name: Scrub-gate (no personal tokens in public repo)
         shell: bash
         run: |
-          # Public repo should never contain personal tokens outside docs/ / *.example.
-          # Token list is assembled from individual parts so the workflow file itself
-          # does not match its own pattern.
-          tokens=()
-          tokens+=("$(printf 'f%sa%sh%sl%sk%se' '' '' '' '' '')")          # ident1
-          tokens+=("$(printf 'F%sa%sh%sl%sk%se' '' '' '' '' '')")          # ident1-cap
-          tokens+=("$(printf 'D%sa%sa%sb%so%su%sl%se%sx' '' '' '' '' '' '' '')") # ident2
-          tokens+=("$(printf 'P%so%sr%st%sa%sb%sl%se%s-%sB%su%si%sl%sd%se%sr' '' '' '' '' '' '' '' '' '' '' '' '' '' '' '')") # proj
-          tokens+=("$(printf '/%sh%so%sm%se%s/%su%ss%se%sr' '' '' '' '' '' '' '' '' '')") # abs-home
-          tokens+=("$(printf 'k%si%sp%sp%se%sr%s_%se%sl%si%sx%si%sr%ss' '' '' '' '' '' '' '' '' '' '' '' '' '')") # email-local
-          PATTERN=$(IFS='|'; echo "${tokens[*]}")
-          HITS=$(
-            grep -rn -E "$PATTERN" . \
-              --include='*.md' --include='*.js' --include='*.json' \
-              --include='*.sh' --include='*.ps1' \
-              2>/dev/null \
-            | grep -v '^\./\.git/' \
-            | grep -v '/docs/' \
-            | grep -v '\.example\b' \
-            | grep -v '^\./README\.md' \
-            | grep -v '^\./LICENSE' \
-            | grep -v '^\./CONTRIBUTING\.md' \
-            | grep -v '^\./SECURITY\.md' \
-            | grep -v '^\./CHANGELOG\.md' \
-            | grep -v '^\./\.github/workflows/ci\.yml' \
-            || true
-          )
-          if [ -n "$HITS" ]; then
-            echo "⚠ personal tokens detected in public repo:"
-            echo "$HITS"
-            exit 1
-          fi
-          echo "scrub-gate OK"
+          # Delegate to the shipped pre-push gate so CI + local enforcement
+          # share one token list. Prior inline duplication drifted — CI was a
+          # strict subset of scripts/scrub-check.sh.
+          bash scripts/scrub-check.sh
 
       - name: Lib unit tests
         shell: bash
