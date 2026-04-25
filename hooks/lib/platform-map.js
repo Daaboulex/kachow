@@ -12,7 +12,7 @@ const toolMap = {
   'Agent': 'spawn_agent',
   'Skill': 'activate_skill',
   'WebFetch': 'web_fetch',
-  'WebSearch': 'web_search',
+  'WebSearch': 'google_web_search',
   'TodoWrite': 'todo_write',
   'TodoRead': 'todo_read',
 };
