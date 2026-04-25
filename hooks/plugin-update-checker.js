@@ -9,6 +9,14 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
+// Gemini has no plugin marketplace (extensions instead) — skip on Gemini-side runs.
+// Detected via hook copy location so symmetric sync stays clean.
+// Fixes "Hook(s) [plugin-update-checker] failed for event SessionStart" on Gemini CLI 0.39+.
+if (__dirname.includes('/.gemini/')) {
+  process.stdout.write('{"continue":true}');
+  process.exit(0);
+}
+
 const claudeDir = process.env.CLAUDE_CONFIG_DIR || path.join(require('os').homedir(), '.claude');
 const installedPath = path.join(claudeDir, 'plugins', 'installed_plugins.json');
 const marketplacesDir = path.join(claudeDir, 'plugins', 'marketplaces');
