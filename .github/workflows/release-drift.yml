@@ -1,6 +1,12 @@
 name: Upstream Release Drift Watch
 
 on:
+  push:
+    # Explicit push trigger so the noop-on-push job below actually fires.
+    # Without this, GitHub still queues phantom workflow_run records on push
+    # (even with no on:push declared) and concludes them as failure 0s
+    # because no job's `if:` is evaluated before queue conclusion.
+    # See: kachow v0.2.4 fix for release-drift phantom failures.
   schedule:
     # Weekly Mon 12:00 UTC
     - cron: '0 12 * * 1'
@@ -11,14 +17,15 @@ permissions:
   issues: write
 
 jobs:
-  # No-op job: GitHub creates a workflow_run record when the workflow file is
-  # modified in a push, even if no on.push trigger exists. Without at least
-  # one runnable job, the run reports as failure (0 jobs). This passes silently.
+  # No-op job that runs on push events. Drift watch only meaningfully runs
+  # on schedule/workflow_dispatch; pushes touch nothing actionable. With the
+  # explicit on:push trigger above, GitHub evaluates this `if:` correctly
+  # and noop-on-push runs to success on every push.
   noop-on-push:
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
-      - run: echo "Drift watch only runs on schedule/workflow_dispatch. Push event skipped."
+      - run: echo "Drift watch only runs on schedule/workflow_dispatch. Push event handled by noop."
 
   check-drift:
     if: github.event_name != 'push'
