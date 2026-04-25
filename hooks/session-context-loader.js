@@ -15,6 +15,29 @@ try {
   const input = JSON.parse(raw);
   const cwd = input.cwd || process.cwd();
 
+  // R-CTX idempotency guard: skip 2nd+ fire for same session_id (prevents
+  // /resume + subagent-spawn re-injection. Marker in os.tmpdir() so survives
+  // across hook processes within session but auto-clears on reboot.
+  if (input.session_id) {
+    const markerDir = path.join(os.tmpdir(), 'claude-session-ctx');
+    const marker = path.join(markerDir, `${String(input.session_id).replace(/[^a-zA-Z0-9_-]/g, '_')}.flag`);
+    try { fs.mkdirSync(markerDir, { recursive: true }); } catch {}
+    if (fs.existsSync(marker)) {
+      process.stdout.write('{"continue":true}');
+      process.exit(0);
+    }
+    try { fs.writeFileSync(marker, String(Date.now())); } catch {}
+    // Cleanup markers >24h old (best-effort, cap 50 to avoid pathological dirs)
+    try {
+      const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+      const entries = fs.readdirSync(markerDir).slice(0, 50);
+      for (const f of entries) {
+        const fp = path.join(markerDir, f);
+        try { if (fs.statSync(fp).mtimeMs < cutoff) fs.unlinkSync(fp); } catch {}
+      }
+    } catch {}
+  }
+
   const parts = [];
 
   // Project identity (local-private vs github-ok) — announced up front so agent knows constraints
@@ -353,15 +376,20 @@ try {
           const totalCount = scored.length;
           const relevantCount = scored.filter(s => s.score > 0).length;
 
-          // Section 1: top 5 with full description (most relevant)
-          const topFull = scored.slice(0, 5).map(s => s.entry);
+          // R-CTX: configurable counts (default 3 full + 10 titles, was 5+15).
+          // Restore old behavior with: MEMORY_INJECTION_FULL_COUNT=5 MEMORY_INJECTION_TITLE_COUNT=15
+          const FULL_N = parseInt(process.env.MEMORY_INJECTION_FULL_COUNT, 10) || 3;
+          const TITLE_N = parseInt(process.env.MEMORY_INJECTION_TITLE_COUNT, 10) || 10;
 
-          // Section 2: titles-only for next 15 cwd-relevant (or first 15 if no relevance signal)
+          // Section 1: top N with full description (most relevant)
+          const topFull = scored.slice(0, FULL_N).map(s => s.entry);
+
+          // Section 2: titles-only for next N cwd-relevant
           const titleOnly = (e) => {
             const m = e.match(/^\[([^\]]+)\]\(([^)]+)\)/);
             return m ? `${m[1]} (${m[2]})` : e.split(' — ')[0];
           };
-          const nextTitles = scored.slice(5, 20).map(s => titleOnly(s.entry));
+          const nextTitles = scored.slice(FULL_N, FULL_N + TITLE_N).map(s => titleOnly(s.entry));
 
           // Section 3: total inventory awareness (so AI knows what else exists)
           // Categorize by file prefix convention (feedback_/project_/standard_/reference_/etc.)
@@ -673,9 +701,21 @@ try {
   } catch {}
 
   if (parts.length > 0) {
+    // R-CTX hard byte cap: prevent runaway SessionStart token cost.
+    // Default 1500B; override via SESSION_CTX_MAX_BYTES env var.
+    const MAX_MSG_BYTES = parseInt(process.env.SESSION_CTX_MAX_BYTES, 10) || 1500;
+    let msg = `[Session context] ${parts.join(' | ')}`;
+    if (Buffer.byteLength(msg, 'utf8') > MAX_MSG_BYTES) {
+      // UTF-8 safe truncation — slice on bytes then trim trailing partial char
+      const buf = Buffer.from(msg, 'utf8');
+      const room = MAX_MSG_BYTES - 60;
+      let truncated = buf.slice(0, room).toString('utf8');
+      // Buffer.toString may have trimmed trailing partial; safe.
+      msg = truncated + ` ... [TRUNCATED ${parts.length} sections — /memory + Read for more]`;
+    }
     process.stdout.write(JSON.stringify({
       continue: true,
-      systemMessage: `[Session context] ${parts.join(' | ')}`
+      systemMessage: msg
     }));
   } else {
     process.stdout.write('{"continue":true}');
