@@ -596,6 +596,17 @@
       {
         "hooks": [
           {
+            "name": "block-subagent-non-bash-writes",
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/block-subagent-non-bash-writes.js\"",
+            "timeout": 3
+          }
+        ],
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit|mcp__.*"
+      },
+      {
+        "hooks": [
+          {
             "type": "command",
             "command": "node \"$HOME/.claude/hooks/pre-write-combined-guard.js\"",
             "timeout": 5
@@ -741,6 +752,24 @@
             "name": "slash-command-logger",
             "type": "command",
             "command": "node \"$HOME/.claude/hooks/slash-command-logger.js\"",
+            "timeout": 3
+          },
+          {
+            "name": "prompt-clarity-check",
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/prompt-clarity-check.js\"",
+            "timeout": 3
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "name": "session-end-logger",
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/session-end-logger.js\"",
             "timeout": 3
           }
         ]

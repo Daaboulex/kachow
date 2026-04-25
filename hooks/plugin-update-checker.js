@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 require(__dirname + "/lib/emit-simple-timing.js").start(__filename);
-// gsd-hook-version: 1.29.0
+// gsd-hook-version: 1.38.3
 // Plugin Update Checker - runs on SessionStart
 // Checks if installed plugins have newer versions in their marketplaces
 // Outputs systemMessage if updates available (was stderr-only, fixed for LLM visibility)
@@ -16,6 +16,25 @@ if (__dirname.includes('/.gemini/')) {
   process.stdout.write('{"continue":true}');
   process.exit(0);
 }
+
+// F1.D R-CTX idempotency: skip 2nd+ fire same session_id (prevents /resume
+// + subagent re-spawn re-emitting same banner). Marker in os.tmpdir() so
+// survives across processes within a session and auto-clears on reboot.
+try {
+  const inputRaw = (() => { try { return fs.readFileSync(0, 'utf8'); } catch { return ''; } })();
+  const inputSid = inputRaw ? (JSON.parse(inputRaw).session_id || '') : '';
+  if (inputSid) {
+    const os = require('os');
+    const markerDir = path.join(os.tmpdir(), 'claude-session-ctx');
+    const marker = path.join(markerDir, `puc-${String(inputSid).replace(/[^a-zA-Z0-9_-]/g, '_')}.flag`);
+    try { fs.mkdirSync(markerDir, { recursive: true }); } catch {}
+    if (fs.existsSync(marker)) {
+      process.stdout.write('{"continue":true}');
+      process.exit(0);
+    }
+    try { fs.writeFileSync(marker, String(Date.now())); } catch {}
+  }
+} catch {}
 
 const claudeDir = process.env.CLAUDE_CONFIG_DIR || path.join(require('os').homedir(), '.claude');
 const installedPath = path.join(claudeDir, 'plugins', 'installed_plugins.json');

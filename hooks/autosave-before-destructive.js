@@ -34,6 +34,23 @@ const DESTRUCTIVE_PATTERNS = [
   /\bsed\s+-i\b.*\s+\S+\s+\S+/,        // sed -i with multiple files
   /\bperl\s+-i\b.*-e/,                 // perl -i -e
   /\bclang-tidy\s+.*--fix\b/,
+  // F4.E (R-AUDIT-5 2026-04-25): R-CTX-style triggers — operations that
+  // delete or wipe state where loss-recovery via git stash is valuable.
+  /\bfind\b.*\s+-delete\b/,                                  // find ... -delete
+  /\bfind\b.*\s+-(?:exec|execdir)\s+rm\b/,                   // find ... -exec rm
+  /\brsync\b.*\s+--delete(?:-after|-before|-during|-excluded)?\b/,  // rsync --delete*
+  /\bcargo\s+clean\b/,                                       // cargo clean
+  /\bnpm\s+(?:clean|prune)\b/,                               // npm clean / prune
+  /\byarn\s+(?:clean|cache\s+clean)\b/,                      // yarn clean
+  /\bpnpm\s+(?:clean|store\s+prune)\b/,                      // pnpm clean
+  /\bnix-collect-garbage\b/,                                 // nix-collect-garbage
+  /\bnix\s+store\s+(?:gc|delete|optimise)\b/,                // nix store gc
+  /\bdocker\s+(?:system\s+prune|volume\s+rm|image\s+rm|rmi)\b/,
+  /\bkubectl\s+delete\b/,
+  /\bdd\s+if=\S+\s+of=\/dev\//,                              // dd ... of=/dev/...
+  /\bshred\s+-[uvz]+\b/,                                     // shred -uvz
+  /\btruncate\s+(?:-s\s+0|--size\s+0)/,                      // truncate -s 0
+  /\b(?:>\s*\/dev\/null|>\s*\/dev\/zero)\b.*\bof=/,          // dd-style overwrite
 ];
 
 // Hard-block patterns: never stash, always reject. Cross-platform dangerous roots.

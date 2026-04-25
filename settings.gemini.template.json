@@ -177,6 +177,17 @@
           }
         ],
         "matcher": "write_file"
+      },
+      {
+        "hooks": [
+          {
+            "name": "block-subagent-non-bash-writes",
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/block-subagent-non-bash-writes.js\"",
+            "timeout": 3000
+          }
+        ],
+        "matcher": "write_file|replace|mcp__.*"
       }
     ],
     "SessionEnd": [
