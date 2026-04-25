@@ -27,16 +27,35 @@ try {
   const input = JSON.parse(raw || '{}');
 
   const toolName = input.tool_name || '';
-  if (!/^(TodoWrite|write_todos)$/.test(toolName)) passthrough();
+  // R-RES-3 extension 2026-04-25: also catch TaskUpdate (newer hosted-task system)
+  // for status transitions to completed/done. TaskCreate is allowed (creating
+  // pending/in_progress tasks doesn't claim verification).
+  const isTodoTool = /^(TodoWrite|write_todos)$/.test(toolName);
+  const isTaskUpdate = toolName === 'TaskUpdate';
+  if (!isTodoTool && !isTaskUpdate) passthrough();
 
-  const todos = (input.tool_input && input.tool_input.todos) || [];
   const flagged = [];
-  for (const t of todos) {
-    const status = (t.status || '').toLowerCase();
-    if (status === 'done' || status === 'completed') {
-      const v = t.verifiedBy || t.verified_by || t.verification;
+
+  if (isTodoTool) {
+    const todos = (input.tool_input && input.tool_input.todos) || [];
+    for (const t of todos) {
+      const status = (t.status || '').toLowerCase();
+      if (status === 'done' || status === 'completed') {
+        const v = t.verifiedBy || t.verified_by || t.verification;
+        if (!v || String(v).trim() === '' || v === 'not-verified') {
+          flagged.push(t.content || t.subject || t.id || '(unnamed)');
+        }
+      }
+    }
+  }
+
+  if (isTaskUpdate) {
+    const status = ((input.tool_input && input.tool_input.status) || '').toLowerCase();
+    if (status === 'completed' || status === 'done') {
+      const meta = (input.tool_input && input.tool_input.metadata) || {};
+      const v = meta.verifiedBy || meta.verified_by;
       if (!v || String(v).trim() === '' || v === 'not-verified') {
-        flagged.push(t.content || t.subject || t.id || '(unnamed)');
+        flagged.push(`task#${input.tool_input.taskId || '?'}`);
       }
     }
   }
