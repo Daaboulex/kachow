@@ -11,7 +11,7 @@ All notable changes to this framework. See [Semantic Versioning](https://semver.
 
 ### Added
 - `scripts/setup-branch-protection.sh` — idempotent gh-api wrapper enforcing CI status checks + linear history + no-force-push on `main`. Run once after fork creation.
-- `.github/workflows/upstream-drift-watch.yml` — weekly cron (Mon 12:00 UTC) checks `anthropics/claude-code` and `google-gemini/gemini-cli` latest releases vs pinned versions in `.github/VERSION-DEPS`. Opens labeled issue on drift; idempotent.
+- ~~`.github/workflows/upstream-drift-watch.yml`~~ — weekly cron for upstream version drift detection. **Removed in v0.2.4** because GitHub Actions registration cache got stuck producing phantom 0s failures on every push regardless of file contents. Drift watch will be re-implemented out-of-Actions (local cron or different repo).
 - `.github/VERSION-DEPS` — pinned upstream versions (claude-code=2.1.119, gemini-cli=0.39.0).
 - `hooks/slash-command-logger.js` — UserPromptSubmit hook emitting `slash_invoke` episodic events (mirrors `skill_invoke` schema). Closes the slash-command-usage observability gap. Registered on Claude side; ships to Gemini for codebase parity (Gemini lacks UserPromptSubmit event).
 - Inline TIMER instrumentation in 5 hooks: `post-write-sync`, `meta-system-stop`, `reflect-stop`, `auto-push-global`, `stop-sleep-consolidator`. Was Claude-only per 2026-04-24 drift audit; now in both Gemini and kachow.

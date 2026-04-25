@@ -1,4 +1,3 @@
 # Upstream pinned versions. Bumped after testing.
-# upstream-drift-watch.yml watches these vs upstream latest.
 claude-code=2.1.119
 gemini-cli=0.39.0
