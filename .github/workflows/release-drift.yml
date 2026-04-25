@@ -1,12 +1,11 @@
 name: Upstream Release Drift Watch
 
 on:
+  # Explicit push trigger so noop-on-push fires and the run reports success.
+  # Without this, GitHub queued phantom workflow_run records on push and
+  # concluded them as failure 0s. See kachow v0.2.4 fix.
   push:
-    # Explicit push trigger so the noop-on-push job below actually fires.
-    # Without this, GitHub still queues phantom workflow_run records on push
-    # (even with no on:push declared) and concludes them as failure 0s
-    # because no job's `if:` is evaluated before queue conclusion.
-    # See: kachow v0.2.4 fix for release-drift phantom failures.
+    branches: ['**']
   schedule:
     # Weekly Mon 12:00 UTC
     - cron: '0 12 * * 1'
