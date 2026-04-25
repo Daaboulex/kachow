@@ -5,7 +5,7 @@ on:
   # Without this, GitHub queued phantom workflow_run records on push and
   # concluded them as failure 0s. See kachow v0.2.4 fix.
   push:
-    branches: ['**']
+    branches: [main]
   schedule:
     # Weekly Mon 12:00 UTC
     - cron: '0 12 * * 1'
