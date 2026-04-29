@@ -160,7 +160,8 @@ jobs:
           echo '{}' > "$HOME/.gemini/settings.json"
           echo '{}' > "$HOME/.claude.json"
           cp -r "$GITHUB_WORKSPACE" "$HOME/.ai-context"
-          bash "$HOME/.ai-context/scripts/bootstrap.sh"
+          # Wave G 2026-04-29: bootstrap.sh deleted; use canonical .mjs.
+          node "$HOME/.ai-context/scripts/bootstrap.mjs"
           echo "bootstrap smoke OK"
 
       - name: Bootstrap smoke (Windows)
