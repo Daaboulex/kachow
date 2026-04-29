@@ -118,7 +118,7 @@ A hook is appropriate when the learning is a **deterministic, repeatable action*
 → **HOOK** (`~/.claude/hooks/<name>.js` + register in `settings.json`)
 Examples:
 - "After editing .claude/AI-tasks.json, also copy to .gemini/" → PostToolUse hook
-- "When editing Actuator/ files, warn about safety" → PreToolUse hook
+- "When editing SafetyCritical/ files, warn about safety" → PreToolUse hook
 - "At session start, show active tasks and git status" → SessionStart hook
 - "At session end, clean up stale completed tasks" → SessionStart hook
 

@@ -38,6 +38,16 @@ tokens+=("$(printf 'r%sy%sz%se%sn%s-%s9%s9%s5%s0%sx%s3%sd' '' '' '' '' '' '' '' 
 tokens+=("$(printf 'F%sC%sS%sE%s0%s1' '' '' '' '' '')")             # host3
 tokens+=("$(printf 'L%sa%sC%si%se' '' '' '' '')")                   # drive brand
 tokens+=("$(printf 'S%st%se%sp%sh%sa%sn' '' '' '' '' '' '')")       # other-name
+# Domain-structure tokens (CG-1 fix 2026-04-29) — leak vectors for
+# safety-critical project fingerprinting. Word-boundary anchored to avoid
+# false-positives on common substrings. Same printf-obscuration so this file
+# itself does not match its own pattern.
+tokens+=("\\b$(printf 'A%sc%st%su%sa%st%so%sr' '' '' '' '' '' '')\\b")              # safety-dir-1
+tokens+=("\\b$(printf 'V%sa%sl%sv%se%sL%so%sg%si%sc' '' '' '' '' '' '' '' '')\\b") # safety-dir-2
+tokens+=("\\b$(printf 'S%sa%sf%se%st%sy%sT%si%sm%se%sr' '' '' '' '' '' '' '' '')\\b") # safety-dir-3
+tokens+=("\\b$(printf 'E%sE%sP%sR%sO%sM%s_%sC%so%sn%st%sr%so%sl' '' '' '' '' '' '' '' '' '' '' '' '')\\b") # safety-dir-4
+tokens+=("\\b$(printf 'l%sp%sc%s4%s3%sx%sx' '' '' '' '' '' '')\\b")                # mcu-family
+tokens+=("$(printf 'M%so%sd%sb%su%ss%s-%sR%sT%sU%s-%sp%ss%st' '' '' '' '' '' '' '' '' '' '' '')") # protocol-fingerprint
 
 PATTERN=$(IFS='|'; echo "${tokens[*]}")
 

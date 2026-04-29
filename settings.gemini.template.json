@@ -194,6 +194,12 @@
       {
         "hooks": [
           {
+            "name": "session-end-logger",
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/session-end-logger.js\"",
+            "timeout": 3000
+          },
+          {
             "name": "session-presence-end",
             "type": "command",
             "command": "node \"$HOME/.gemini/hooks/session-presence-end.js\"",

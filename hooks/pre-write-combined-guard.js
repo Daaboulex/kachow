@@ -4,7 +4,7 @@ require(__dirname + "/lib/emit-simple-timing.js").start(__filename);
 // Merges guards into 1 process: saves Node spawns per tool call.
 //
 // Guards:
-//   1. Safety-critical file guard (advisory) — warns on Actuator/EEPROM/SafetyTimer edits
+//   1. Safety-critical file guard (advisory) — warns on edits to paths listed in KACHOW_SAFETY_PATHS
 //   2. GSD prompt injection guard (advisory) — scans .planning/ writes for injection patterns
 //   3. GSD workflow guard (advisory) — nudges toward /gsd:fast when editing outside GSD (opt-in)
 //   4. Git identity guard (HARD BLOCK) — enforces per-project allow/deny rules from
@@ -99,17 +99,17 @@ try {
   }
 
   // ── 1. Safety-critical file guard ──
+  // Configurable via KACHOW_SAFETY_PATHS (comma-separated path-substring matches).
+  // Default values are generic; users with safety-critical projects override per their domain.
   try {
-    const SAFETY_PATHS = [
-      'Actuator/ActuatorControl', 'Actuator/ValveLogic', 'Actuator/MotorControl',
-      'Actuator/RemoteCommandGate', 'SafetyTimer/SafetyTimer',
-      'EEPROM/EEPROM_Control', 'EEPROM/StructureValidation', 'EEPROM/MemoryAlignment',
-    ];
+    const SAFETY_PATHS = (process.env.KACHOW_SAFETY_PATHS ||
+      'SafetyCritical/,HardwareControl/,FailSafe/,WatchdogTimer/,FlashControl/,EmergencyStop/')
+      .split(',').map(s => s.trim()).filter(Boolean);
     if (SAFETY_PATHS.some(sp => normalized.includes(sp))) {
       messages.push(
-        `SAFETY-CRITICAL FILE: ${path.basename(filePath)} — This file controls ESD/SSD safety logic, actuator movement, or EEPROM integrity. ` +
+        `SAFETY-CRITICAL FILE: ${path.basename(filePath)} — This file matches a configured safety-critical path. ` +
         'Per project rules: (1) Do NOT let agents edit these files — manual edits only. ' +
-        '(2) Read the FULL function before changing anything. (3) Verify ESD/SSD override logic, timeout values, and motor guards are preserved. ' +
+        '(2) Read the FULL function before changing anything. (3) Verify safety override logic, timeout values, and hardware guards are preserved. ' +
         '(4) Build and verify after changes.'
       );
     }

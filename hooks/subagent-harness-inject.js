@@ -65,7 +65,15 @@ try {
   // Safety-critical detection (SEC-5 v0.2.0 2026-04-23): walk up to nearest
   // .git or .envrc boundary; detect at EACH level (not just cwd + cwd/..).
   // Prior 1-level check missed deep subdirs under safety-critical projects.
-  const safetyDirs = ['Actuator', 'ValveLogic', 'SafetyTimer', 'EEPROM_Control'];
+  // Configurable via env vars so kachow stays domain-agnostic in public:
+  //   KACHOW_SAFETY_DIRS — comma-separated dir names (default: SafetyCritical,HardwareControl)
+  //   KACHOW_SAFETY_PATTERNS — regex matching file content (default: IEC 61508/61511)
+  const safetyDirs = (process.env.KACHOW_SAFETY_DIRS || 'SafetyCritical,HardwareControl')
+    .split(',').map(s => s.trim()).filter(Boolean);
+  const safetyContentRegex = (() => {
+    try { return new RegExp(process.env.KACHOW_SAFETY_PATTERNS || 'IEC\\s*615(08|11)', 'i'); }
+    catch { return /IEC\s*615(08|11)/i; }
+  })();
   const hasSafetyDir = (dir) => safetyDirs.some(d => {
     try { return fs.existsSync(path.join(dir, d)); } catch { return false; }
   });
@@ -75,7 +83,7 @@ try {
         if (!name.endsWith('.c') && !name.endsWith('.h')) continue;
         try {
           const head = fs.readFileSync(path.join(dir, name), 'utf8').slice(0, 2000);
-          if (/lpc43xx|IEC\s*61508|IEC\s*61511/i.test(head)) return true;
+          if (safetyContentRegex.test(head)) return true;
         } catch {}
       }
     } catch {}
@@ -101,7 +109,7 @@ try {
   } catch {}
 
   if (hasSafetyCode) {
-    rules.push('SAFETY: Actuator/, SafetyTimer/, EEPROM/, ValveLogic/ files are safety-critical (IEC 61508 domain). Do NOT edit these in a subagent — flag for manual review.');
+    rules.push(`SAFETY: Files in safety-critical directories (configured via KACHOW_SAFETY_DIRS=${safetyDirs.join(',')}) are subject to functional-safety standards like IEC 61508/61511. Do NOT edit these in a subagent — flag for manual review.`);
   }
 
   if (rules.length > 0) {
