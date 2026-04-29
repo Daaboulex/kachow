@@ -4,6 +4,40 @@ All notable changes to this framework. See [Semantic Versioning](https://semver.
 
 > *"I eat losers for breakfast."* — Lightning McQueen, while your hooks pass selftest at 0.4s
 
+## [0.3.0] — 2026-04-29 (tri-tool parity + 16 new hooks + Codex support)
+
+### Added
+- 16 new hooks upstreamed from local development:
+  - **SessionStart:** `injection-size-monitor`, `gsd-check-update`, `tri-tool-parity-check`
+  - **PostToolUse:** `skill-completion-correlator`, `rule-enforcement-check`, `post-commit-sync-reminder`, `repomap-refresh`
+  - **PreToolUse:** `peer-conflict-check`
+  - **Stop:** `ai-snapshot-stop`, `mirror-kachow`, `skill-auto-updater`
+  - **PreCompact:** `caveman-precompact`
+  - **UserPromptSubmit:** `prompt-clarity-check`, `per-prompt-overhead`, `prompt-hash-logger`, `prompt-item-tracker`, `caveman-post-compact-reinject`
+- Codex CLI support: hooks compatible with Codex's 6-event model (SessionStart, PreToolUse, PostToolUse, UserPromptSubmit, PermissionRequest, Stop)
+- `wire-hook-codex.mjs` script for TOML-based hook registration
+- `tri-tool-parity-check` — SessionStart hook detects hook registration drift between Claude, Gemini, and Codex
+- `skill-auto-updater` — Stop hook auto-updates plugins + syncs portable skills to Codex (24h cooldown)
+- `prompt-item-tracker` — scope drift prevention, detects 3+ items in prompts
+- `peer-conflict-check` — anti-skew concurrent session detection via side-channel
+
+### Changed
+- `auto-push-global` now commits + pushes `~/.codex/` (tri-tool parity)
+- `auto-push-global` credential regex hardened: checks known credential filenames only, not arbitrary path substrings containing "token"
+- Hook count: 45 → 61 (+ 21 library helpers)
+- HOOKS.md updated with all 16 new hooks in correct event sections
+- SESSION_START_P95_CEILING_MS default raised to 15000 (10+ SessionStart hooks take time)
+
+### Fixed
+- `auto-push-global` credential regex false-positive: `/token/i` matched "tokenfix" in .bak filenames → blocked pushes for 2+ days. Now checks `^(\.credentials|oauth_creds|auth|\.env|\.secret|api[_-]?key)` on filename only.
+
+### Notes
+- Codex `apply_patch` does NOT fire hooks (upstream bug openai/codex#16732). File write guards only protect Bash-based writes.
+- Codex tool names differ: `apply_patch` (not Write/Edit), `shell` (not Bash), `read_file` (not Read). Matchers must use Codex names.
+- Gemini event names differ: `AfterTool` (not PostToolUse), `BeforeTool` (not PreToolUse), `PreCompress` (not PreCompact).
+
+[0.3.0]: https://github.com/Daaboulex/kachow/releases/tag/v0.3.0
+
 ## [0.2.1] — 2026-04-24 (parity + observability + v2.1.119 adoption)
 
 ### Security
