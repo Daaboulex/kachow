@@ -120,8 +120,11 @@ kachow is designed to plug into whichever AI tools you already have. Nothing is 
 **What you get:**
 - `~/.codex/AGENTS.md` → symlinked to `~/.ai-context/AGENTS.md`
 - MCP server registered in `~/.codex/config.toml`
+- Hooks installed via TOML config (Codex v0.125.0+ supports 6 hook events)
 
-**No hooks.** Codex has no hook interface yet — kachow only provides the rules + MCP.
+**Codex hooks:** Codex supports `SessionStart`, `PreToolUse`, `PostToolUse`, `UserPromptSubmit`, `PermissionRequest`, and `Stop`. kachow registers hooks for all 6 events. Note: Codex's `apply_patch` (file writes) does NOT fire hooks — only `shell` (Bash) commands trigger PreToolUse/PostToolUse. Matchers use Codex tool names (`apply_patch`, `shell`, `read_file`), not Claude names.
+
+**Codex config:** `project_doc_fallback_filenames = ["CLAUDE.md"]` so Codex reads existing CLAUDE.md files. `project_doc_max_bytes = 65536` raises the 32KB default.
 
 ### OpenCode
 
@@ -185,13 +188,14 @@ Re-running `bootstrap.sh` is always idempotent.
 
 ## Where things live
 
-Three top-level directories:
+Four top-level directories:
 
 - **`~/.ai-context/`** — canonical source (rules, memory, skills, MCP, scripts). Edit here.
 - **`~/.claude/`** — Claude-specific (hooks master, commands, settings). Mostly populated by bootstrap.
 - **`~/.gemini/`** — Gemini-specific (settings, hooks mirrored from Claude). Mostly populated by bootstrap.
+- **`~/.codex/`** — Codex-specific (config.toml, skills, rules). Hooks reference Claude's hook files directly.
 
-Codex, OpenCode, and Aider all read `~/.ai-context/AGENTS.md` through a global symlink — no per-tool duplication. Cursor reads `AGENTS.md` at the project root (it has no user-global AGENTS.md concept); bootstrap installs the MCP server for Cursor via `~/.cursor/mcp.json` and you point project-level `.cursor/rules/*.mdc` at the canonical `AGENTS.md` as needed.
+OpenCode and Aider read `~/.ai-context/AGENTS.md` through a global symlink. Cursor reads `AGENTS.md` at the project root; bootstrap installs the MCP server for Cursor via `~/.cursor/mcp.json`.
 
 Full breakdown in [docs/LOCATIONS.md](./docs/LOCATIONS.md).
 
@@ -281,20 +285,30 @@ Inspired-by, not forked: kachow's hooks, commands, skills, and memory schema are
 
 ## Roadmap
 
-### v0.3.0 — portability + self-maintenance
+### v0.3.0 — tri-tool parity + Codex support ✅ SHIPPED (2026-04-29)
+- [x] 16 new hooks upstreamed (57 total)
+- [x] Codex CLI hook support (6-event model, TOML config)
+- [x] `tri-tool-parity-check` — detects hook drift between Claude, Gemini, Codex
+- [x] `skill-auto-updater` — auto-updates plugins + syncs portable skills
+- [x] `peer-conflict-check` — anti-skew concurrent session detection
+- [x] `prompt-item-tracker` — scope drift prevention
+- [x] `auto-push-global` credential regex hardened + Codex support
+- [x] `wire-hook-codex.mjs` — TOML hook wirer for Codex
+
+### v0.4.0 — portability + self-maintenance
 - [ ] Per-tool skill adapters (auto-rewrite skill descriptions for Gemini's semantic retrieval + Cursor `.mdc` generation)
 - [ ] Node-native publish pipeline so Windows maintainers don't need bash
-- [ ] Prune oversize slash commands (`consolidate-memory`, `wrap-up`, `platform-audit`, `reflect`) via `/distill`
-- [ ] Expand skill tracker beyond `Skill` tool invocations — join `slash_invoke` + `skill_invoke` events for true usage coverage
-- [ ] Auto-consolidate 4 Stop-chain consolidation hooks (`reflect-stop`, `meta-system-stop`, `dream-auto`, `stop-sleep-consolidator`) into one dispatcher
-- [ ] Sharable `ai-snapshot-stop` hook without personal filesystem paths
-- [ ] CI: bootstrap-smoke that exercises the real Claude Code binary on a throwaway `$HOME`
+- [ ] Prune oversize slash commands via `/distill`
+- [ ] Auto-consolidate 4 Stop-chain consolidation hooks into one dispatcher
+- [ ] CI: bootstrap-smoke that exercises real Claude Code binary on a throwaway `$HOME`
+- [ ] `sync-memory-dirs` incremental mode (skip same-target symlinks, mtime-only copy)
 
 ### v1.0.0 — stable promise
 - [ ] Frozen hook interface: stdin JSON shape, stdout envelope, event names
-- [ ] Frozen `settings.template.json` shape
+- [ ] Frozen `settings.template.json` shape + `settings.codex.template.toml` shape
 - [ ] Documented MCP tool contract (names, args, return shapes, error model)
 - [ ] Tested upgrade path from every v0.x
+- [ ] Cross-tool event name mapping documented in templates (Claude↔Gemini↔Codex)
 
 ## Contributing
 
