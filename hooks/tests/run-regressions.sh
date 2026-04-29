@@ -90,19 +90,19 @@ fi
 # 5. scrub-gate-catches-leak — stage file with personal token
 # ═══════════════════════════════════════════════════════════
 echo "─── scrub-gate-catches-leak ───"
-SCRUB="$(dirname "$CLAUDE_HOOKS")/scripts/scrub-check.sh"
+SCRUB="$(dirname "$CLAUDE_HOOKS")/scripts/scrub-check.mjs"
 if [ ! -f "$SCRUB" ]; then
-  SCRUB="$CLAUDE_HOOKS/../scripts/scrub-check.sh"
+  SCRUB="$CLAUDE_HOOKS/../scripts/scrub-check.mjs"
 fi
 if [ -x "$SCRUB" ]; then
   # Create isolated git-less test dir with a leak
   TESTDIR=$(mktemp -d)
   mkdir -p "$TESTDIR/scripts"
-  cp "$SCRUB" "$TESTDIR/scripts/scrub-check.sh"
+  cp "$SCRUB" "$TESTDIR/scripts/scrub-check.mjs"
   # shellcheck disable=SC2016
   printf 'console.log("hello f%sa%sh%sl%sk%se");\n' '' '' '' '' '' > "$TESTDIR/leak.js"
   cd "$TESTDIR" || exit 1
-  if "$TESTDIR/scripts/scrub-check.sh" --quiet 2>&1 | grep -qE 'personal tokens (detected|in file content)'; then
+  if "$TESTDIR/scripts/scrub-check.mjs" --quiet 2>&1 | grep -qE 'personal tokens (detected|in file content)'; then
     record_pass "scrub-check catches injected leak"
   else
     record_fail "scrub-gate-catches-leak" "expected detection, got no hit"
@@ -120,10 +120,10 @@ echo "─── scrub-gate-clean-pass ───"
 if [ -x "$SCRUB" ]; then
   TESTDIR=$(mktemp -d)
   mkdir -p "$TESTDIR/scripts"
-  cp "$SCRUB" "$TESTDIR/scripts/scrub-check.sh"
+  cp "$SCRUB" "$TESTDIR/scripts/scrub-check.mjs"
   echo 'console.log("just plain code");' > "$TESTDIR/clean.js"
   cd "$TESTDIR" || exit 1
-  if "$TESTDIR/scripts/scrub-check.sh" --quiet 2>&1 >/dev/null; then
+  if "$TESTDIR/scripts/scrub-check.mjs" --quiet 2>&1 >/dev/null; then
     record_pass "scrub-check clean passes"
   else
     record_fail "scrub-gate-clean-pass" "unexpected failure on clean tree"

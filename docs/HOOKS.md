@@ -120,7 +120,7 @@ Fires once at session end. Data-safety hooks (commit local before network) come 
 
 | Script | Purpose |
 |---|---|
-| `validate-symlinks` | Recursive symlink audit across every AI-tool surface. Invoke via `node ~/.claude/hooks/validate-symlinks.js` or from CI. Also callable from `scripts/bootstrap.sh`. |
+| `validate-symlinks` | Recursive symlink audit across every AI-tool surface. Invoke via `node ~/.claude/hooks/validate-symlinks.js` or from CI. Also callable from `scripts/bootstrap.mjs`. |
 
 ## Library helpers (`hooks/lib/`)
 

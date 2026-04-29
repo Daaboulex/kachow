@@ -199,7 +199,7 @@ Four layers protect the public repo:
 ```
 1. Editor / pre-commit  ← developer convenience, not authoritative
        │
-2. scripts/scrub-check.sh  ← assembles token regex from parts, scans repo
+2. scripts/scrub-check.mjs  ← assembles token regex from parts, scans repo
        │                     Install as .git/hooks/pre-push to block local push
 3. CI scrub-gate          ← same regex, runs on every push/PR to main
        │                     Fails build if any personal token surfaces

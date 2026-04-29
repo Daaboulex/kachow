@@ -119,7 +119,7 @@ description: One concrete sentence about when to activate this skill.
 ...
 EOF
 
-bash scripts/bootstrap.sh       # re-runs install-adapters to symlink into all tools
+node scripts/bootstrap.mjs       # re-runs install-adapters to symlink into all tools
 ```
 
 The new skill lands in every installed tool's skill directory on next session start.

@@ -12,8 +12,8 @@ Step-by-step install tutorials for each supported AI. Pick the one(s) you use. I
 ```bash
 git clone https://github.com/Daaboulex/kachow ~/.ai-context
 cd ~/.ai-context
-./scripts/customize.sh    # asks which AIs + add-ons you have
-./scripts/bootstrap.sh    # installs symlinks + hooks + MCP + runs health-check
+./scripts/customize.mjs    # asks which AIs + add-ons you have
+./scripts/bootstrap.mjs    # installs symlinks + hooks + MCP + runs health-check
 ```
 
 Windows equivalent (PowerShell 7+, Developer Mode enabled):
@@ -55,7 +55,7 @@ ls ~/.claude/hooks/*.js | wc -l    # expect >30
 node -e 'console.log(require("os").homedir()+"/.claude.json"); console.log(JSON.parse(require("fs").readFileSync(require("os").homedir()+"/.claude.json","utf8")).mcpServers)'
 
 # 4. Health
-bash ~/.ai-context/scripts/health-check.sh
+bash ~/.ai-context/scripts/health-check.mjs
 ```
 
 **First session after install:** Claude Code will show you an `⚡ HANDOFF`, memory index, and self-improvement queue in the session-start banner. Zero manual steps.
@@ -75,7 +75,7 @@ bash ~/.ai-context/scripts/health-check.sh
 
 **Uninstall:**
 ```bash
-bash ~/.ai-context/scripts/uninstall.sh --yes
+bash ~/.ai-context/scripts/uninstall.mjs --yes
 ```
 
 ---
@@ -238,7 +238,7 @@ ln -s ~/.ai-context/AGENTS.md AGENTS.md
 ## Verify everything at once
 
 ```bash
-bash ~/.ai-context/scripts/health-check.sh
+bash ~/.ai-context/scripts/health-check.mjs
 ```
 
 Should end with `═══ ALL CHECKS PASSED ═══`. Individual checks:
@@ -253,8 +253,8 @@ Should end with `═══ ALL CHECKS PASSED ═══`. Individual checks:
 ## Uninstall
 
 ```bash
-bash ~/.ai-context/scripts/uninstall.sh           # dry-run
-bash ~/.ai-context/scripts/uninstall.sh --yes     # actually remove
+bash ~/.ai-context/scripts/uninstall.mjs           # dry-run
+bash ~/.ai-context/scripts/uninstall.mjs --yes     # actually remove
 ```
 
 Reads `~/.ai-context/.install-manifest`, removes every file/symlink created by kachow, sweeps dangling symlinks in common tool dirs. Your `~/.ai-context/memory/` and `~/.ai-context/AGENTS.md` (rules + memory) are untouched. Remove those manually:

@@ -64,8 +64,8 @@ memory: 14 entries (project:5, feedback:6, user:3), top-5 loaded
 ```bash
 git clone https://github.com/Daaboulex/kachow ~/.ai-context
 cd ~/.ai-context
-./scripts/customize.sh      # interactive: pick which AIs + add-ons you have
-./scripts/bootstrap.sh      # installs symlinks, registers MCP, runs health-check
+./scripts/customize.mjs      # interactive: pick which AIs + add-ons you have
+./scripts/bootstrap.mjs      # installs symlinks, registers MCP, runs health-check
 ```
 
 ### 30-second install (Windows, PowerShell 7+)
@@ -82,7 +82,7 @@ cd "$HOME\.ai-context"
 ### Verify it worked
 
 ```bash
-bash ~/.ai-context/scripts/health-check.sh          # Linux/macOS
+bash ~/.ai-context/scripts/health-check.mjs          # Linux/macOS
 # or:
 pwsh ~/.ai-context/scripts/health-check.ps1         # Windows
 ```
@@ -156,7 +156,7 @@ kachow is designed to plug into whichever AI tools you already have. Nothing is 
 ```bash
 export AI_CONTEXT="$HOME/Documents/ai-rules"
 git clone https://github.com/Daaboulex/kachow "$AI_CONTEXT"
-"$AI_CONTEXT/scripts/bootstrap.sh"
+"$AI_CONTEXT/scripts/bootstrap.mjs"
 ```
 
 Every script honours `$AI_CONTEXT` before falling back to `$HOME/.ai-context`. Useful if you sync the dir via Syncthing from `~/Documents`, or if `$XDG_CONFIG_HOME` lives elsewhere.
@@ -164,7 +164,7 @@ Every script honours `$AI_CONTEXT` before falling back to `$HOME/.ai-context`. U
 ## What survives updates
 
 ```bash
-bash ~/.ai-context/scripts/self-update.sh
+bash ~/.ai-context/scripts/self-update.mjs
 ```
 
 The script:

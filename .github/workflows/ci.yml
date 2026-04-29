@@ -199,8 +199,8 @@ jobs:
         run: |
           # Delegate to the shipped pre-push gate so CI + local enforcement
           # share one token list. Prior inline duplication drifted — CI was a
-          # strict subset of scripts/scrub-check.sh.
-          bash scripts/scrub-check.sh
+          # strict subset of scripts/scrub-check.mjs.
+          node scripts/scrub-check.mjs
 
       - name: Lib unit tests
         shell: bash

@@ -1,5 +1,5 @@
 {
-  "_": "Template settings — run scripts/customize.sh to populate env/allow/hooks for your stack. Add optional add-ons from settings.embedded.json.example / settings.nix.json.example / etc.",
+  "_": "Template settings — run scripts/customize.mjs to populate env/allow/hooks for your stack. Add optional add-ons from settings.embedded.json.example / settings.nix.json.example / etc.",
   "env": {
     "OTEL_EXPORTER_OTLP_ENDPOINT": ""
   },

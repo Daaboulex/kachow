@@ -2,7 +2,7 @@
 This is the CANONICAL agent-rules file. Shared across Claude Code, Gemini CLI,
 Codex CLI, OpenCode, Aider, Cursor, Windsurf, and any other AGENTS.md-aware tool.
 
-On first install, run scripts/customize.sh to personalize the Identity section.
+On first install, run scripts/customize.mjs to personalize the Identity section.
 Your personal rules go between the USER SECTION markers — they survive updates.
 -->
 
@@ -191,8 +191,8 @@ All supported tools read from this single source:
 **How to install on a new machine:**
 ```bash
 # sync ~/.ai-context/ via your method (git clone / Syncthing / rsync)
-~/.ai-context/scripts/install-adapters.sh   # drop symlinks
-~/.ai-context/scripts/install-mcp.sh        # register MCP server
+~/.ai-context/scripts/install-adapters.mjs   # drop symlinks
+~/.ai-context/scripts/install-mcp.mjs        # register MCP server
 ```
 
 **MCP tools exposed (14):**

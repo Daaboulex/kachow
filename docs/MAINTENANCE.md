@@ -11,7 +11,7 @@ Configuration is deliberately split across three per-user directories. They have
 
 | Dir | Owns | Git remote | Cross-machine sync |
 |---|---|---|---|
-| `~/.ai-context/` | `AGENTS.md`, `memory/`, `skills/`, `mcp/`, `scripts/`, `VERSION` | **Your choice.** Syncthing, private git, or nothing. | User decides — `scripts/setup-private-remote.sh` lists the common options. |
+| `~/.ai-context/` | `AGENTS.md`, `memory/`, `skills/`, `mcp/`, `scripts/`, `VERSION` | **Your choice.** Syncthing, private git, or nothing. | User decides — `scripts/setup-private-remote.mjs` lists the common options. |
 | `~/.claude/` | Claude Code: `hooks/`, `commands/`, `settings.json`, `.notifications.jsonl` | Typically a private GitHub repo (`<you>/claude-global`). | Automatic via the `auto-push-global.js` Stop hook. |
 | `~/.gemini/` | Gemini CLI: `hooks/`, `commands/`, `settings.json` | Typically a private GitHub repo (`<you>/gemini-global`). | Same — `auto-push-global.js` covers both. |
 
@@ -28,7 +28,7 @@ Every Stop hook runs in a known order (see `settings.template.json → hooks.Sto
 |---|---|---|---|
 | `auto-push-global` | `~/.claude/` + `~/.gemini/` (+ `~/.ai-context/` opt-in) | Commits locally always; pushes every 5 min or when commits pile up. | 5 min (push only) |
 
-Upstream framework maintainers typically also run a private mirror hook that scrubs `~/.ai-context/` + `~/.claude/` + `~/.gemini/` into a separate release tree, deep-verifies the output, and pushes to the public repo on a cooldown. That hook is **not shipped in the public framework** — every maintainer's publishing tree is personal. The public framework ships `scripts/scrub-check.sh` as the fast pre-push gate; publish manually with `bump-version` + `scrub-check` + `git push` as covered below.
+Upstream framework maintainers typically also run a private mirror hook that scrubs `~/.ai-context/` + `~/.claude/` + `~/.gemini/` into a separate release tree, deep-verifies the output, and pushes to the public repo on a cooldown. That hook is **not shipped in the public framework** — every maintainer's publishing tree is personal. The public framework ships `scripts/scrub-check.mjs` as the fast pre-push gate; publish manually with `bump-version` + `scrub-check` + `git push` as covered below.
 
 ## Machine scenarios
 
@@ -63,14 +63,14 @@ If Developer Mode is off, symlinks fall back to plain file copies — you just h
 
 The shipped release helpers are:
 
-- `scripts/bump-version.sh` / `scripts/bump-version.ps1` — semver bump from Conventional Commits; writes `VERSION` + updates `CHANGELOG.md`.
-- `scripts/scrub-check.sh` — fast pre-push scrub verifier; install as `.git/hooks/pre-push` for automatic enforcement.
+- `scripts/bump-version.mjs` / `scripts/bump-version.ps1` — semver bump from Conventional Commits; writes `VERSION` + updates `CHANGELOG.md`.
+- `scripts/scrub-check.mjs` — fast pre-push scrub verifier; install as `.git/hooks/pre-push` for automatic enforcement.
 
 Typical release flow (cross-platform):
 
 ```bash
-bash scripts/bump-version.sh          # or .ps1 on Windows
-bash scripts/scrub-check.sh           # fails loud on hard findings
+node scripts/bump-version.mjs          # or .ps1 on Windows
+node scripts/scrub-check.mjs           # fails loud on hard findings
 git add VERSION CHANGELOG.md
 git commit -m "release: $(cat VERSION)"
 git tag "v$(cat VERSION)"
@@ -115,7 +115,7 @@ Run once after creating your fork's public repo.
 ## Quick health check
 
 ```bash
-bash scripts/health-check.sh    # Linux / macOS / Git-Bash
+node scripts/health-check.mjs    # Linux / macOS / Git-Bash
 pwsh scripts/health-check.ps1   # Windows PowerShell
 ```
 

@@ -77,6 +77,31 @@ function runNode(scriptPath, label) {
 }
 runNode(path.join(SCRIPTS, 'install-adapters.mjs'), 'Installing AGENTS.md adapters');
 
+// ── 3b. Hooks (JSON: Claude + Gemini) ──
+runNode(path.join(SCRIPTS, 'install-hooks.mjs'), 'Installing hooks (Claude + Gemini)');
+
+// ── 3c. Codex hook detection (TOML — separate from JSON installer) ──
+// Codex stores hooks in config.toml, not settings.json. Currently no bulk
+// wirer for kachow's Codex hooks; bulk-wire script is v0.4 work. Until then,
+// surface the gap so users can hand-author config.toml or use
+// wire-hook-codex.mjs per-hook.
+const codexDir = path.join(os.homedir(), '.codex');
+if (fs.existsSync(codexDir)) {
+  const codexConfig = path.join(codexDir, 'config.toml');
+  let codexHasHooks = false;
+  try {
+    const cfg = fs.readFileSync(codexConfig, 'utf8');
+    codexHasHooks = /codex_hooks\s*=\s*true/.test(cfg);
+  } catch {}
+  if (!codexHasHooks) {
+    console.log('  ⚠ Codex detected but config.toml missing or hooks not enabled.');
+    console.log('    Manual setup needed (settings.codex.template.toml is v0.4 work).');
+    console.log('    OR use scripts/wire-hook-codex.mjs per-hook to wire individual hooks.');
+  } else {
+    console.log('  ✓ Codex config.toml has hooks enabled.');
+  }
+}
+
 // ── 4. MCP registration ──
 runNode(path.join(SCRIPTS, 'install-mcp.mjs'), 'Registering MCP server');
 

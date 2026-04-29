@@ -71,7 +71,7 @@ Every script honours `$AI_CONTEXT` and falls back to `$HOME/.ai-context`.
 ### Step 2. Customize (interactive, one-shot)
 
 ```bash
-bash ~/.ai-context/scripts/customize.sh
+bash ~/.ai-context/scripts/customize.mjs
 ```
 
 It asks seven things:
@@ -91,7 +91,7 @@ This is the only interactive step in the whole install. After this, every instal
 `customize.sh` runs this for you unless you said no. If you said no, run it yourself:
 
 ```bash
-bash ~/.ai-context/scripts/bootstrap.sh
+bash ~/.ai-context/scripts/bootstrap.mjs
 ```
 
 Bootstrap does six things in order. Each is idempotent:
@@ -108,7 +108,7 @@ If the health check exits clean, you're done. Move on.
 ### Step 4. Verify
 
 ```bash
-bash ~/.ai-context/scripts/health-check.sh
+bash ~/.ai-context/scripts/health-check.mjs
 ```
 
 You should see something like:
@@ -259,7 +259,7 @@ If `~/.ai-context/` is moved, deleted, or its network mount is unavailable, the 
 Fix:
 
 ```bash
-bash ~/.ai-context/scripts/install-adapters.sh
+bash ~/.ai-context/scripts/install-adapters.mjs
 # OR on Windows
 pwsh ~/.ai-context/scripts/install-adapters.ps1
 ```
@@ -445,7 +445,7 @@ description: One concrete sentence about when to activate this skill for retriev
 - Thing to avoid.
 EOF
 
-bash ~/.ai-context/scripts/bootstrap.sh
+bash ~/.ai-context/scripts/bootstrap.mjs
 ```
 
 Bootstrap re-runs the adapter installer, which symlinks the new skill into every tool's skill dir.
@@ -453,7 +453,7 @@ Bootstrap re-runs the adapter installer, which symlinks the new skill into every
 ### Updating kachow itself
 
 ```bash
-bash ~/.ai-context/scripts/self-update.sh
+bash ~/.ai-context/scripts/self-update.mjs
 ```
 
 What this does:
@@ -466,24 +466,24 @@ What this does:
 6. Re-runs `bootstrap.sh` so any new hooks / adapters / settings get picked up.
 7. Prints the `CHANGELOG` diff.
 
-Preview without applying: `bash ~/.ai-context/scripts/self-update.sh --dry-run`.
+Preview without applying: `bash ~/.ai-context/scripts/self-update.mjs --dry-run`.
 
 ### Publishing a release from your fork
 
 Once you've made changes you want to tag:
 
 ```bash
-bash ~/.ai-context/scripts/bump-version.sh --dry-run
+bash ~/.ai-context/scripts/bump-version.mjs --dry-run
 ```
 
 Review the proposed bump + changelog section. Then:
 
 ```bash
-bash ~/.ai-context/scripts/bump-version.sh
+bash ~/.ai-context/scripts/bump-version.mjs
 git add VERSION CHANGELOG.md
 git commit -m "chore(release): v$(cat VERSION)"
 git tag "v$(cat VERSION)"
-bash ~/.ai-context/scripts/scrub-check.sh
+bash ~/.ai-context/scripts/scrub-check.mjs
 # If clean:
 git push --follow-tags origin main
 ```
@@ -491,7 +491,7 @@ git push --follow-tags origin main
 `scrub-check.sh` is the pre-push gate. Install it as `.git/hooks/pre-push`:
 
 ```bash
-ln -s ../../scripts/scrub-check.sh .git/hooks/pre-push
+ln -s ../../scripts/scrub-check.mjs .git/hooks/pre-push
 ```
 
 Now every push is scrubbed automatically.
@@ -506,7 +506,7 @@ The goal: your second machine picks up the same rules, memories, and tool wiring
 
 ```bash
 git clone <your-ai-context-remote> ~/.ai-context
-bash ~/.ai-context/scripts/bootstrap.sh
+bash ~/.ai-context/scripts/bootstrap.mjs
 ```
 
 The `~/.claude/` and `~/.gemini/` repos have their own auto-push remotes (configured by `setup-private-remote.sh`). `auto-pull-global` (SessionStart hook) fetches them on every session, so they stay in sync automatically.
