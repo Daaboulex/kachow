@@ -63,6 +63,36 @@
       {
         "hooks": [
           {
+            "name": "injection-size-monitor",
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/injection-size-monitor.js\"",
+            "timeout": 5000
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "name": "gsd-check-update",
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/gsd-check-update.js\"",
+            "timeout": 5000
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "name": "tri-tool-parity-check",
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/tri-tool-parity-check.js\"",
+            "timeout": 5000
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
             "name": "plugin-update-checker",
             "type": "command",
             "command": "node \"$HOME/.gemini/hooks/plugin-update-checker.js\"",
@@ -112,6 +142,16 @@
       }
     ],
     "BeforeTool": [
+      {
+        "hooks": [
+          {
+            "name": "peer-conflict-check",
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/peer-conflict-check.js\"",
+            "timeout": 3000
+          }
+        ]
+      },
       {
         "hooks": [
           {
@@ -200,6 +240,12 @@
             "timeout": 3000
           },
           {
+            "name": "skill-auto-updater",
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/skill-auto-updater.js\"",
+            "timeout": 30000
+          },
+          {
             "name": "session-presence-end",
             "type": "command",
             "command": "node \"$HOME/.gemini/hooks/session-presence-end.js\"",
@@ -272,6 +318,26 @@
       }
     ],
     "AfterTool": [
+      {
+        "hooks": [
+          {
+            "name": "skill-completion-correlator",
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/skill-completion-correlator.js\"",
+            "timeout": 5000
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "name": "rule-enforcement-check",
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/rule-enforcement-check.js\"",
+            "timeout": 5000
+          }
+        ]
+      },
       {
         "hooks": [
           {
