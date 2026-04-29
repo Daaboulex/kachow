@@ -1,6 +1,6 @@
 # Hooks catalog
 
-61 shipped hooks + 21 library helpers (19 top-level + 2 under `lib/self-improvement/`). Every one is pure Node (stdlib only); runs identically on Linux, macOS, and Windows (where the host AI CLI supports hooks).
+57 shipped hooks + 21 library helpers (19 top-level + 2 under `lib/self-improvement/`). Every one is pure Node (stdlib only); runs identically on Linux, macOS, and Windows (where the host AI CLI supports hooks).
 
 Registered under `hooks.<event>[].hooks[]` in the tool's settings JSON. See `settings.template.json` (Claude) and `settings.gemini.template.json` (Gemini) for the wiring.
 
@@ -40,8 +40,6 @@ Fires after each tool call (matcher-scoped — not every hook runs on every tool
 | `research-lint` | `Write\|Edit` | Lints research writes for source-citation drift. Linux/macOS only. |
 | `skill-completion-correlator` | _(global)_ | Correlates skill invocations with task outcomes (verification pass/fail). D3 instrumentation. |
 | `rule-enforcement-check` | _(global)_ | Catches missing `model:` parameter on Agent dispatches. Nudges (doesn't block). |
-| `post-commit-sync-reminder` | `Bash` on `git commit` | Reminds to sync cross-tool state after committing. |
-| `repomap-refresh` | `Write\|Edit` | Refreshes repo map when files change in mapped directories. |
 
 ## PreToolUse
 
@@ -73,8 +71,6 @@ Fires once at session end. Data-safety hooks (commit local before network) come 
 | `track-skill-usage` | Writes skill-invocation counts to `~/.claude/skill-usage.json`. |
 | `meta-system-stop` | Runs the skill-regression + research-scheduler detectors. Writes findings to `self-improvements-pending-<host>.jsonl`. |
 | `stop-sleep-consolidator` | Sleep-time background consolidator. Runs long-tail cleanup if the box is idle. |
-| `ai-snapshot-stop` | Session snapshot for continuity — captures key state for cross-session persistence. |
-| `mirror-kachow` | Auto-mirrors local hook changes to the kachow public repo (if checkout exists). |
 | `skill-auto-updater` | Auto-updates Claude plugins (24h cooldown) and syncs portable skills to Codex. |
 
 ## SubagentStart

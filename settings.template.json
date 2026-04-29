@@ -575,27 +575,6 @@
             "timeout": 5
           }
         ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/post-commit-sync-reminder.js\"",
-            "timeout": 3
-          }
-        ],
-        "matcher": "Bash"
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/repomap-refresh.js\"",
-            "timeout": 3,
-            "async": true
-          }
-        ],
-        "matcher": "Write|Edit"
       }
     ],
     "Notification": [
@@ -805,25 +784,6 @@
             "type": "command",
             "command": "node \"$HOME/.claude/hooks/stop-sleep-consolidator.js\"",
             "timeout": 5,
-            "async": true
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/ai-snapshot-stop.js\"",
-            "timeout": 10
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/mirror-kachow.js\"",
-            "timeout": 20,
             "async": true
           }
         ]
