@@ -42,15 +42,43 @@ function rotateIfNeeded(filePath) {
     const content = fs.readFileSync(filePath, 'utf8');
     const lines = content.split('\n').filter(Boolean);
     if (lines.length < ROTATE_THRESHOLD) return;
-    // Atomic rotation: copy → rename old, write truncated to temp → rename.
-    // Prevents race if two sessions rotate within same tick.
-    const oldPath = filePath + '.old.jsonl';
-    const tmpOld = oldPath + '.' + process.pid + '.' + Date.now() + '.tmp';
-    const tmpNew = filePath + '.' + process.pid + '.' + Date.now() + '.tmp';
-    fs.copyFileSync(filePath, tmpOld);
-    fs.renameSync(tmpOld, oldPath);
-    fs.writeFileSync(tmpNew, lines.slice(-RETAIN_LIVE_LINES).join('\n') + '\n');
-    fs.renameSync(tmpNew, filePath);
+
+    // Lock-then-rotate (CG-3 fix 2026-04-29). Exclusive lockfile create
+    // ensures only one session rotates per tick. Concurrent sessions skip
+    // rotation cleanly — at-most-N+ROTATE_THRESHOLD entries before the next
+    // session rotates. Prevents the prior race where two sessions would each
+    // copyFileSync→renameSync, with the second overwriting the first's
+    // backup data.
+    const lockPath = filePath + '.rotate.lock';
+    let lockFd;
+    try {
+      lockFd = fs.openSync(lockPath, 'wx');
+    } catch (e) {
+      // Another session holds the lock OR a stale lock from a crashed session.
+      // If the lock file is older than 60s, treat as stale and reclaim.
+      try {
+        const lockAge = Date.now() - fs.statSync(lockPath).mtimeMs;
+        if (lockAge > 60000) {
+          fs.unlinkSync(lockPath);
+          lockFd = fs.openSync(lockPath, 'wx');
+        } else {
+          return; // active rotation in progress; skip this tick
+        }
+      } catch { return; }
+    }
+
+    try {
+      const oldPath = filePath + '.old.jsonl';
+      const tmpOld = oldPath + '.' + process.pid + '.' + Date.now() + '.tmp';
+      const tmpNew = filePath + '.' + process.pid + '.' + Date.now() + '.tmp';
+      fs.copyFileSync(filePath, tmpOld);
+      fs.renameSync(tmpOld, oldPath);
+      fs.writeFileSync(tmpNew, lines.slice(-RETAIN_LIVE_LINES).join('\n') + '\n');
+      fs.renameSync(tmpNew, filePath);
+    } finally {
+      try { fs.closeSync(lockFd); } catch {}
+      try { fs.unlinkSync(lockPath); } catch {}
+    }
   } catch {}
 }
 
@@ -67,9 +95,16 @@ function readActiveSessions(filePath, sinceMs) {
         if (ts < sinceMs) continue;
         if (rec.event === 'end') {
           bySid.delete(rec.sid);
-        } else if (rec.event === 'start' || rec.event === 'heartbeat') {
+        } else if (rec.event === 'start') {
           const existing = bySid.get(rec.sid);
           if (!existing || existing.ts < ts) bySid.set(rec.sid, { ...rec, ts });
+        } else if (rec.event === 'heartbeat') {
+          // Heartbeat records lack agent/host/cwd — only update ts on existing.
+          // If no start record exists (e.g. file_touch resurrection after end),
+          // ignore the heartbeat instead of inserting a fields-undefined peer.
+          // Bug fixed 2026-04-29 — was producing "undefined@undefined" peer.
+          const existing = bySid.get(rec.sid);
+          if (existing) { existing.ts = ts; bySid.set(rec.sid, existing); }
         }
       } catch {}
     }

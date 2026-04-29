@@ -59,7 +59,7 @@ try {
   const CANONICAL_EVENTS_GEMINI = new Set([
     'SessionStart', 'SessionEnd', 'BeforeTool', 'AfterTool',
     'BeforeAgent', 'AfterAgent', 'PreCompress',
-    'BeforePrompt', 'AfterPrompt',
+    'Notification', 'UserPromptSubmit',
   ]);
   const canonicalEvents = isGemini ? CANONICAL_EVENTS_GEMINI : CANONICAL_EVENTS_CLAUDE;
 

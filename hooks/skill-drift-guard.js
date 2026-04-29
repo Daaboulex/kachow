@@ -39,7 +39,7 @@ try {
   const cwd = input.cwd || process.cwd();
 
   // Scope check — only fire in tracked projects
-  const projectMarker = path.join(cwd, '.claude', 'memory');
+  const projectMarker = (() => { const t = require(__dirname + '/lib/tool-detect.js').detectTool(); return path.join(cwd, t === 'gemini' ? '.gemini' : '.claude', 'memory'); })();
   if (!fs.existsSync(projectMarker)) passthrough();
 
   // Per-session counter (per-machine, gitignored)
@@ -65,7 +65,7 @@ try {
   // Read project identity (if present) for identity line
   let identityType = '';
   try {
-    const pid = JSON.parse(fs.readFileSync(path.join(cwd, '.claude', 'project-identity.json'), 'utf8'));
+    const pid = JSON.parse(fs.readFileSync((() => { const t = require(__dirname + '/lib/tool-detect.js').detectTool(); return path.join(cwd, t === 'gemini' ? '.gemini' : '.claude', 'project-identity.json'); })(), 'utf8'));
     identityType = pid.type || '';
   } catch {}
 
@@ -80,7 +80,7 @@ try {
   }
 
   // 2. Project-specific rules from file (if exists)
-  const rulesFile = path.join(cwd, '.claude', 'critical-rules.txt');
+  const rulesFile = (() => { const t = require(__dirname + '/lib/tool-detect.js').detectTool(); return path.join(cwd, t === 'gemini' ? '.gemini' : '.claude', 'critical-rules.txt'); })();
   try {
     const lines = fs.readFileSync(rulesFile, 'utf8').split('\n')
       .map(l => l.trim()).filter(l => l && !l.startsWith('#'));

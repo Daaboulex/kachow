@@ -59,24 +59,30 @@ try {
   // Always: no self-evaluation
   rules.push('Do NOT evaluate your own work quality. Report what you changed and let a separate evaluator verify.');
 
-  // Always: no git state changes (universal, hard-enforced by block-subagent-writes.js)
-  rules.push('NEVER use git state-changing commands (commit, push, merge, rebase, reset --hard, cherry-pick, revert, tag -f/-d, branch -D, checkout -b, add -A/./--all, restore --staged/., clean -f, submodule add, worktree add/remove). Read-only git (status, log, diff, show, ls-files, grep) is allowed. This rule is HARD-ENFORCED at the PreToolUse hook level — attempts will be blocked with an explanation. Report file changes via your return value; parent handles all commits.');
+  // R-RES-6 2026-04-25: reasoning anchors counter Opus 4.7 zero-reasoning turns.
+  // Sub-agents inherit explicit intent + plan + verification expectations.
+  rules.push('REASONING ANCHOR: Before any non-trivial tool call (Edit, Write, Bash with side effects), state intent in ONE sentence. For multi-step work (3+ tool calls or 2+ edits), output a numbered plan first. State what command/test will verify success. Skip these for pure-read tasks.');
 
-  // Safety-critical detection (SEC-5 v0.2.0 2026-04-23): walk up to nearest
-  // .git or .envrc boundary; detect at EACH level (not just cwd + cwd/..).
-  // Prior 1-level check missed deep subdirs under safety-critical projects.
-  // Configurable via env vars so kachow stays domain-agnostic in public:
-  //   KACHOW_SAFETY_DIRS — comma-separated dir names (default: SafetyCritical,HardwareControl)
-  //   KACHOW_SAFETY_PATTERNS — regex matching file content (default: IEC 61508/61511)
-  const safetyDirs = (process.env.KACHOW_SAFETY_DIRS || 'SafetyCritical,HardwareControl')
-    .split(',').map(s => s.trim()).filter(Boolean);
+  // Always: no git state changes (universal, hard-enforced by block-subagent-writes.js)
+  // Use the tool-specific event name so subagents see the correct identifier for their tool.
+  const _hookEventName = require(__dirname + '/lib/tool-detect.js').EVENT_NAMES[require(__dirname + '/lib/tool-detect.js').detectTool()].preTool;
+  rules.push(`NEVER use git state-changing commands (commit, push, merge, rebase, reset --hard, cherry-pick, revert, tag -f/-d, branch -D, checkout -b, add -A/./--all, restore --staged/., clean -f, submodule add, worktree add/remove). Read-only git (status, log, diff, show, ls-files, grep) is allowed. This rule is HARD-ENFORCED at the ${_hookEventName} hook level — attempts will be blocked with an explanation. Report file changes via your return value; parent handles all commits.`);
+
+  // Safety-critical project detection (SEC-5 2026-04-23): walk up to nearest
+  // .git or .envrc boundary; detect by directory trait at EACH level (not
+  // just cwd + cwd/..). Prior 1-level check missed Tests/Integration/Cases/
+  // style deep subdirs under safety-critical projects.
+  const safetyDirs = (process.env.KACHOW_SAFETY_DIRS || 'SafetyCritical,HardwareControl').split(',').map(s => s.trim()).filter(Boolean);
+  const hasSafetyDir = (dir) => safetyDirs.some(d => {
+    try { return fs.existsSync(path.join(dir, d)); } catch { return false; }
+  });
+  // Configurable via KACHOW_SAFETY_PATTERNS env var (regex string).
+  // Default matches functional-safety standards (IEC 61508/61511).
+  // Users with safety-critical projects can extend per their domain markers.
   const safetyContentRegex = (() => {
     try { return new RegExp(process.env.KACHOW_SAFETY_PATTERNS || 'IEC\\s*615(08|11)', 'i'); }
     catch { return /IEC\s*615(08|11)/i; }
   })();
-  const hasSafetyDir = (dir) => safetyDirs.some(d => {
-    try { return fs.existsSync(path.join(dir, d)); } catch { return false; }
-  });
   const hasSafetyContent = (dir) => {
     try {
       for (const name of fs.readdirSync(dir)) {
@@ -93,11 +99,14 @@ try {
   try {
     let walkDir = cwd;
     const root = path.parse(walkDir).root;
+    // Walk up until we hit .git, .envrc, or filesystem root — detect at each level
     for (let i = 0; i < 10 && walkDir && walkDir !== root; i++) {
       if (hasSafetyDir(walkDir) || hasSafetyContent(walkDir)) { hasSafetyCode = true; break; }
+      // Stop at project boundary markers
       try {
         if (fs.existsSync(path.join(walkDir, '.git')) ||
             fs.existsSync(path.join(walkDir, '.envrc'))) {
+          // Final check at boundary before stopping
           if (hasSafetyDir(walkDir) || hasSafetyContent(walkDir)) hasSafetyCode = true;
           break;
         }
@@ -109,7 +118,7 @@ try {
   } catch {}
 
   if (hasSafetyCode) {
-    rules.push(`SAFETY: Files in safety-critical directories (configured via KACHOW_SAFETY_DIRS=${safetyDirs.join(',')}) are subject to functional-safety standards like IEC 61508/61511. Do NOT edit these in a subagent — flag for manual review.`);
+    rules.push(`SAFETY: Files in ${safetyDirs.join('/, ')}/ are safety-critical (IEC 61508 domain). Do NOT edit these in a subagent — flag for manual review.`);
   }
 
   if (rules.length > 0) {

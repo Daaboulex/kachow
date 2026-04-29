@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 require(__dirname + "/lib/emit-simple-timing.js").start(__filename);
-// Combined PreToolUse guard for Write|Edit|MultiEdit|Bash operations.
+// Combined pre-write guard for write tools across all 3 CLIs.
+// Event names per tool: PreToolUse (Claude/Codex), BeforeTool (Gemini).
+// Tool-aware via lib/tool-detect.js (path-based + env-based detection).
 // Merges guards into 1 process: saves Node spawns per tool call.
 //
 // Guards:
@@ -8,7 +10,7 @@ require(__dirname + "/lib/emit-simple-timing.js").start(__filename);
 //   2. GSD prompt injection guard (advisory) — scans .planning/ writes for injection patterns
 //   3. GSD workflow guard (advisory) — nudges toward /gsd:fast when editing outside GSD (opt-in)
 //   4. Git identity guard (HARD BLOCK) — enforces per-project allow/deny rules from
-//      <repo>/.claude/project-identity.json. Prevents pushing local-private projects to public remotes.
+//      <repo>/.claude/project-identity.json. Prevents pushing <project-name> to GitHub, etc.
 //      Logs every fire (block or allow) to episodic JSONL for Tier 3 self-improvement.
 
 const fs = require('fs');
@@ -99,17 +101,17 @@ try {
   }
 
   // ── 1. Safety-critical file guard ──
-  // Configurable via KACHOW_SAFETY_PATHS (comma-separated path-substring matches).
-  // Default values are generic; users with safety-critical projects override per their domain.
   try {
+    // Configurable via KACHOW_SAFETY_PATHS env var (comma-separated path-substring matches).
+    // Default values are generic; users with safety-critical projects override per their domain.
     const SAFETY_PATHS = (process.env.KACHOW_SAFETY_PATHS ||
       'SafetyCritical/,HardwareControl/,FailSafe/,WatchdogTimer/,FlashControl/,EmergencyStop/')
       .split(',').map(s => s.trim()).filter(Boolean);
     if (SAFETY_PATHS.some(sp => normalized.includes(sp))) {
       messages.push(
-        `SAFETY-CRITICAL FILE: ${path.basename(filePath)} — This file matches a configured safety-critical path. ` +
+        `SAFETY-CRITICAL FILE: ${path.basename(filePath)} — This file controls ESD/SSD safety logic, actuator movement, or EEPROM integrity. ` +
         'Per project rules: (1) Do NOT let agents edit these files — manual edits only. ' +
-        '(2) Read the FULL function before changing anything. (3) Verify safety override logic, timeout values, and hardware guards are preserved. ' +
+        '(2) Read the FULL function before changing anything. (3) Verify ESD/SSD override logic, timeout values, and motor guards are preserved. ' +
         '(4) Build and verify after changes.'
       );
     }
@@ -199,8 +201,10 @@ try {
       output.systemMessage = messages.join('\n');
     }
     if (advisories.length > 0) {
+      const { detectTool, EVENT_NAMES } = require(__dirname + '/lib/tool-detect.js');
+      const tool = detectTool();
       output.hookSpecificOutput = {
-        hookEventName: 'PreToolUse',
+        hookEventName: EVENT_NAMES[tool].preTool,
         additionalContext: advisories.join('\n'),
       };
     }

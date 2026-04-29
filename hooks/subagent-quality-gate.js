@@ -38,17 +38,11 @@ try {
     warnings.push('Subagent produced very short output — may not have completed its task.');
   }
 
-  // Check if safety-critical files were mentioned as modified.
-  // Configurable via KACHOW_SAFETY_FILE_PATTERNS (comma-separated tokens).
-  // Defaults: generic safety-critical naming patterns; user overrides for domain-specific names.
-  const safetyPatterns = (process.env.KACHOW_SAFETY_FILE_PATTERNS ||
-    'SafetyCritical,HardwareControl,FailSafe,WatchdogTimer,FlashControl,EmergencyStop')
-    .split(',').map(s => s.trim()).filter(Boolean);
+  // Check if safety-critical files were mentioned as modified
+  const safetyPatterns = (process.env.KACHOW_SAFETY_FILE_PATTERNS || 'SafetyCritical,HardwareControl,FailSafe,WatchdogTimer,FlashControl,EmergencyStop').split(',').map(s => s.trim()).filter(Boolean);
   const touchedSafety = safetyPatterns.filter(p => lastMsg.includes(p));
-  // Detect safety-critical project by trait, not name. Configurable via KACHOW_SAFETY_DIRS.
-  const safetyDirs = (process.env.KACHOW_SAFETY_DIRS || 'SafetyCritical,HardwareControl')
-    .split(',').map(s => s.trim()).filter(Boolean);
-  const hasSafetyCode = safetyDirs.some(d => {
+  // Detect safety-critical project by trait, not name (configurable via KACHOW_SAFETY_DIRS)
+  const hasSafetyCode = (process.env.KACHOW_SAFETY_DIRS || 'SafetyCritical,HardwareControl').split(',').map(s => s.trim()).filter(Boolean).some(d => {
     try { return fs.existsSync(require('path').join(cwd, d)) ||
                  fs.existsSync(require('path').join(cwd, '..', d)); } catch { return false; }
   });

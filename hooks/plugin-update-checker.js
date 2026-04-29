@@ -10,9 +10,9 @@ const path = require('path');
 const { execSync } = require('child_process');
 
 // Gemini has no plugin marketplace (extensions instead) — skip on Gemini-side runs.
-// Detected via hook copy location so symmetric sync stays clean.
-// Fixes "Hook(s) [plugin-update-checker] failed for event SessionStart" on Gemini CLI 0.39+.
-if (__dirname.includes('/.gemini/')) {
+// Tool detection via argv[1] (preserved through symlink, unlike __dirname).
+const { detectTool } = require(__dirname + '/lib/tool-detect.js');
+if (detectTool() === 'gemini') {
   process.stdout.write('{"continue":true}');
   process.exit(0);
 }
