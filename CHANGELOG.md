@@ -4,6 +4,38 @@ All notable changes to this framework. See [Semantic Versioning](https://semver.
 
 > *"I eat losers for breakfast."* — Lightning McQueen, while your hooks pass selftest at 0.4s
 
+## [0.3.1] — 2026-04-29 (security + parity + bugfixes + .mjs migration partial)
+
+### Security (P0)
+- **Removed safety-critical project fingerprints** from 4 hook files (`subagent-harness-inject.js`, `subagent-quality-gate.js`, `pre-write-combined-guard.js`, `commands/reflect.md`). Hardcoded directory names (`Actuator`, `ValveLogic`, `SafetyTimer`, `EEPROM_Control`) replaced with env-configurable defaults: `KACHOW_SAFETY_DIRS`, `KACHOW_SAFETY_PATTERNS`, `KACHOW_SAFETY_FILE_PATTERNS`, `KACHOW_SAFETY_PATHS`. Generic defaults (`SafetyCritical,HardwareControl`) apply when env unset.
+- **Scrub-check tokens added** for previously-undetected leak vectors: `Actuator`, `ValveLogic`, `SafetyTimer`, `EEPROM_Control`, `lpc43xx`, `Modbus-RTU-pst`. Word-boundary anchored to avoid false-positives on common substrings.
+- **Public branch deleted**: `backup-main-2026-04-22` removed from remote (predated SEC-1..4 hardening).
+
+### Added
+- `wire-hook-codex.mjs` — TOML-based Codex hook wirer (was claimed shipped in v0.3.0 but file was missing; now actually present).
+- `install-hooks.mjs` — cross-platform Node ESM installer replacing `install-hooks.sh`. Idempotent; manifest-driven; substitutes `$HOME` placeholder.
+- `uninstall.mjs` — cross-platform manifest-driven uninstaller. Dry-run by default; `--yes` to actually delete; sweeps broken symlinks.
+- `session-end-logger` — registered in Gemini template (was Claude-only, asymmetric).
+- 7 v0.3.0 hooks added to Gemini template (had been Claude-only): `injection-size-monitor`, `gsd-check-update`, `tri-tool-parity-check`, `peer-conflict-check`, `skill-completion-correlator`, `rule-enforcement-check`, `skill-auto-updater`.
+
+### Changed
+- `commands/wrap-up.md` — tri-tool aware. Now checks `~/.codex/` git status + parity + risky-changes alongside `~/.claude/` + `~/.gemini/`. Output shows "Claude ↔ Gemini ↔ Codex" sync status.
+- `bootstrap.sh` — prefers `.mjs` installers when Node available + `.mjs` sibling exists. Falls back to `.sh` otherwise. Adds Codex detection notice (bulk-wirer is v0.4 work).
+- CI Node-syntax step gated on `shell: bash` (Windows runner Git-Bash compat). Bash-syntax step uses `nullglob` for tolerant phased `.sh` removal.
+
+### Fixed
+- `presence.js` heartbeat handling: heartbeat events lack `agent`/`host`/`cwd` fields. Previously overwrote start record → `undefined@undefined` peer in display. Fix: heartbeats only update `ts` on existing entries, never create new.
+- `session-context-loader.js` memory category counter: regex `/\(([^)]+)\)/` matched first paren, broken for titles containing parens like "(renamed from foo)". Result: spurious categories like "renamed from fahlke:1", "subagent gaps:1". Fixed via `/\(([^()]+\.md)\)/`.
+- Codex agent tagging in presence: `__dirname` heuristic only checked Gemini path; Codex sessions tagged as `claude`. Fix: env var `AGENT_TOOL` precedence + `CODEX_HOME`/`process.argv[0]` detection fallback.
+- CHANGELOG arithmetic for v0.3.0: net hook count is `45 + 16 added - 4 removed = 57` (not "61" as originally written). v0.3.0 entry stays as-is for historical accuracy.
+
+### Notes
+- 11 already-migrated `.sh` scripts (have `.mjs` siblings) NOT yet deleted in this release — coordinated docs+CI update deferred to v0.4. Both formats work currently; bootstrap prefers `.mjs`.
+- 6 remaining `.sh-only` kachow scripts still pending `.mjs` port: `cleanup-stale`, `hook-stats`, `install-commands`, `note`, `scrub-check`, `setup-branch-protection`. v0.4 work.
+- `apply_patch` upstream bug openai/codex#16732 STILL unfixed — Codex `apply_patch` skips ALL hooks. v0.3.1 adds informational warning at SessionStart explaining the gap (see `~/.codex/README.md`).
+
+[0.3.1]: https://github.com/Daaboulex/kachow/releases/tag/v0.3.1
+
 ## [0.3.0] — 2026-04-29 (tri-tool parity + 16 new hooks + Codex support)
 
 ### Added
