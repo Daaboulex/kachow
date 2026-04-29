@@ -58,22 +58,48 @@ done
 # ── 3. Adapters (AGENTS.md + memory symlinks) ──
 echo
 echo "── Installing AGENTS.md adapters ──"
-bash "$AI_CONTEXT/scripts/install-adapters.sh"
+# Prefer .mjs when available (single-format cross-platform 2026-04-29).
+if [ -f "$AI_CONTEXT/scripts/install-adapters.mjs" ] && command -v node >/dev/null 2>&1; then
+  node "$AI_CONTEXT/scripts/install-adapters.mjs"
+else
+  bash "$AI_CONTEXT/scripts/install-adapters.sh"
+fi
 
 # ── 3b. Hooks ──
 echo
 echo "── Installing hooks ──"
-bash "$AI_CONTEXT/scripts/install-hooks.sh"
+if [ -f "$AI_CONTEXT/scripts/install-hooks.mjs" ] && command -v node >/dev/null 2>&1; then
+  node "$AI_CONTEXT/scripts/install-hooks.mjs"
+else
+  bash "$AI_CONTEXT/scripts/install-hooks.sh"
+fi
 
 # ── 3c. Slash commands ──
 echo
 echo "── Installing slash commands ──"
 bash "$AI_CONTEXT/scripts/install-commands.sh"
 
+# ── 3d. Codex hooks (config.toml — separate from JSON hook installer) ──
+# Codex stores hooks in config.toml, not settings.json. Currently no bulk wirer
+# for kachow's Codex hooks. Until v0.4 (codex.template.toml + bulk-wire script),
+# Codex users must hand-author config.toml or use wire-hook-codex.mjs per-hook.
+if [ -d "$HOME/.codex" ]; then
+  if [ ! -f "$HOME/.codex/config.toml" ] || ! grep -q "codex_hooks = true" "$HOME/.codex/config.toml" 2>/dev/null; then
+    echo "  ⚠ Codex detected but config.toml missing or hooks not enabled."
+    echo "    Manual setup needed for now (v0.4 will deliver a template)."
+  else
+    echo "  ✓ Codex config.toml has hooks enabled (manual maintenance for now)."
+  fi
+fi
+
 # ── 4. MCP registration ──
 echo
 echo "── Registering MCP server ──"
-bash "$AI_CONTEXT/scripts/install-mcp.sh"
+if [ -f "$AI_CONTEXT/scripts/install-mcp.mjs" ] && command -v node >/dev/null 2>&1; then
+  node "$AI_CONTEXT/scripts/install-mcp.mjs"
+else
+  bash "$AI_CONTEXT/scripts/install-mcp.sh"
+fi
 
 # ── 4. Memory/skills symlinks (if fresh machine, may need to symlink these) ──
 echo
