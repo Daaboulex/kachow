@@ -23,8 +23,8 @@ foreach ($p in @(
   @{file='memory';label='memory/ dir exists'},
   @{file='skills';label='skills/ dir exists'},
   @{file='mcp/personal-context/server.js';label='MCP server exists'},
-  @{file='scripts/install-adapters.sh';label='install-adapters.sh'},
-  @{file='scripts/install-mcp.sh';label='install-mcp.sh'}
+  @{file='scripts/install-adapters.mjs';label='install-adapters.mjs'},
+  @{file='scripts/install-mcp.mjs';label='install-mcp.mjs'}
 )) {
   if (Test-Path (Join-Path $AI $p.file)) { Pass $p.label } else { Fail $p.label }
 }

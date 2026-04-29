@@ -287,19 +287,20 @@ if (-not (Test-Path $mcpServer)) {
             Write-Host "  ✓ Claude Code" -ForegroundColor Green
         }
         # Similar for Gemini/Codex/OpenCode — less verbose, trust user to verify
-        Write-Host "  (Gemini/Codex/OpenCode: run the Linux install-mcp.sh equivalent manually)" -ForegroundColor Yellow
+        Write-Host "  (Gemini/Codex/OpenCode: run install-mcp.mjs manually)" -ForegroundColor Yellow
     } else {
-        # Linux/Mac/Git-Bash: prefer install-mcp.ps1; fall back to .sh via bash if present.
+        # Linux/Mac/Git-Bash: prefer install-mcp.mjs (single-format post Wave G 2026-04-29).
+        # Fall back to .ps1 if Node unavailable.
+        $mjsScript = Join-Path $homeDir ".ai-context/scripts/install-mcp.mjs"
         $ps1Script = Join-Path $homeDir ".ai-context/scripts/install-mcp.ps1"
-        $shScript  = Join-Path $homeDir ".ai-context/scripts/install-mcp.sh"
-        if (Test-Path $ps1Script) {
+        if ((Test-Path $mjsScript) -and (Get-Command node -ErrorAction SilentlyContinue)) {
+            if ($DryRun) { Write-Host "  WOULD run install-mcp.mjs via node" }
+            else { & node $mjsScript }
+        } elseif (Test-Path $ps1Script) {
             if ($DryRun) { Write-Host "  WOULD run install-mcp.ps1" }
             else { & $ps1Script }
-        } elseif ((Test-Path $shScript) -and (Get-Command bash -ErrorAction SilentlyContinue)) {
-            if ($DryRun) { Write-Host "  WOULD run install-mcp.sh via bash" }
-            else { & bash $shScript }
         } else {
-            Write-Host "  (install-mcp: no .ps1 or bash available — run scripts/install-mcp.* manually)" -ForegroundColor Yellow
+            Write-Host "  (install-mcp: no .mjs/.ps1 found — run scripts/install-mcp.* manually)" -ForegroundColor Yellow
         }
     }
 }
