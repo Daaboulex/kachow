@@ -99,10 +99,13 @@ jobs:
           shopt -u nullglob
 
       - name: Node script syntax (cross-platform — .mjs canonical post v0.4)
+        shell: bash
         run: |
+          shopt -s nullglob
           for f in scripts/*.mjs; do
             node --check "$f"
           done
+          shopt -u nullglob
 
       - name: PowerShell script syntax (Windows + macOS + Linux via pwsh)
         shell: pwsh
