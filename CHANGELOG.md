@@ -4,6 +4,31 @@ All notable changes to this framework. See [Semantic Versioning](https://semver.
 
 > *"I eat losers for breakfast."* — Lightning McQueen, while your hooks pass selftest at 0.4s
 
+## [0.3.2] — 2026-04-29 (tri-tool symmetric hook architecture)
+
+### Added
+- `hooks/lib/tool-detect.js` — runtime tool detection helper. Replaces `__dirname`-based detection (which breaks under symlink-based canonicalization). Detection order: `AI_TOOL` env var → `argv[1]` path inspection → tool-specific env hints (`CLAUDECODE`/`GEMINI_API_KEY`/`CODEX_HOME`) → default 'claude'. Exposes `EVENT_NAMES` (per-tool event mapping: PreToolUse vs BeforeTool, etc) and `TOOL_DIRS` (per-tool config dir names).
+
+### Changed (tool-aware refactor — all use `tool-detect.js`)
+- `pre-write-combined-guard.js` — `hookEventName` in output now correct per tool (was hardcoded `'PreToolUse'`).
+- `subagent-harness-inject.js` — injected rule text references the correct event name per tool.
+- `skill-drift-guard.js` — `.claude/memory` vs `.gemini/memory` path detection.
+- `skill-completion-correlator.js` — config dir per tool.
+- `plugin-update-checker.js` — skip on Gemini (no plugins).
+- `session-presence-start.js` — agent tagging now identifies Codex correctly (was tagging Codex sessions as 'claude' because `__dirname.includes('/.gemini/')` was the only check).
+- `subagent-harness-inject.js` — `KACHOW_SAFETY_PATTERNS` env var replaces hardcoded MCU-family marker in safety-content detection.
+
+### Fixed
+- `lib/presence.js` — heartbeat events lack agent/host/cwd; previously overwrote start records → produced `undefined@undefined` peer in display. Heartbeats now only update `ts` on existing entries; never create new. Also: file-lock guard on rotation prevents data loss when concurrent sessions hit `ROTATE_THRESHOLD` simultaneously.
+- `session-context-loader.js` — memory category counter regex changed from `/\(([^)]+)\)/` to `/\(([^()]+\.md)\)/`. Old regex matched first paren in entry, broken for titles containing parens (e.g. `(renamed from foo)` would shadow `(filename.md)`). Result: spurious categories like `'renamed from foo:1'`, `'subagent gaps:1'`. Now matches the `.md` filename group specifically.
+- `dead-hook-detector.js` — `CANONICAL_EVENTS_GEMINI` corrected: removed phantom `'BeforePrompt'`/`'AfterPrompt'` (not real Gemini events); added `'Notification'`/`'UserPromptSubmit'` (which ARE real Gemini events on v0.39+).
+
+### Architecture (advanced users)
+- Optional canonical-symlink architecture: install hooks once at `~/.ai-context/hooks/` and symlink each tool's hook dir to it. With `tool-detect.js`, all tool-specific behavior works correctly under symlinks (uses `argv[1]`, not `__dirname`). `install-hooks.mjs` still ships a copy-based install by default; symlink architecture is a manual user choice.
+- Adding a 4th CLI in the future: (1) symlink its hook dir to `~/.ai-context/hooks/`, (2) add an entry to `EVENT_NAMES` + `TOOL_DIRS` in `tool-detect.js`, (3) update settings/config equivalents. No per-hook port needed.
+
+[0.3.2]: https://github.com/Daaboulex/kachow/releases/tag/v0.3.2
+
 ## [0.3.1] — 2026-04-29 (security + parity + bugfixes + .mjs migration partial)
 
 ### Security (P0)
