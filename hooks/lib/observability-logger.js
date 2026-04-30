@@ -24,7 +24,7 @@ const HOSTNAME = os.hostname();
  *
  * Priority order (first match wins):
  *   1. <cwd>/.ai-context/memory/episodic/  — NixOS/nix-style project with .ai-context dir
- *   2. <cwd>/.claude/memory/episodic/      — simple-style project with .claude dir
+ *   2. <cwd>/.claude/memory/episodic/      — local-private style project with .claude dir
  *   3. ~/.claude/projects/<sanitized>/memory/episodic/  — fallback for any cwd (auto-memory)
  *
  * Rationale: .ai-context takes precedence so nix projects (which symlink .claude into
