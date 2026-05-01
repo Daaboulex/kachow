@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.4.0] — 2026-05-01
+Bump: forced
+
+### Ship stats
+- 66 hooks + 28 lib files
+- 12 shell scripts + 11 PowerShell parity
+- 14 slash commands
+- MCP server: 14 tools, dependency-free
+
 ## [0.3.0] — 2026-05-01
 Bump: forced
 

@@ -487,6 +487,17 @@
         "hooks": [
           {
             "type": "command",
+            "command": "node \"$HOME/.claude/hooks/post-commit-sync-reminder.js\"",
+            "if": "Bash(git commit*)",
+            "timeout": 3
+          }
+        ],
+        "matcher": "Bash"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
             "command": "node \"$HOME/.claude/hooks/hook-doc-drift-detector.js\"",
             "if": "Write(*.claude/hooks/*.js)",
             "timeout": 5
@@ -812,6 +823,16 @@
             "type": "command",
             "command": "node \"$HOME/.claude/hooks/stop-sleep-consolidator.js\"",
             "timeout": 5,
+            "async": true
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/skill-auto-updater.js\"",
+            "timeout": 30,
             "async": true
           }
         ]

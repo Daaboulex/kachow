@@ -252,6 +252,12 @@
             "timeout": 5000
           },
           {
+            "name": "auto-reflect",
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/reflect-session-end.js\"",
+            "timeout": 5000
+          },
+          {
             "name": "auto-consolidate-memory",
             "type": "command",
             "command": "node \"$HOME/.gemini/hooks/dream-auto.js\"",
@@ -283,6 +289,12 @@
             "type": "command",
             "command": "node \"$HOME/.gemini/hooks/meta-system-stop.js\"",
             "timeout": 15000
+          },
+          {
+            "name": "sync-memory",
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/sync-memory-dirs.js\"",
+            "timeout": 5000
           }
         ],
         "matcher": "exit"
@@ -305,6 +317,16 @@
             "type": "command",
             "command": "node \"$HOME/.gemini/hooks/session-end-logger.js\"",
             "timeout": 3000
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/skill-auto-updater.js\"",
+            "name": "skill-auto-updater",
+            "timeout": 30000
           }
         ]
       },
@@ -377,6 +399,17 @@
       {
         "hooks": [
           {
+            "name": "post-commit-sync-reminder",
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/post-commit-sync-reminder.js\"",
+            "timeout": 3000
+          }
+        ],
+        "matcher": "run_shell_command"
+      },
+      {
+        "hooks": [
+          {
             "name": "task-verification-gate",
             "type": "command",
             "command": "node \"$HOME/.gemini/hooks/task-verification-gate.js\"",
@@ -424,6 +457,29 @@
             "type": "command",
             "command": "node \"$HOME/.gemini/hooks/bandaid-loop-detector.js\"",
             "timeout": 3000
+          }
+        ],
+        "matcher": "write_file|replace"
+      },
+      {
+        "hooks": [
+          {
+            "name": "sync-claude-md",
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/sync-claude-md.js\"",
+            "timeout": 5000
+          },
+          {
+            "name": "sync-claude-skills",
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/sync-claude-skills.js\"",
+            "timeout": 5000
+          },
+          {
+            "name": "sync-claude-agents",
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/sync-claude-agents.js\"",
+            "timeout": 5000
           }
         ],
         "matcher": "write_file|replace"
