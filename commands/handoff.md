@@ -101,24 +101,24 @@ Write a structured handoff file:
 
 ## Step 3: Write Files
 
-**3a. Write the detailed handoff** with **per-session-id filename** (NEVER collides with parallel sessions):
+**3a. Write the detailed handoff** to the canonical location:
 
-Generate the filename using BOTH session_id (from your hook input or a short hash) AND timestamp:
-- Format: `.session-handoff-<short-session-id>-YYYY-MM-DDTHH-MM.md`
-- Short session ID: first 8 chars of session UUID OR `<hostname>-<pid-or-rand>` if no session_id available
-- Example: `.session-handoff-a1b2c3d4-2026-04-14T18-30.md`
+Write to: `~/.ai-context/handoffs/sessions/<session-id>.md`
 
-Write to the FIRST EXISTING location (in priority order):
-1. `<repo>/` (root) — preferred for project handoffs
-2. `<repo>/.ai-context/` — NixOS projects with `.ai-context/` convention
-3. `<repo>/.claude/` — fallback
-4. `~/.claude/` — global fallback (very rare; use only if no project context)
+**To get the session ID:** Read `~/.ai-context/handoffs/sessions/.current-session-claude.json` — the
+auto-save hook writes this pointer. Use the `session_id` field from that file.
+If the file doesn't exist (auto-save never fired), use a timestamp-based ID: `manual-YYYY-MM-DDTHH-MM`.
 
-**ALSO write/overwrite `.session-handoff.md`** (no suffix) — but ONLY if no other concurrent handoff has been written in the last 5 minutes. Check via `Glob` for `.session-handoff-*-*.md` mtimes. If concurrent activity detected, skip the unsuffixed pointer (next session-context-loader merges all per-session files).
+**One location. No cascade. No fallback.** Per-session-id filenames prevent collisions.
+No Glob check needed for concurrent sessions.
 
-Old timestamped handoffs accumulate but are small (~5KB each). `/consolidate-memory` cleans them after 14 days.
+## Deferred Items (managed in ~/.ai-context/handoffs/deferred/items.json)
 
-**Why per-session-id?** Two Claude sessions running /wrap-up at the same minute would collide on `YYYY-MM-DDTHH-MM`. Per-session-id is collision-free regardless of timing. Mirror of how `self-improvements-pending-<host>.jsonl` was made per-machine.
+New items added this session:
+- [type] "title" (project: X)
+
+Do NOT copy-paste deferred items from previous handoffs. They live in the canonical store.
+Use MCP tool `update_deferred` to add items, or write directly to the JSON file.
 
 **3b. Update AI-progress.json** (if it exists):
 ```json
@@ -148,8 +148,11 @@ Tell the user clearly:
 
 ## How the Next Session Picks This Up
 
-The `session-context-loader.js` SessionStart hook reads AI-progress.json and displays
-in-flight status. The next agent should also read `.session-handoff.md` for full context.
+The `session-context-loader.js` SessionStart hook reads the project index at
+`~/.ai-context/handoffs/projects/<key>.json` and shows a banner with the latest session
+summary. If a prose handoff exists, it points to `~/.ai-context/handoffs/sessions/<id>.md`.
+
+The `handoff-triage-gate.js` hook surfaces stale deferred items from the canonical store.
 
 If the next session runs /wrap-up or /reflect, the quick-reflect learnings from the handoff
 file should be promoted to proper memory files (if they're still relevant).

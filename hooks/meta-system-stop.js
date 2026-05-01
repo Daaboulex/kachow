@@ -26,73 +26,104 @@ const cwd = process.cwd();
 const messages = [];
 
 // Constants centralized in lib/constants.js (CI-001)
-const { SKILL_REGRESSION_DROP_THRESHOLD, SKILL_MIN_INVOCATIONS, RESEARCH_COOLDOWN_MS: RES_COOLDOWN, RESEARCH_MIN_SESSIONS: RES_MIN_SESSIONS } = require(path.join(configDir, 'hooks', 'lib', 'constants.js'));
+const { SKILL_REGRESSION_DROP_THRESHOLD, SKILL_MIN_INVOCATIONS, MIN_SESSIONS_PER_WINDOW, SKILL_REGRESSION_EXEMPT, RESEARCH_COOLDOWN_MS: RES_COOLDOWN, RESEARCH_MIN_SESSIONS: RES_MIN_SESSIONS } = require(path.join(configDir, 'hooks', 'lib', 'constants.js'));
 const { readCounter } = require(path.join(configDir, 'hooks', 'lib', 'atomic-counter.js'));
 
-// --- Section A: Skill Regression Detector ---
-// D-05 adapted: success field absent from skill_invoke events — using frequency
-// analysis instead. >50% drop in invocation rate between two 7-day windows = regression.
+// --- Section A: Skill Regression Detector (v2 — per-session-rate normalized) ---
+// D-05 adapted: frequency analysis with session-count normalization.
+// Compares invocations-per-session rate between two 7-day windows.
+// Exempts session-type-dependent skills (wrap-up, brainstorming, etc.)
 try {
   const { readEvents, logEvent } = require(path.join(configDir, 'hooks', 'lib', 'observability-logger.js'));
   const { archiveAndWrite } = require(path.join(configDir, 'hooks', 'lib', 'tier3-consolidation.js'));
 
-  const allEvents = readEvents(cwd, 14, { eventTypes: ['skill_invoke'] });
+  const allSkillEvents = readEvents(cwd, 14, { eventTypes: ['skill_invoke'] });
+  const allSessionEvents = readEvents(cwd, 14, { eventTypes: ['session_start'] });
 
   const now = Date.now();
   const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
   const cutoff = new Date(now - sevenDaysMs).toISOString();
 
-  // Split into two 7-day windows: recent (days 1-7) and older (days 8-14)
-  const recent = {}, older = {};
-  for (const e of allEvents) {
-    const skill = e.payload && e.payload.skill;
-    if (!skill) continue;
-    if (e.ts >= cutoff) {
-      recent[skill] = (recent[skill] || 0) + 1;
-    } else {
-      older[skill] = (older[skill] || 0) + 1;
-    }
+  // Count sessions per window
+  let sessionsRecent = 0, sessionsOlder = 0;
+  for (const e of allSessionEvents) {
+    if (e.ts >= cutoff) sessionsRecent++;
+    else sessionsOlder++;
   }
 
-  const regressions = [];
-  const allSkills = new Set([...Object.keys(recent), ...Object.keys(older)]);
-  for (const skill of allSkills) {
-    const r = recent[skill] || 0;
-    const o = older[skill] || 0;
-    if (r + o < SKILL_MIN_INVOCATIONS) continue; // skip low-signal skills
-    if (o > 0 && r < o * SKILL_REGRESSION_DROP_THRESHOLD) {
-      const drop = Math.round((1 - r / o) * 100);
-      regressions.push({ skill, older: o, recent: r, drop });
-    }
-  }
-
-  if (regressions.length > 0) {
-    // Find semantic dir: project memory dir pattern (same as dream-auto.js findMemoryDir)
-    let semanticDir = null;
-    for (const candidate of ['.ai-context/memory', '.claude/memory']) {
-      const fullPath = path.join(cwd, candidate);
-      if (fs.existsSync(path.join(fullPath, 'MEMORY.md'))) {
-        semanticDir = path.join(fullPath, 'semantic');
-        break;
+  // Skip if either window has too few sessions (statistically meaningless)
+  if (sessionsRecent >= MIN_SESSIONS_PER_WINDOW && sessionsOlder >= MIN_SESSIONS_PER_WINDOW) {
+    // Count skill invocations per window
+    const recent = {}, older = {};
+    for (const e of allSkillEvents) {
+      const skill = (e.payload && e.payload.skill) || (e.meta && e.meta.skill);
+      if (!skill) continue;
+      if (SKILL_REGRESSION_EXEMPT.has(skill)) continue;
+      if (e.ts >= cutoff) {
+        recent[skill] = (recent[skill] || 0) + 1;
+      } else {
+        older[skill] = (older[skill] || 0) + 1;
       }
     }
-    if (!semanticDir) {
-      const sanitized = cwd.replace(/\//g, '-');
-      semanticDir = path.join(configDir, 'projects', sanitized, 'memory', 'semantic');
+
+    const regressions = [];
+    const allSkills = new Set([...Object.keys(recent), ...Object.keys(older)]);
+    for (const skill of allSkills) {
+      const r = recent[skill] || 0;
+      const o = older[skill] || 0;
+      if (r + o < SKILL_MIN_INVOCATIONS) continue;
+
+      // Per-session rates
+      const rateRecent = r / sessionsRecent;
+      const rateOlder = o / sessionsOlder;
+
+      if (rateOlder > 0 && rateRecent < rateOlder * SKILL_REGRESSION_DROP_THRESHOLD) {
+        const drop = Math.round((1 - rateRecent / rateOlder) * 100);
+        regressions.push({ skill, older: o, recent: r, drop, rateOlder: +rateOlder.toFixed(2), rateRecent: +rateRecent.toFixed(2), sessionsOlder, sessionsRecent });
+      }
     }
 
-    const today = new Date().toISOString().slice(0, 10);
-    const rows = regressions.map(r =>
-      `| ${r.skill} | ${r.older} | ${r.recent} | ${r.drop}% | ${today} |`
-    ).join('\n');
-    const content = `# Skill Health\n\n| Skill | Older 7d | Recent 7d | Drop | Detected |\n|-------|---------|-----------|------|----------|\n${rows}\n`;
+    if (regressions.length > 0) {
+      let semanticDir = null;
+      for (const candidate of ['.ai-context/memory', '.claude/memory']) {
+        const fullPath = path.join(cwd, candidate);
+        if (fs.existsSync(path.join(fullPath, 'MEMORY.md'))) {
+          semanticDir = path.join(fullPath, 'semantic');
+          break;
+        }
+      }
+      if (!semanticDir) {
+        const sanitized = cwd.replace(/\//g, '-');
+        semanticDir = path.join(configDir, 'projects', sanitized, 'memory', 'semantic');
+      }
 
-    archiveAndWrite(path.join(semanticDir, 'skill-health.md'), content);
-    logEvent(cwd, { type: 'skill_regression_detected', source: 'meta-system-stop', meta: { regressions } });
-    messages.push(`[skill-regression] ${regressions.length} skill(s) show >50% frequency drop: ${regressions.map(r => r.skill).join(', ')}. See skill-health.md.`);
+      const today = new Date().toISOString().slice(0, 10);
+      const rows = regressions.map(r =>
+        `| ${r.skill} | ${r.rateOlder}/sess | ${r.rateRecent}/sess | ${r.drop}% | ${r.sessionsOlder} | ${r.sessionsRecent} | ${today} |`
+      ).join('\n');
+      const content = `# Skill Health (v2 — rate-normalized)\n\n| Skill | Older rate | Recent rate | Drop | Older sess | Recent sess | Detected |\n|-------|-----------|-------------|------|-----------|------------|----------|\n${rows}\n`;
+
+      archiveAndWrite(path.join(semanticDir, 'skill-health.md'), content);
+      logEvent(cwd, { type: 'skill_regression_detected', source: 'meta-system-stop', meta: { regressions, sessionsOlder, sessionsRecent } });
+      messages.push(`[skill-regression] ${regressions.length} skill(s) show >50% per-session-rate drop: ${regressions.map(r => r.skill).join(', ')}. See skill-health.md.`);
+      // Wire regressions into self-improvement queue (was advisory-only before)
+      try {
+        const queue = require(path.join(configDir, 'hooks', 'lib', 'self-improvement', 'queue.js'));
+        for (const r of regressions) {
+          queue.enqueue({
+            rule: 'skill_regression',
+            tier: 'SUGGEST',
+            target: { type: 'skill', path: r.skill },
+            evidence: { rateOlder: r.rateOlder, rateRecent: r.rateRecent, drop: r.drop, sessionsOlder: r.sessionsOlder, sessionsRecent: r.sessionsRecent },
+            proposal: `Skill '${r.skill}' per-session rate dropped ${r.drop}%: ${r.rateOlder}/sess → ${r.rateRecent}/sess. Investigate if this is expected (project change) or regression.`,
+            auto_applicable: false,
+            fingerprint_class: 'skill_regression'
+          });
+        }
+      } catch {}
+    }
   }
 } catch (e) {
-  // SF-002: log silent failures
   try { process.stderr.write(`meta-system-stop regression: ${e.message}\n`); } catch {}
   try { require(path.join(configDir, 'hooks', 'lib', 'observability-logger.js')).logEvent(cwd, { type: 'hook_errors', source: 'meta-system-stop', errors: [{ section: 'skill-regression', error: e.message }] }); } catch {}
 }

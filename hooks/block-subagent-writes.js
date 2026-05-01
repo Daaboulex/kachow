@@ -43,9 +43,11 @@ try {
 
   if (!sessionId || !command) passthrough();
 
-  // Check marker file (written by SubagentStart hook)
+  // Check marker files (written by SubagentStart hook, keyed by session_id-pid).
+  // A marker means THIS process is a subagent. Parent session has a different PID,
+  // so parent's markers don't match (fixing the false-positive block bug).
   const markerDir = path.join(os.homedir(), '.claude', 'cache', 'subagent-active');
-  const markerPath = path.join(markerDir, `${sessionId}.json`);
+  const markerPath = path.join(markerDir, `${sessionId}-${process.pid}.json`);
   if (!fs.existsSync(markerPath)) passthrough();
 
   // Subagent context confirmed. Check command against blocked patterns.

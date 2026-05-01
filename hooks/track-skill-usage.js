@@ -13,7 +13,8 @@ const os = require('os');
 const scriptDir = __dirname;
 const isGemini = scriptDir.includes('.gemini');
 const home = process.env.HOME || process.env.USERPROFILE || os.homedir();
-const configDir = path.join(home, isGemini ? '.gemini' : '.claude');
+const { toolHomeDir } = require('./lib/tool-detect.js');
+const configDir = toolHomeDir();
 
 const USAGE_FILE = path.join(configDir, 'skill-usage.json');
 const MAX_ENTRIES = 500; // Rolling window — prevents unbounded growth

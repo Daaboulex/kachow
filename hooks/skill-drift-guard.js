@@ -44,7 +44,7 @@ try {
 
   // Per-session counter (per-machine, gitignored)
   const home = process.env.HOME || process.env.USERPROFILE || os.homedir();
-  const cacheDir = path.join(home, '.claude', 'cache');
+  const cacheDir = path.join(require('./lib/tool-detect.js').toolHomeDir(), 'cache');
   try { fs.mkdirSync(cacheDir, { recursive: true }); } catch {}
   const counterFile = path.join(cacheDir, `skill-drift-${sessionId}.count`);
 

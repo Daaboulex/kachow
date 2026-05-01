@@ -3,15 +3,15 @@
 ## Symlinks broken after sync
 
 ```
-node scripts/health-check.mjs        # diagnoses
-node scripts/install-adapters.mjs    # restores
+bash scripts/health-check.sh        # diagnoses
+bash scripts/install-adapters.sh    # restores
 ```
 
 ## MCP not registering
 
 Run with verbose:
 ```
-bash -x scripts/install-mcp.mjs
+bash -x scripts/install-mcp.sh
 ```
 
 Common: `~/.claude.json` missing (run Claude Code at least once first).

@@ -33,7 +33,7 @@ try {
   obs.logEvent(projectDir, { type: 'session_start', source: 'session-start-combined', agent: isGemini ? 'gemini' : 'claude' });
 } catch {}
 
-// Stale-marker sweep (v0.2.0 SEC-3 hygiene): delete subagent markers
+// Stale-marker sweep (SEC-3 hygiene 2026-04-23): delete subagent markers
 // older than 24h. Prevents SEC-3 MCP write gate from false-blocking on
 // abandoned subagents. Shared marker dir between Claude + Gemini.
 try {

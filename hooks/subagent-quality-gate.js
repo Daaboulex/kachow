@@ -21,11 +21,16 @@ try {
 
   // ── Remove subagent-active marker ──
   // Counterpart to marker creation in subagent-harness-inject.js.
-  // If marker missing (never written or already cleaned), no-op.
+  // Markers keyed by session_id-pid. Clean up both new format and legacy format.
   if (sessionId) {
     try {
-      const markerPath = path.join(os.homedir(), '.claude', 'cache', 'subagent-active', `${sessionId}.json`);
+      const markerDir = path.join(os.homedir(), '.claude', 'cache', 'subagent-active');
+      // New format: session_id-pid.json
+      const markerPath = path.join(markerDir, `${sessionId}-${process.pid}.json`);
       if (fs.existsSync(markerPath)) fs.unlinkSync(markerPath);
+      // Legacy format: session_id.json (clean up old markers too)
+      const legacyPath = path.join(markerDir, `${sessionId}.json`);
+      if (fs.existsSync(legacyPath)) fs.unlinkSync(legacyPath);
     } catch (e) {
       try { process.stderr.write('subagent-quality-gate (marker cleanup): ' + e.message + '\n'); } catch {}
     }

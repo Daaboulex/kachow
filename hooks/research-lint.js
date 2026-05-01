@@ -4,6 +4,11 @@ require(__dirname + "/lib/emit-simple-timing.js").start(__filename);
 // PostToolUse Write|Edit hook. Runs on any write under ~/Documents/research/.
 // Scans for principle-style claims without citations and warns.
 //
+// 2026-04-23 KEEP DECISION: this hook has 0 signal in 14d because it only
+// fires on writes UNDER ~/Documents/research/. That's intentional narrow
+// scope — research extraction happens in bursts, not continuously. Do NOT
+// retire for zero-signal alone. Driver: `feedback_hook-system-gaps-audit.md`.
+//
 // Signals that require a citation (one of: arxiv:, github:, transcript:, doc:, commit:):
 //   - "from transcript"
 //   - "from the paper"

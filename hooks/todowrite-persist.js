@@ -15,6 +15,7 @@ require(__dirname + "/lib/emit-simple-timing.js").start(__filename);
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const { toolHomeDir, toolCacheDir } = require('./lib/tool-detect.js');
 
 function findCanonicalDir(cwd) {
   for (const candidate of ['.claude', '.ai-context']) {
@@ -37,7 +38,7 @@ try {
   if (!sessionId) { process.stdout.write('{"continue":true}'); process.exit(0); }
 
   // Read session todo cache
-  const cachePath = path.join(os.homedir(), '.claude', 'cache', 'todos', `${sessionId}.json`);
+  const cachePath = path.join(toolHomeDir(), 'cache', 'todos', `${sessionId}.json`);
   if (!fs.existsSync(cachePath)) { process.stdout.write('{"continue":true}'); process.exit(0); }
 
   let cache;
@@ -58,7 +59,7 @@ try {
   if (!canonicalDir) {
     // Orphan fallback — preserve todos even when no project dir
     try {
-      const orphanDir = path.join(os.homedir(), '.claude', 'cache', 'orphan-todos');
+      const orphanDir = path.join(toolHomeDir(), 'cache', 'orphan-todos');
       fs.mkdirSync(orphanDir, { recursive: true });
       const dateStr = new Date().toISOString().slice(0, 10);
       const orphanPath = path.join(orphanDir, `${dateStr}-${sessionId}.json`);

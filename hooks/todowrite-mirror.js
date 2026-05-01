@@ -11,6 +11,7 @@ require(__dirname + "/lib/emit-simple-timing.js").start(__filename);
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const { toolHomeDir, toolCacheDir } = require('./lib/tool-detect.js');
 
 try {
   let raw = '';
@@ -33,7 +34,7 @@ try {
     process.exit(0);
   }
 
-  const cacheDir = path.join(os.homedir(), '.claude', 'cache', 'todos');
+  const cacheDir = path.join(toolHomeDir(), 'cache', 'todos');
   try { fs.mkdirSync(cacheDir, { recursive: true }); } catch {}
   const cachePath = path.join(cacheDir, `${sessionId}.json`);
 

@@ -30,7 +30,8 @@ try {
   // SessionStart clears this on notice; user can manually truncate.
   if (!desktopOk) {
     try {
-      const notifFile = path.join(os.homedir(), '.claude', '.notifications.jsonl');
+      const { toolHomeDir } = require('./lib/tool-detect.js');
+      const notifFile = path.join(toolHomeDir(), '.notifications.jsonl');
       const line = JSON.stringify({
         ts: new Date().toISOString(),
         title,

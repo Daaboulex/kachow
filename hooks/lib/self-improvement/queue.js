@@ -77,9 +77,9 @@ function _isSuppressedClass(fingerprint_class) {
     const resolved = _readJsonl(RESOLVED);
     const cutoff = Date.now() - 90 * 24 * 60 * 60 * 1000;
     const rejects = resolved.filter(e =>
-      e.decision === 'reject' &&
+      (e.decision === 'reject' || e.resolution === 'reject') &&
       e.fingerprint_class === fingerprint_class &&
-      new Date(e.decided_at).getTime() > cutoff
+      new Date(e.decided_at || e.resolved_at || 0).getTime() > cutoff
     );
     return rejects.length >= 3;
   } catch { return false; }
@@ -91,8 +91,9 @@ function _isSuppressedClass(fingerprint_class) {
  * @returns {object} - The stored entry (with id populated)
  */
 function enqueue(finding) {
-  const evidenceKey = finding.evidence ? Object.values(finding.evidence).join('|').slice(0, 100) : '';
-  const id = _hashId(finding.rule, finding.target?.path || finding.target?.type || 'global', evidenceKey);
+  // Dedup by rule + target ONLY (not evidence). Evidence changes between detections
+  // (e.g., sample_n varies) which previously caused duplicate entries for same issue.
+  const id = _hashId(finding.rule, finding.target?.path || finding.target?.type || 'global', '');
 
   // Suppression check
   if (_isSuppressedClass(finding.fingerprint_class)) {

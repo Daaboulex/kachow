@@ -4,7 +4,7 @@ Thanks for considering a contribution.
 
 ## Before opening a PR
 
-1. Run `node scripts/health-check.mjs` — must pass.
+1. Run `bash scripts/health-check.sh` — must pass.
 2. Run `node hooks/lib/hook-selftest.js` — must pass.
 3. Run `node hooks/lib/hook-topology.js` — no new collisions introduced.
 4. New hooks MUST add a `SPECS` entry in `hooks/lib/hook-selftest.js`.

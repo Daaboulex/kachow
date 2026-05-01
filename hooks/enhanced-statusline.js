@@ -35,7 +35,7 @@ process.stdin.on('end', () => {
       parts.push(gitInfo);
     }
 
-    // --- Project identity badge ([user] vs nix vs github-ok) ---
+    // --- Project identity badge (local-private vs github-ok) ---
     try {
       const { detect } = require('./lib/project-identity.js');
       const identity = detect(dir);

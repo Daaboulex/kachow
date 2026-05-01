@@ -16,6 +16,7 @@ require(__dirname + "/lib/emit-simple-timing.js").start(__filename);
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const { toolHomeDir } = require('./lib/tool-detect.js');
 
 function normTool(name) {
   // TOOL_NORM — map Gemini → Claude names
@@ -55,7 +56,7 @@ try {
   // Resolve cache dir — always under ~/.claude/cache regardless of platform
   // (single per-machine log; both platforms feed same retrieval history).
   const home = process.env.HOME || process.env.USERPROFILE || os.homedir();
-  const cacheDir = path.join(home, '.claude', 'cache');
+  const cacheDir = path.join(toolHomeDir(), 'cache');
   try { fs.mkdirSync(cacheDir, { recursive: true }); } catch {}
 
   const host = os.hostname();

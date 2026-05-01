@@ -109,9 +109,9 @@ try {
       .split(',').map(s => s.trim()).filter(Boolean);
     if (SAFETY_PATHS.some(sp => normalized.includes(sp))) {
       messages.push(
-        `SAFETY-CRITICAL FILE: ${path.basename(filePath)} — This file controls ESD/SSD safety logic, actuator movement, or EEPROM integrity. ` +
+        `SAFETY-CRITICAL FILE: ${path.basename(filePath)} — This file controls [safety-domain] safety logic, actuator movement, or [nvram] integrity. ` +
         'Per project rules: (1) Do NOT let agents edit these files — manual edits only. ' +
-        '(2) Read the FULL function before changing anything. (3) Verify ESD/SSD override logic, timeout values, and motor guards are preserved. ' +
+        '(2) Read the FULL function before changing anything. (3) Verify [safety-domain] override logic, timeout values, and motor guards are preserved. ' +
         '(4) Build and verify after changes.'
       );
     }

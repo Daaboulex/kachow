@@ -29,6 +29,7 @@ const { run, isGitRepo, getDefaultBranch, hasChanges, hasUnpushedCommits } = g;
 const home = os.homedir();
 const claudeDir = path.join(home, '.claude');
 const geminiDir = path.join(home, '.gemini');
+const codexDir = path.join(home, '.codex');
 const aiContextDir = path.join(home, '.ai-context');
 const lastPush = path.join(claudeDir, '.auto-push-last');
 const PUSH_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes (push only, not commit)
@@ -75,14 +76,24 @@ const warnings = [];
 function autoCommit(dir, label) {
   if (!isGitRepo(dir) || !hasChanges(dir)) return false;
 
-  // Security: never stage credential files (belt + suspenders with .gitignore)
+  // Security: never stage actual credential files (belt + suspenders with .gitignore)
+  // Only match known credential filenames, not arbitrary paths containing "token"
   const status = run('git status --porcelain', dir) || '';
-  if (/oauth|credential|secret|token/i.test(status)) {
-    warnings.push(`${label}: SKIPPED — potential credential file detected`);
+  const credFiles = status.split('\n').filter(line => {
+    const fname = line.replace(/^.{3}/, '').trim().split('/').pop();
+    return /^(\.credentials|oauth_creds|auth|\.env|\.secret|api[_-]?key)/i.test(fname);
+  });
+  if (credFiles.length > 0) {
+    warnings.push(`${label}: SKIPPED — credential file detected: ${credFiles.map(f => f.trim().split('/').pop()).join(', ')}`);
     return false;
   }
 
   // Stage and commit locally — ALWAYS (no cooldown)
+  // GPG-sign is intentionally bypassed here: auto-sync commits are mechanical
+  // session-end snapshots, not user-authored work. Forcing GPG sign would
+  // either prompt for passphrase (breaks autopush in non-interactive context)
+  // or silently fail (breaks data preservation). User-authored commits remain
+  // signed via standard git config. AGENTS.md documents this exception.
   run('git add -A', dir);
   const committed = run(`git commit -m "chore: auto-sync from session end" --no-gpg-sign`, dir);
   return committed !== null;
@@ -138,6 +149,7 @@ try {
   // Phase 1: ALWAYS commit locally (no cooldown — data safety first)
   const claudeCommitted    = autoCommit(claudeDir, '~/.claude');
   const geminiCommitted    = autoCommit(geminiDir, '~/.gemini');
+  const codexCommitted     = autoCommit(codexDir, '~/.codex');
   const aiContextCommitted = AI_CONTEXT_AUTOCOMMIT
     ? autoCommit(aiContextDir, '~/.ai-context')
     : false;
@@ -150,12 +162,17 @@ try {
   // Push if: cooldown elapsed OR there are unpushed commits (from previous skipped pushes)
   const claudeUnpushed = hasUnpushedCommits(claudeDir);
   const geminiUnpushed = hasUnpushedCommits(geminiDir);
+  const codexUnpushed = isGitRepo(codexDir) && hasUnpushedCommits(codexDir);
   const aiContextUnpushed = AI_CONTEXT_AUTOPUSH && isGitRepo(aiContextDir) && hasUnpushedCommits(aiContextDir);
-  const shouldPush = cooldownElapsed || claudeUnpushed || geminiUnpushed || aiContextUnpushed;
+  const shouldPush = cooldownElapsed || claudeUnpushed || geminiUnpushed || codexUnpushed || aiContextUnpushed;
 
   if (shouldPush) {
     autoPush(claudeDir, '~/.claude');
     autoPush(geminiDir, '~/.gemini');
+    if (isGitRepo(codexDir)) {
+      const codexRemotes = run('git remote', codexDir);
+      if (codexRemotes && codexRemotes.trim()) autoPush(codexDir, '~/.codex');
+    }
     // Only push ai-context if opted in AND a remote is configured.
     if (AI_CONTEXT_AUTOPUSH && isGitRepo(aiContextDir)) {
       const remotes = run('git remote', aiContextDir);

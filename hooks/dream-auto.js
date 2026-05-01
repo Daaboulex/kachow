@@ -18,7 +18,8 @@ const home = os.homedir();
 // Detect platform from script location
 const scriptDir = __dirname;
 const isGemini = scriptDir.includes('.gemini');
-const configDir = path.join(home, isGemini ? '.gemini' : '.claude');
+const { toolHomeDir } = require('./lib/tool-detect.js');
+const configDir = toolHomeDir();
 
 const lastFile = path.join(configDir, '.dream-last');
 const counterFile = path.join(configDir, '.dream-session-count');
@@ -34,7 +35,7 @@ const LOCK_STALE_MS = DREAM_LOCK_STALE_MS;
 // Find memory directory
 function findMemoryDir() {
   const projectDir = process.cwd();
-  for (const candidate of ['.ai-context/memory', '.claude/memory']) {
+  for (const candidate of ['.ai-context/memory', path.basename(toolHomeDir()) + '/memory']) {
     const fullPath = path.join(projectDir, candidate);
     if (fs.existsSync(path.join(fullPath, 'MEMORY.md'))) {
       return { path: fullPath, type: candidate };

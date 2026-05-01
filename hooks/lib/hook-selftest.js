@@ -20,12 +20,12 @@ const CACHE = path.join(HOME, '.claude', 'cache', 'hook-healthcheck-latest.json'
 
 const SPECS = [
   {
-    hook: 'validate-symlinks.js',
+    hook: 'session-start-combined.js',
     event: 'SessionStart',
     tests: [
-      // Silent-when-healthy design: assert no crash/fatal marker leaked to stderr.
-      // Detects case where the hook crashed but swallowed the error (exit=0 hides it).
-      { name: 'exits 0 with resolving symlinks and no fatal marker', stdin: '{}', expect: { exit: 0, stdoutNotMatch: 'fatal|TypeError|ReferenceError|ENOENT' } },
+      // Silent-when-healthy design: assert no crash/fatal marker leaked to stdout.
+      // validate-symlinks logic merged into session-start-combined.js (2026-04-21 audit).
+      { name: 'exits 0 with no fatal marker', stdin: '{}', expect: { exit: 0, stdoutNotMatch: 'fatal|TypeError|ReferenceError|ENOENT' } },
     ],
   },
   {

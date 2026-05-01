@@ -30,24 +30,19 @@ CTX_REMAINING=$(cat /tmp/claude-ctx-*.json 2>/dev/null | node -e "
   });
 " 2>/dev/null || echo 100)
 
-# Signal 2: commits this session across all known layers (tri-tool aware)
+# Signal 2: commits this session across all known layers
 COMMITS_GLOBAL=$(git -C ~/.claude log --oneline --since="12 hours ago" 2>/dev/null | wc -l)
 COMMITS_GEMINI=$(git -C ~/.gemini log --oneline --since="12 hours ago" 2>/dev/null | wc -l)
-COMMITS_CODEX=$(git -C ~/.codex log --oneline --since="12 hours ago" 2>/dev/null | wc -l)
 COMMITS_CWD=$(git log --oneline --since="12 hours ago" 2>/dev/null | wc -l)
-TOTAL_COMMITS=$((COMMITS_GLOBAL + COMMITS_GEMINI + COMMITS_CODEX + COMMITS_CWD))
+TOTAL_COMMITS=$((COMMITS_GLOBAL + COMMITS_GEMINI + COMMITS_CWD))
 
-# Signal 3: uncommitted changes (dirty vs clean) — all 3 global repos
+# Signal 3: uncommitted changes (dirty vs clean)
 DIRTY_GLOBAL=$(git -C ~/.claude status --porcelain 2>/dev/null | wc -l)
-DIRTY_GEMINI=$(git -C ~/.gemini status --porcelain 2>/dev/null | wc -l)
-DIRTY_CODEX=$(git -C ~/.codex status --porcelain 2>/dev/null | wc -l)
 DIRTY_CWD=$(git status --porcelain 2>/dev/null | wc -l)
 
-# Signal 4: session touched skills/hooks/memories (risky categories) — check all 3 trees
+# Signal 4: session touched skills/hooks/memories (risky categories)
 RISKY_CHANGES=0
-for tree in ~/.claude ~/.gemini ~/.codex; do
-  git -C "$tree" log --since="12 hours ago" --name-only --pretty=format: 2>/dev/null | grep -qE "hooks/|skills/|commands/|config\.toml" && RISKY_CHANGES=1
-done
+git -C ~/.claude log --since="12 hours ago" --name-only --pretty=format: 2>/dev/null | grep -qE "hooks/|skills/|commands/" && RISKY_CHANGES=1
 
 # Signal 5: phase just completed (check for recent VERIFICATION.md or state transition)
 PHASE_COMPLETED=$(find .planning/phases -name "*-VERIFICATION.md" -newer .planning/STATE.md 2>/dev/null | head -1)
@@ -210,6 +205,9 @@ Run the /reflect workflow inline (don't invoke the skill — execute its phases 
 - Explicit corrections (user said "no", "don't", "wrong")
 - Validated patterns (user said "yes exactly", "perfect", accepted approach)
 - Skill/hook issues encountered (wrong output, silent failures, stale references)
+- Agent findings worth persisting (research agents, review agents — their results are conversation-only and will be LOST)
+- Architectural decisions made (design choices, approach selections, rejected alternatives)
+- Tool quirks discovered (format requirements, CLI bugs, workarounds)
 
 **2b. Quick staleness check** — For any memory/rule/skill touched or referenced this session, is it still accurate?
 
@@ -274,33 +272,19 @@ function countMd(dir) {
 const root = process.cwd();
 const cr = path.join(root, '.claude/rules');
 const gr = path.join(root, '.gemini/rules');
-const xr = path.join(root, '.codex/rules');
 const cm = path.join(root, '.claude/memory');
 const gm = path.join(root, '.gemini/memory');
-const xm = path.join(root, '.codex/memories');
 const cs = path.join(root, '.claude/skills');
 const gs = path.join(root, '.gemini/skills');
-const xs = path.join(root, '.codex/skills');
 const crn = countMd(cr), grn = countMd(gr);
 const cmn = countMd(cm), gmn = countMd(gm);
 console.log('Project rules (Claude): ' + crn + ' | (Gemini): ' + grn + (crn !== grn ? ' WARNING: mismatch' : ''));
 console.log('Project memory (Claude): ' + cmn + ' | (Gemini): ' + gmn + (cmn !== gmn ? ' WARNING: mismatch' : ''));
-// Codex parity — note Codex uses different structures (config.toml not settings.json,
-// memories/ not memory/, skills auto-synced so count may legitimately differ).
-if (fs.existsSync(xr) || fs.existsSync(xm)) {
-  const xrn = fs.existsSync(xr) ? fs.readdirSync(xr).length : 0;
-  const xmn = fs.existsSync(xm) ? fs.readdirSync(xm).length : 0;
-  console.log('Project Codex: ' + xrn + ' rules, ' + xmn + ' memory entries — structural differences expected');
-}
 // Check skills directory if it exists
 if (fs.existsSync(cs) || fs.existsSync(gs)) {
   const csn = fs.existsSync(cs) ? fs.readdirSync(cs).length : 0;
   const gsn = fs.existsSync(gs) ? fs.readdirSync(gs).length : 0;
   console.log('Project skills (Claude): ' + csn + ' | (Gemini): ' + gsn + (csn !== gsn ? ' WARNING: mismatch' : ''));
-  if (fs.existsSync(xs)) {
-    const xsn = fs.readdirSync(xs).length;
-    console.log('Project skills (Codex):  ' + xsn + ' (auto-synced from Claude — count may differ)');
-  }
 }
 "
 ```
@@ -428,14 +412,12 @@ If everything clean, report: "Sync: OK"
 - [list of memories/rules/skills created or updated, or "None"]
 
 ### Sync Status
-- Claude ↔ Gemini ↔ Codex: [OK | issues found and fixed | DRIFT — details]
-  (Hooks: 3-way symmetric? Skills: synced via skill-auto-updater? AGENTS.md symlinks resolve in all 3?)
+- Claude ↔ Gemini: [OK | issues found and fixed | DRIFT — details]
 
 ### Auto-Push Ready
 - ~/.claude/: [N files changed, ready to commit]
 - ~/.gemini/: [N files changed, ready to commit]
-- ~/.codex/:  [N files changed, ready to commit]
-- auto-push-global.js will commit+push all 3 on session end (30-min cooldown)
+- auto-push-global.js will commit+push on session end (30-min cooldown)
 ```
 
 ## Important

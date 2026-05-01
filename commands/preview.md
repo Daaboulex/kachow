@@ -8,7 +8,7 @@ description: Render image in terminal via chafa. TERMINAL-ONLY — output does N
 
 **Agent guidance:** do not run `/preview` expecting the user to see the image in this chat. Either:
 - Tell the user to open the image in their file manager / IDE, OR
-- Tell the user to run `bash ~/.claude/scripts/preview-image.mjs <path>` themselves in a real terminal.
+- Tell the user to run `bash ~/.claude/scripts/preview-image.sh <path>` themselves in a real terminal.
 
 ## When the script is useful
 
@@ -18,7 +18,7 @@ description: Render image in terminal via chafa. TERMINAL-ONLY — output does N
 ## Usage (run from real terminal, not Claude chat)
 
 ```bash
-bash ~/.claude/scripts/preview-image.mjs <path-to-image>
+bash ~/.claude/scripts/preview-image.sh <path-to-image>
 ```
 
 On Windows:

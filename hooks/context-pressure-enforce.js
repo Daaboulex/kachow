@@ -17,9 +17,11 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-const EARLY_THRESHOLD = 35; // remaining <= 35% (65% used) — advance notice (absorbed from gsd-context-monitor)
-const SOFT_THRESHOLD = 30;  // remaining <= 30% (70% used) — suggest /handoff
-const HARD_THRESHOLD = 20;  // remaining <= 20% (80% used) — block
+// Thresholds tuned for 1M context (Opus 4.6/4.7). Previous values (35/30/20)
+// were designed for 200K and fired WAY too early on 1M, wasting tokens nagging.
+const EARLY_THRESHOLD = 20; // remaining <= 20% (80% used) — advance notice
+const SOFT_THRESHOLD = 15;  // remaining <= 15% (85% used) — suggest /handoff
+const HARD_THRESHOLD = 8;   // remaining <= 8% (92% used) — block
 const STALE_SECONDS = 60;
 
 function passthrough() {
@@ -55,6 +57,7 @@ try {
 
   // Check if handoff was saved recently (within 10 min)
   const handoffPaths = [
+    path.join(os.homedir(), '.ai-context', 'handoffs', 'sessions', '.current-session-' + (require('./lib/tool-detect.js').detectTool()) + '.json'),
     path.join(cwd, '.claude', '.session-handoff.md'),
     path.join(cwd, '.ai-context', '.session-handoff.md'),
   ];
@@ -68,7 +71,7 @@ try {
 
   // Debounce: don't re-fire if we just fired (per-session counter file)
   const home = os.homedir();
-  const cacheDir = path.join(home, '.claude', 'cache');
+  const cacheDir = path.join(toolHomeDir(), 'cache');
   try { fs.mkdirSync(cacheDir, { recursive: true }); } catch {}
   const fireFile = path.join(cacheDir, `ctx-enforce-${sessionId}.last`);
   let lastFire = 0;
@@ -85,7 +88,7 @@ try {
     passthrough();  // Already saved, don't block
   } else if (remaining <= SOFT_THRESHOLD) {
     // SOFT WARN — passthrough + systemMessage. Only fire once per ~10 tool calls.
-    if (Date.now() - lastFire < 30 * 1000) passthrough();
+    if (Date.now() - lastFire < 5 * 60 * 1000) passthrough();
     try { fs.writeFileSync(fireFile, String(Date.now())); } catch {}
     const msg = handoffRecent
       ? `[CONTEXT 70% USED] ${Math.round(remaining)}% remaining. Handoff recent — OK to continue but be concise.`

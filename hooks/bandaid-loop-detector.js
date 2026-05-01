@@ -3,7 +3,7 @@ require(__dirname + "/lib/emit-simple-timing.js").start(__filename);
 // PostToolUse hook: detect when agent edits the same file 3+ times within N tool calls.
 // Signals a "bandaid loop" — iterating on symptoms instead of identifying root cause.
 //
-// The user's #1 documented frustration: bandaid solutions over root cause.
+// the user's #1 frustration (per user voice analysis): bandaid solutions over root cause.
 // Triple-iterating the same file is a strong signal the current approach isn't working.
 //
 // State: per-session JSONL at ~/.claude/cache/edit-history/<sid>.jsonl (rolling, keeps last 30 edits).
@@ -41,7 +41,7 @@ try {
   const filePath = (input.tool_input && (input.tool_input.file_path || input.tool_input.absolute_path)) || '';
   if (!filePath) passthrough();
 
-  const cacheDir = path.join(os.homedir(), '.claude', 'cache', 'edit-history');
+  const cacheDir = path.join(toolHomeDir(), 'cache', 'edit-history');
   try { fs.mkdirSync(cacheDir, { recursive: true }); } catch {}
   const historyFile = path.join(cacheDir, `${sessionId}.jsonl`);
   const warnFile = path.join(cacheDir, `${sessionId}.warn.json`);
@@ -67,18 +67,21 @@ try {
   warnState[filePath] = now;
   try { fs.writeFileSync(warnFile, JSON.stringify(warnState)); } catch {}
 
-  // R17 support (v0.2.0): emit bandaid_loop event for skill→loop correlation.
+  // R17 support (2026-04-23): emit bandaid_loop event. skill-invocation-logger's
+  // Stop-chain reconciliation reads the last 3 skill_invoke events in this
+  // session and marks them meta.followed_by_bandaid_loop = true.
   try {
     const obs = require('./lib/observability-logger.js');
+const { toolHomeDir, toolCacheDir } = require('./lib/tool-detect.js');
     obs.logEvent(process.cwd(), {
       type: 'bandaid_loop',
       source: 'bandaid-loop-detector',
-      session_id: sid,
+      session_id: sessionId,
       meta: { file: filePath, same_file_count: sameFileCount, window: WINDOW }
     });
   } catch {}
 
-  const msg = `[bandaid-loop] ${path.basename(filePath)} edited ${sameFileCount}× in the last ${WINDOW} tool calls. Bandaid fixes are a common AI failure mode — pause and ask: is this a symptom or root cause? Read the surrounding logic, trace upstream callers, verify the premise before the next edit.`;
+  const msg = `[bandaid-loop] ${path.basename(filePath)} edited ${sameFileCount}× in the last ${WINDOW} tool calls. a common pain point is bandaid fixes — pause and ask: is this a symptom or root cause? Read the surrounding logic, trace upstream callers, verify the premise before the next edit.\n\nSystematic-debugging skill may help: invoke via /systematic-debugging if the pattern persists.`;
   process.stdout.write(JSON.stringify({ continue: true, systemMessage: msg }));
   process.exit(0);
 } catch {

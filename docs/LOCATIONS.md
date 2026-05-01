@@ -17,7 +17,7 @@ Override with the `AI_CONTEXT` env var before bootstrap:
 # Linux / macOS
 export AI_CONTEXT="$HOME/Documents/ai-rules"
 git clone https://github.com/Daaboulex/kachow "$AI_CONTEXT"
-"$AI_CONTEXT/scripts/bootstrap.mjs"
+"$AI_CONTEXT/scripts/bootstrap.sh"
 ```
 
 ```powershell
@@ -59,7 +59,7 @@ Hooks, commands, and settings for Claude and Gemini MUST live where their CLIs e
 
 ## Cross-machine sync strategies
 
-You decide how `~/.ai-context/` syncs between machines. The framework doesn't assume. Common options — `scripts/setup-private-remote.mjs` walks you through each:
+You decide how `~/.ai-context/` syncs between machines. The framework doesn't assume. Common options — `scripts/setup-private-remote.sh` walks you through each:
 
 1. **Syncthing** — peer-to-peer file sync, offline-capable, no server.
 2. **Private GitHub repo** — `gh repo create ai-context-private --private --source=.`.

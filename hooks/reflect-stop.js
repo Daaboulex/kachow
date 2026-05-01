@@ -99,7 +99,7 @@ try {
   if (claudeChanged || geminiChanged) {
     __emitTiming(0); process.stdout.write(JSON.stringify({
       continue: true,
-      systemMessage: '[session-end] Changes detected. Run /wrap-up (comprehensive) or /handoff (fast) to capture state and learnings before this session ends. Without either, only a timestamp is saved — session context and learnings are lost.'
+      systemMessage: '[session-end] Changes detected. State auto-saved by handoff-session-end hook. For learnings capture, run /wrap-up before exiting.'
     }));
   } else {
     __emitTiming(0); process.stdout.write('{"continue":true}');

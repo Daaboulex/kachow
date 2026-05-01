@@ -127,6 +127,38 @@ try {
     }
   }
 
+  // Check 3: async hooks must NOT emit systemMessage or use exit(2)
+  // async:true causes Claude Code to discard stdout — systemMessage and exit(2) silently fail.
+  // Guard added 2026-05-01 after 3 hooks were incorrectly made async, neutering their output.
+  for (const [event, groups] of Object.entries(hooks)) {
+    if (!Array.isArray(groups)) continue;
+    for (const group of groups) {
+      const groupHooks = group.hooks || [];
+      for (const h of groupHooks) {
+        if (!h.async) continue;
+        const cmd = h.command || '';
+        const fileMatch = cmd.match(/node\s+["']?([^"'\s]+\.js)["']?/);
+        if (!fileMatch) continue;
+        let resolved = fileMatch[1]
+          .replace(/\$HOME/g, os.homedir())
+          .replace(/\${HOME}/g, os.homedir())
+          .replace(/^~\//, os.homedir() + '/');
+        if (resolved.includes('$') || !resolved.startsWith('/')) continue;
+        try {
+          const src = fs.readFileSync(resolved, 'utf8');
+          const hasSystemMessage = /systemMessage/.test(src) && !/\/\/.*systemMessage/.test(src.split('\n').find(l => /systemMessage/.test(l)) || '');
+          const hasExit2 = /process\.exit\(2\)/.test(src);
+          if (hasSystemMessage || hasExit2) {
+            const reasons = [];
+            if (hasSystemMessage) reasons.push('emits systemMessage');
+            if (hasExit2) reasons.push('uses exit(2) to block');
+            issues.push(`Event ${event}: hook "${path.basename(resolved)}" is async:true but ${reasons.join(' and ')}. Async hooks have stdout DISCARDED — systemMessage/exit(2) silently fail. Remove async:true.`);
+          }
+        } catch {}
+      }
+    }
+  }
+
   if (issues.length > 0) {
     process.stdout.write(JSON.stringify({
       continue: false,

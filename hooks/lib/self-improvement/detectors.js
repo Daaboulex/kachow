@@ -437,16 +437,21 @@ function detectSettingsDrift(ctx) {
     // Check hook event parity (Claude events → Gemini equivalent)
     const CLAUDE_TO_GEMINI_EVENTS = {
       SessionStart: 'SessionStart', Stop: 'SessionEnd', PreToolUse: 'BeforeTool',
-      PostToolUse: 'AfterTool', PreCompact: 'PreCompress', SubagentStart: 'SubagentStart',
-      SubagentStop: 'SubagentStop', TaskCompleted: 'TaskCompleted',
-      Notification: 'Notification', InstructionsLoaded: 'InstructionsLoaded',
-      StopFailure: 'StopFailure', FileChanged: 'FileChanged'
+      PostToolUse: 'AfterTool', PreCompact: 'PreCompress',
+      Notification: 'Notification', UserPromptSubmit: 'UserPromptSubmit',
+      SessionEnd: 'SessionEnd',
+      // Claude-only events (null = skip drift check, no Gemini equivalent)
+      PostCompact: null, CwdChanged: null, FileChanged: null,
+      SubagentStart: null, SubagentStop: null,
+      ConfigChange: null, PostToolBatch: null, InstructionsLoaded: null,
+      PermissionDenied: null, StopFailure: null,
     };
 
     const claudeEvents = Object.keys(claudeSettings.hooks || {});
     const geminiEvents = Object.keys(geminiSettings.hooks || {});
     for (const ce of claudeEvents) {
       const geminiEquiv = CLAUDE_TO_GEMINI_EVENTS[ce] || ce;
+      if (geminiEquiv === null) continue; // Claude-only event, skip
       if (!geminiEvents.includes(geminiEquiv)) {
         findings.push({
           rule: 'settings_drift',
@@ -480,7 +485,17 @@ function detectCrossPlatformAsymmetry(ctx) {
     claude_only: [
       'skill-routing-injector.js', 'reflect-stop.js', 'reflect-stop-failure.js',
       'reflect-precompact.js', 'subagent-harness-inject.js', 'subagent-quality-gate.js',
-      'task-verification-gate.js'
+      'task-verification-gate.js',
+      // 2026-04-22: Claude-local orchestration tools (not meaningful on Gemini):
+      'mirror-kachow.js',       // mirrors Claude hook changes to ~/.kachow-release
+      'ai-snapshot-stop.js',    // filesystem-specific snapshot logic
+      'gsd-check-update.js',    // GSD plugin version check (Claude plugins only)
+      'post-commit-sync-reminder.js', // monorepo dual-remote nudge (user's [tooling-dir])
+      'repomap-refresh.js',     // calls user's [tooling-dir] tooling
+      // 2026-05-01: Claude-only events (PostCompact, CwdChanged, FileChanged not in Gemini/Codex):
+      'memory-post-compact.js', // PostCompact event — memory-compression coupling
+      'cwd-changed-watcher.js', // CwdChanged event — file watch setup
+      'file-changed-notify.js', // FileChanged event — context file change notification
     ],
     gemini_only: [
       'reflect-session-end.js',
@@ -539,6 +554,32 @@ function detectDeadLibModule(ctx) {
     for (const f of fs.readdirSync(hooksDir).filter(x => x.endsWith('.js'))) {
       try { allHookContents[f] = fs.readFileSync(path.join(hooksDir, f), 'utf8'); } catch {}
     }
+    // Also scan non-hook references: slash commands, scripts, settings.json, CI.
+    // These sources invoke libs via CLI (node path/to/lib.js) or name-drop them in docs.
+    // Without this, CLI-only libs like hook-topology, hook-selftest show up as "dead".
+    const extraSources = [
+      path.join(ctx.configDir, 'commands'),
+      path.join(ctx.configDir, 'scripts'),
+      path.join(ctx.configDir, '..', '.ai-context', 'commands'),
+      path.join(ctx.configDir, '..', '.ai-context', 'scripts'),
+      path.join(ctx.configDir, 'settings.json'),
+    ];
+    for (const src of extraSources) {
+      try {
+        const st = fs.statSync(src);
+        if (st.isDirectory()) {
+          for (const f of fs.readdirSync(src)) {
+            const fp = path.join(src, f);
+            try {
+              const fst = fs.statSync(fp);
+              if (fst.isFile()) allHookContents['__extra__' + fp] = fs.readFileSync(fp, 'utf8');
+            } catch {}
+          }
+        } else if (st.isFile()) {
+          allHookContents['__extra__' + src] = fs.readFileSync(src, 'utf8');
+        }
+      } catch {}
+    }
     // Also scan subdirs of lib/ recursively (self-improvement/queue.js etc.)
     function walkLibDir(dir, refList) {
       try {
@@ -579,7 +620,14 @@ function detectDeadLibModule(ctx) {
           if (c.includes(`./${name}`) || c.includes(`/${name}`)) usedByCount++;
         } catch {}
       }
-      if (usedByCount === 0) {
+      // CLI-only libs — intentional standalone utilities, never required by hooks
+      const CLI_ONLY_ALLOWLIST = new Set([
+        'hook-topology.js',         // CLI: node lib/hook-topology.js
+        'hook-interaction-map.js',  // CLI: node lib/hook-interaction-map.js
+        'hook-selftest.js',         // CLI + CI: node lib/hook-selftest.js
+        'memory-migrate.js',        // one-shot migration tool, invoked manually
+      ]);
+      if (usedByCount === 0 && !CLI_ONLY_ALLOWLIST.has(lib)) {
         findings.push({
           rule: 'dead_lib_module',
           tier: 'OBSERVE',
@@ -595,8 +643,9 @@ function detectDeadLibModule(ctx) {
   return findings;
 }
 
-// ── R15: session_start_p95_regression (v0.2.0) ──
-// SessionStart p95 exceeds static ceiling. Configure CEILING_MS per install.
+// ── R15: session_start_p95_regression ──
+// SessionStart p95 exceeds baseline + 30% headroom (2026-04-23 baseline 6977ms → 9070ms ceiling).
+// Gate uses measured p95 × 1.3, NOT avg × 1.3 (avg-based ceiling false-positives at p95 tail).
 function detectSessionStartP95Regression(ctx) {
   const findings = [];
   try {
@@ -605,19 +654,17 @@ function detectSessionStartP95Regression(ctx) {
       .filter(e => (e.source === 'session-start-combined') && e.meta && typeof e.meta.total_ms === 'number')
       .map(e => e.meta.total_ms)
       .sort((a, b) => a - b);
-    if (samples.length < 10) return findings;
+    if (samples.length < 10) return findings; // variance-dominated, not gate-eligible
     const idx = Math.max(0, Math.ceil(0.95 * samples.length) - 1);
     const p95 = samples[idx];
-    // Ceiling defaults to 9070ms (baseline 6977ms × 1.3 headroom) — adjust
-    // via SESSION_START_P95_CEILING_MS env var per installation.
-    const CEILING_MS = parseInt(process.env.SESSION_START_P95_CEILING_MS || '9070', 10);
+    const CEILING_MS = parseInt(process.env.SESSION_START_P95_CEILING_MS, 10) || 15000;
     if (p95 > CEILING_MS) {
       findings.push({
         rule: 'session_start_p95_regression',
         tier: 'BLOCKER',
         target: { type: 'hook', path: '~/.claude/hooks/session-start-combined.js' },
         evidence: { p95_ms: +p95.toFixed(1), ceiling_ms: CEILING_MS, sample_n: samples.length },
-        proposal: `SessionStart p95=${p95.toFixed(0)}ms exceeds ${CEILING_MS}ms ceiling. Investigate via hook-stats.sh + observability episodic logs.`,
+        proposal: `SessionStart p95=${p95.toFixed(0)}ms exceeds ${CEILING_MS}ms ceiling. Investigate slowest section via hook-stats.sh + observability episodic logs.`,
         auto_applicable: false,
         fingerprint_class: 'hook_perf'
       });
@@ -626,9 +673,11 @@ function detectSessionStartP95Regression(ctx) {
   return findings;
 }
 
-// ── R17: skill_followed_by_bandaid_loop (v0.2.0) ──
-// Lazy JOIN at query time: skill_invoke within 20min before bandaid_loop
-// in same session_id. Raw count — correlation ≠ causation.
+// ── R17: skill_followed_by_bandaid_loop ──
+// Skills invoked before bandaid-loop-detector fires ≥3 times in 14d may be
+// causing loops (correlation ≠ causation — user triage required).
+// JOIN at query time: for each bandaid_loop event, find skill_invoke events
+// from same session_id with ts within preceding 20min. Count per-skill.
 function detectSkillFollowedByBandaidLoop(ctx) {
   const findings = [];
   try {
@@ -671,6 +720,97 @@ function detectSkillFollowedByBandaidLoop(ctx) {
   return findings;
 }
 
+// ── R18: tool_call_p95_regression ──
+// Aggregate per-tool-call hook overhead (PostToolUse hooks) exceeds ceiling.
+// Measures total hook time per tool call, not individual hook time.
+function detectToolCallP95Regression(ctx) {
+  const findings = [];
+  try {
+    const events = ctx.readEvents(ctx.cwd, 7, { eventTypes: ['hook_timing'] }) || [];
+    // Collect PostToolUse hook timings, grouped by approximate tool-call timestamp
+    // (hooks firing within 500ms of each other are the same tool call)
+    const NON_TOOL_CALL_HOOKS = new Set([
+      'session-start-combined', 'session-context-loader', 'session-end-logger',
+      'auto-push-global', 'mirror-kachow', 'meta-system-stop', 'reflect-stop', 'dream-auto',
+      'track-skill-usage', 'todowrite-persist', 'stop-sleep-consolidator', 'memory-rotate',
+      'ai-snapshot-stop', 'session-presence-start', 'session-presence-end', 'enhanced-statusline',
+      'plugin-update-checker', 'skill-upstream-checker', 'validate-instructions-sync',
+      'gsd-check-update', 'auto-pull-global', 'skill-auto-updater', 'handoff-session-end',
+      'notify-with-fallback', 'memory-post-compact', 'cwd-changed-watcher', 'file-changed-notify',
+    ]);
+    const postToolTimings = events
+      .filter(e => e.source && !NON_TOOL_CALL_HOOKS.has(e.source))
+      .filter(e => e.meta && typeof e.meta.total_ms === 'number')
+      .map(e => e.meta.total_ms);
+
+    if (postToolTimings.length < 50) return findings; // need enough samples
+
+    postToolTimings.sort((a, b) => a - b);
+    const idx = Math.max(0, Math.ceil(0.95 * postToolTimings.length) - 1);
+    const p95 = postToolTimings[idx];
+
+    const CEILING_MS = parseInt(process.env.TOOL_CALL_P95_CEILING_MS, 10) || 200;
+    if (p95 > CEILING_MS) {
+      findings.push({
+        rule: 'tool_call_p95_regression',
+        tier: 'BLOCKER',
+        target: { type: 'hook', path: 'PostToolUse hooks (aggregate)' },
+        evidence: { p95_ms: +p95.toFixed(1), ceiling_ms: CEILING_MS, sample_n: postToolTimings.length },
+        proposal: `PostToolUse aggregate p95=${p95.toFixed(0)}ms exceeds ${CEILING_MS}ms ceiling. Run hook-utilization-report.mjs to identify slowest hooks.`,
+        auto_applicable: false,
+        fingerprint_class: 'hook_perf'
+      });
+    }
+  } catch {}
+  return findings;
+}
+
+// ── R19: async_blocks_output ──
+// Hook file registered as async:true but contains systemMessage or exit(2).
+// Async hooks have stdout discarded — these would silently fail.
+function detectAsyncBlocksOutput(ctx) {
+  const findings = [];
+  try {
+    const settingsPath = path.join(ctx.configDir, 'settings.json');
+    if (!fs.existsSync(settingsPath)) return findings;
+    const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+    const hooks = settings.hooks || {};
+    for (const [event, groups] of Object.entries(hooks)) {
+      if (!Array.isArray(groups)) continue;
+      for (const group of groups) {
+        for (const h of (group.hooks || [])) {
+          if (!h.async) continue;
+          const cmd = h.command || '';
+          const fileMatch = cmd.match(/node\s+["']?([^"'\s]+\.js)["']?/);
+          if (!fileMatch) continue;
+          let resolved = fileMatch[1].replace(/\$HOME/g, os.homedir()).replace(/\${HOME}/g, os.homedir());
+          if (!resolved.startsWith('/') || !fs.existsSync(resolved)) continue;
+          try {
+            const src = fs.readFileSync(resolved, 'utf8');
+            const hasMsg = /systemMessage/.test(src);
+            const hasExit2 = /process\.exit\(2\)/.test(src);
+            if (hasMsg || hasExit2) {
+              const reasons = [];
+              if (hasMsg) reasons.push('emits systemMessage');
+              if (hasExit2) reasons.push('uses exit(2)');
+              findings.push({
+                rule: 'async_blocks_output',
+                tier: 'BLOCKER',
+                target: { type: 'hook', path: resolved },
+                evidence: { event, async: true, reasons },
+                proposal: `Hook '${path.basename(resolved)}' is async:true but ${reasons.join(' and ')}. Async stdout is DISCARDED. Remove async:true from settings.json.`,
+                auto_applicable: true,
+                fingerprint_class: 'hook_config'
+              });
+            }
+          } catch {}
+        }
+      }
+    }
+  } catch {}
+  return findings;
+}
+
 function runAllDetectors(ctx) {
   const allFindings = [];
   const detectors = [
@@ -690,7 +830,9 @@ function runAllDetectors(ctx) {
     { name: 'R14', fn: detectMemoryActiveForgetting },
     { name: 'R15', fn: detectSessionStartP95Regression },
     // R16 reserved (skill-coverage drop) — deferred until R15 proves pipeline
-    { name: 'R17', fn: detectSkillFollowedByBandaidLoop }
+    { name: 'R17', fn: detectSkillFollowedByBandaidLoop },
+    { name: 'R18', fn: detectToolCallP95Regression },
+    { name: 'R19', fn: detectAsyncBlocksOutput }
   ];
   for (const { name, fn } of detectors) {
     try { allFindings.push(...fn(ctx)); }
@@ -715,5 +857,7 @@ module.exports = {
   detectMemoryActiveForgetting,
   detectSessionStartP95Regression,
   detectSkillFollowedByBandaidLoop,
+  detectToolCallP95Regression,
+  detectAsyncBlocksOutput,
   runAllDetectors
 };

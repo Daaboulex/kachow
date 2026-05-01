@@ -76,7 +76,7 @@ function findRepoRoot(cwd) {
   let dir = cwd;
   const root = path.parse(dir).root;
   while (dir && dir !== root) {
-    for (const candidate of ['.claude', '.ai-context']) {
+    for (const candidate of ['.claude', '.gemini', '.codex', '.ai-context']) {
       const p = path.join(dir, candidate);
       try {
         if (fs.existsSync(p) && fs.statSync(p).isDirectory()) return dir;
@@ -146,16 +146,23 @@ try {
       return out.split('\n').filter(Boolean).length;
     } catch { return 0; }
   }
+  // Safety: use commit instead of stash. Stash is dangerous with concurrent sessions
+  // or manual changes — stash push captures ALL changes (including other session's work),
+  // and stash pop can fail or silently merge, trapping changes. A commit is recoverable
+  // via git log/reflog and doesn't affect the stash stack.
   try {
-    const before = stashCount();
-    execSync(`git stash push -u -m "${stashMsg}"`, { cwd, timeout: 15000, stdio: 'pipe' });
-    const after = stashCount();
-    // git stash push can succeed without creating a stash (e.g. only submodule / ignored changes).
-    // If no new stash appeared, treat as no-op: skip rev-parse and let the destructive op proceed.
-    if (after <= before) passthrough();
-    stashRef = execSync('git rev-parse stash@{0}', { cwd, timeout: 2000, encoding: 'utf8' }).trim();
-    // Immediately pop it back — we want the stash ref as safety net, not actually clear working tree
-    execSync('git stash pop --quiet', { cwd, timeout: 15000, stdio: 'pipe' });
+    // Check if there are changes to save
+    const statusOut = execSync('git status --porcelain', { cwd, timeout: 2000, encoding: 'utf8' }).trim();
+    if (!statusOut) passthrough(); // nothing to save
+
+    // Create a safety commit (will be on current branch, easy to find)
+    execSync('git add -A', { cwd, timeout: 5000, stdio: 'pipe' });
+    execSync(`git commit --no-verify --no-gpg-sign -m "${stashMsg}"`, { cwd, timeout: 15000, stdio: 'pipe' });
+    stashRef = execSync('git rev-parse HEAD', { cwd, timeout: 2000, encoding: 'utf8' }).trim();
+    // Immediately undo the commit but keep changes in working tree
+    execSync('git reset --soft HEAD~1', { cwd, timeout: 5000, stdio: 'pipe' });
+    // Unstage (return to original dirty state)
+    execSync('git reset HEAD', { cwd, timeout: 5000, stdio: 'pipe' });
   } catch (e) {
     // Stash failed — don't block, but warn
     process.stdout.write(JSON.stringify({
@@ -165,19 +172,20 @@ try {
     process.exit(0);
   }
 
-  // Log stash ref for recovery — write to repo root .claude/, not cwd's
+  // Log recovery ref — write to .ai-context/ (canonical) or tool-local dir
+  const { toolHomeDir } = require('./lib/tool-detect.js');
   try {
     const repoRoot = findRepoRoot(cwd);
-    const logDir = path.join(repoRoot, '.claude');
+    const logDir = path.join(repoRoot, '.ai-context');
     fs.mkdirSync(logDir, { recursive: true });
-    const logFile = path.join(logDir, '.autosave-stashes.log');
+    const logFile = path.join(logDir, '.autosave-recovery.log');
     const line = `${ts}\t${stashRef}\t${cmdHint}\n`;
     fs.appendFileSync(logFile, line);
   } catch {}
 
   process.stdout.write(JSON.stringify({
     continue: true,
-    systemMessage: `[autosave] Stashed state before destructive op. Recovery: \`git stash apply ${stashRef}\` (logged to .claude/.autosave-stashes.log).`
+    systemMessage: `[autosave] Safety commit before destructive op. Recovery: check git reflog for ${stashRef.slice(0, 8)}.`
   }));
 } catch {
   passthrough();

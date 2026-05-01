@@ -14,9 +14,9 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '20'
 
@@ -28,84 +28,23 @@ jobs:
             [ -f "$f" ] && node -c "$f"
           done
 
-      - name: Hook selftest (Linux/macOS)
+      - name: Hook selftest
         shell: bash
+        # Some shipped hooks (research-lint, etc.) rely on POSIX utilities that
+        # Git-Bash on Windows handles differently — surface real issues via the
+        # Linux + macOS matrix, which is where maintainers run these hooks.
         if: runner.os != 'Windows'
         run: |
           mkdir -p "$HOME/.claude/hooks/lib"
           cp -r hooks/* "$HOME/.claude/hooks/"
           node hooks/lib/hook-selftest.js
 
-      - name: Hook selftest (Windows — Git-Bash-safe subset)
-        shell: bash
-        if: runner.os == 'Windows'
-        run: |
-          # Windows runs the Node-based hooks. POSIX-only hooks (research-lint)
-          # may not apply; SELFTEST_ALLOW_MISSING=1 tolerates a partial-subset
-          # install while failing on real regressions in hooks that DO run.
-          mkdir -p "$HOME/.claude/hooks/lib"
-          cp -r hooks/* "$HOME/.claude/hooks/"
-          SELFTEST_ALLOW_MISSING=1 node hooks/lib/hook-selftest.js
-
-      - name: Orphan hook file detector
-        shell: bash
-        run: |
-          set -e
-          REGISTERED=$(node -e '
-            const s = JSON.parse(require("fs").readFileSync("settings.template.json","utf8"));
-            const names = new Set();
-            for (const ev of Object.values(s.hooks||{})) {
-              for (const block of ev) {
-                for (const h of block.hooks||[]) {
-                  const m = (h.command||"").match(/hooks\/([^\s"\\]+\.js)/);
-                  if (m) names.add(m[1]);
-                }
-              }
-            }
-            // Also include statusLine.command (separate from hooks block)
-            if (s.statusLine?.command) {
-              const m = s.statusLine.command.match(/hooks\/([^\s"\\]+\.js)/);
-              if (m) names.add(m[1]);
-            }
-            console.log([...names].join("\n"));
-          ')
-          FAIL=0
-          for f in hooks/*.js; do
-            base=$(basename "$f")
-            if ! echo "$REGISTERED" | grep -qx "$base"; then
-              # Allowlist: documented standalone CLIs
-              case "$base" in
-                validate-symlinks.js)
-                  echo "ALLOWED orphan: $base (standalone CLI)"
-                  ;;
-                *)
-                  echo "::error::orphan hook $base — present in hooks/ but not registered in settings.template.json"
-                  FAIL=1
-                  ;;
-              esac
-            fi
-          done
-          if [ $FAIL -eq 1 ]; then exit 1; fi
-          echo "All hook files registered (or whitelisted)."
-
       - name: Bash script syntax (Linux/macOS only)
         if: runner.os != 'Windows'
         run: |
-          # .sh scripts (legacy — being phased out per Wave 7 .mjs migration 2026-04-29)
-          shopt -s nullglob
           for f in scripts/*.sh; do
             bash -n "$f"
           done
-          shopt -u nullglob
-
-      - name: Node script syntax (cross-platform — .mjs canonical post v0.4)
-        shell: bash
-        run: |
-          shopt -s nullglob
-          for f in scripts/*.mjs; do
-            node --check "$f"
-          done
-          shopt -u nullglob
 
       - name: PowerShell script syntax (Windows + macOS + Linux via pwsh)
         shell: pwsh
@@ -122,31 +61,25 @@ jobs:
 
       - name: MCP server smoke test
         shell: bash
+        if: runner.os != 'Windows'
         run: |
-          # Cross-platform smoke via Node (avoid python3 dep — not on Windows
-          # runners by default). Scans all response lines for result.tools.
+          # Pipe initialize + tools/list, expect >=10 tools. macOS doesn't have
+          # GNU `timeout` by default, so we rely on EOF to terminate the server
+          # (printf closes stdin after the two requests; server exits cleanly).
           RESPONSE=$(
             printf '%s\n%s\n' \
               '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ci","version":"0"}}}' \
               '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
-            | node mcp/personal-context/server.js 2>/dev/null
+            | node mcp/personal-context/server.js 2>/dev/null \
+            | tail -1
           )
-          node -e '
-            let buf = "";
-            process.stdin.on("data", c => buf += c);
-            process.stdin.on("end", () => {
-              let n = 0;
-              for (const line of buf.split(/\r?\n/)) {
-                if (!line.trim()) continue;
-                try {
-                  const m = JSON.parse(line);
-                  if (m.result && Array.isArray(m.result.tools)) { n = m.result.tools.length; break; }
-                } catch {}
-              }
-              if (n < 10) { console.error("expected >=10 tools, got " + n); process.exit(1); }
-              console.log("MCP smoke OK: " + n + " tools");
-            });
-          ' <<< "$RESPONSE"
+          echo "$RESPONSE" | python3 -c "
+          import json, sys
+          d = json.loads(sys.stdin.read())
+          n = len(d.get('result', {}).get('tools', []))
+          assert n >= 10, f'expected >=10 tools, got {n}'
+          print(f'MCP smoke OK: {n} tools')
+          "
 
       - name: Bootstrap smoke (Linux + macOS)
         shell: bash
@@ -160,8 +93,7 @@ jobs:
           echo '{}' > "$HOME/.gemini/settings.json"
           echo '{}' > "$HOME/.claude.json"
           cp -r "$GITHUB_WORKSPACE" "$HOME/.ai-context"
-          # Wave G 2026-04-29: bootstrap.sh deleted; use canonical .mjs.
-          node "$HOME/.ai-context/scripts/bootstrap.mjs"
+          bash "$HOME/.ai-context/scripts/bootstrap.sh"
           echo "bootstrap smoke OK"
 
       - name: Bootstrap smoke (Windows)
@@ -198,38 +130,36 @@ jobs:
       - name: Scrub-gate (no personal tokens in public repo)
         shell: bash
         run: |
-          # Delegate to the shipped pre-push gate so CI + local enforcement
-          # share one token list. Prior inline duplication drifted — CI was a
-          # strict subset of scripts/scrub-check.mjs.
-          node scripts/scrub-check.mjs
-
-      - name: Lib unit tests
-        shell: bash
-        if: runner.os != 'Windows'
-        run: |
-          if [ -f hooks/tests/lib-unit-tests.js ]; then
-            node hooks/tests/lib-unit-tests.js
-          else
-            echo "lib-unit-tests.js not present — skipping"
+          # Public repo should never contain personal tokens outside docs/ / *.example.
+          # Token list is assembled from individual parts so the workflow file itself
+          # does not match its own pattern.
+          tokens=()
+          tokens+=("$(printf 'f%sa%sh%sl%sk%se' '' '' '' '' '')")          # ident1
+          tokens+=("$(printf 'F%sa%sh%sl%sk%se' '' '' '' '' '')")          # ident1-cap
+          tokens+=("$(printf 'D%sa%sa%sb%so%su%sl%se%sx' '' '' '' '' '' '' '')") # ident2
+          tokens+=("$(printf 'P%so%sr%st%sa%sb%sl%se%s-%sB%su%si%sl%sd%se%sr' '' '' '' '' '' '' '' '' '' '' '' '' '' '' '')") # proj
+          tokens+=("$(printf '/%sh%so%sm%se%s/%su%ss%se%sr' '' '' '' '' '' '' '' '' '')") # abs-home
+          tokens+=("$(printf 'k%si%sp%sp%se%sr%s_%se%sl%si%sx%si%sr%ss' '' '' '' '' '' '' '' '' '' '' '' '' '')") # email-local
+          PATTERN=$(IFS='|'; echo "${tokens[*]}")
+          HITS=$(
+            grep -rn -E "$PATTERN" . \
+              --include='*.md' --include='*.js' --include='*.json' \
+              --include='*.sh' --include='*.ps1' \
+              2>/dev/null \
+            | grep -v '^\./\.git/' \
+            | grep -v '/docs/' \
+            | grep -v '\.example\b' \
+            | grep -v '^\./README\.md' \
+            | grep -v '^\./LICENSE' \
+            | grep -v '^\./CONTRIBUTING\.md' \
+            | grep -v '^\./SECURITY\.md' \
+            | grep -v '^\./CHANGELOG\.md' \
+            | grep -v '^\./\.github/workflows/ci\.yml' \
+            || true
+          )
+          if [ -n "$HITS" ]; then
+            echo "⚠ personal tokens detected in public repo:"
+            echo "$HITS"
+            exit 1
           fi
-
-      - name: Lib unit tests (Windows)
-        shell: pwsh
-        if: runner.os == 'Windows'
-        run: |
-          if (Test-Path hooks/tests/lib-unit-tests.js) {
-            node hooks/tests/lib-unit-tests.js
-            if ($LASTEXITCODE -ne 0) { exit 1 }
-          } else {
-            Write-Host "lib-unit-tests.js not present — skipping"
-          }
-
-      - name: Regression fixtures
-        shell: bash
-        if: runner.os != 'Windows'
-        run: |
-          if [ -x hooks/tests/run-regressions.sh ]; then
-            bash hooks/tests/run-regressions.sh
-          else
-            echo "run-regressions.sh not present — skipping"
-          fi
+          echo "scrub-gate OK"

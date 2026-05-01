@@ -28,22 +28,28 @@ try {
   }
 
   // Write to config dir (NOT /tmp — /tmp writes can trigger systemd events that crash KDE Wayland)
-  const home = process.env.HOME || process.env.USERPROFILE || os.homedir();
-  const scriptDir = __dirname;
-  const isGemini = scriptDir.includes('.gemini');
-  const configDir = path.join(home, isGemini ? '.gemini' : '.claude');
+  const { toolHomeDir } = require('./lib/tool-detect.js');
+  const configDir = toolHomeDir();
   const sessionId = input.session_id || 'unknown';
   const logFile = path.join(configDir, `.skill-log-${sessionId}.jsonl`);
 
   const entry = JSON.stringify({
     skill: skillName,
     timestamp: new Date().toISOString(),
-    cwd: input.cwd || process.cwd()
+    cwd: input.cwd || process.cwd(),
+    session_id: sessionId,
+    outcome: 'invoked',
+    tool_response_correlation: null,
+    bandaid_loop_link: false,
+    user_acted_window_ms: null,
+    tool_use_id: (input.tool_input || {}).tool_use_id || input.tool_use_id || null,
   }) + '\n';
 
   fs.appendFileSync(logFile, entry);
 
-  // R17 support (v0.2.0): session_id for skill→bandaid correlation at R17.
+  // Observability: emit to episodic JSONL.
+  // R17 support: includes session_id so Stop-chain reconciliation can
+  // match bandaid_loop events back to skills invoked in same session.
   try {
     require('./lib/observability-logger.js').logEvent(input.cwd || process.cwd(), {
       type: 'skill_invoke',

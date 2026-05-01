@@ -2,7 +2,7 @@
 This is the CANONICAL agent-rules file. Shared across Claude Code, Gemini CLI,
 Codex CLI, OpenCode, Aider, Cursor, Windsurf, and any other AGENTS.md-aware tool.
 
-On first install, run scripts/customize.mjs to personalize the Identity section.
+On first install, run scripts/customize.sh to personalize the Identity section.
 Your personal rules go between the USER SECTION markers — they survive updates.
 -->
 
@@ -21,7 +21,7 @@ Your personal rules go between the USER SECTION markers — they survive updates
 > - `~/.claude/CLAUDE.md`, `~/.gemini/GEMINI.md`, `~/.codex/AGENTS.md`, `~/.config/opencode/AGENTS.md`, `~/.config/aider/AGENTS.md` are symlinks here.
 > - Edit this file. Every tool picks up the change automatically.
 > - Tool-specific sections below are labeled — other tools should ignore them.
-> - **Last updated:** 2026-04-20 (portable rewrite + MCP bridge)
+> - **Last updated:** 2026-05-01 (Codex apply_patch fix v0.128.0+; new hook events CwdChanged/FileChanged/PostCompact/etc; Gemini v0.40 events)
 > - **Override per-project:** drop `AGENTS.md` at repo root — tools walk from cwd to root, deepest wins.
 
 ## Identity
@@ -50,6 +50,28 @@ Uncomment and fill in your own expertise areas. The agent frames responses diffe
 - Resume caveman mode after the unambiguous part is delivered.
 - Code, commits, and PR text: write normal (caveman only affects prose output).
 
+## Reasoning Anchors (R-RES)
+
+### Reasoning template (R-RES-1)
+For non-trivial work (3+ tool calls or 2+ file edits), output before first tool call:
+```
+Intent: [what + why, 1 sentence]
+Approach: [steps, 1-3 lines]
+Verification: [what command/test confirms success]
+```
+Caveman-mode compatible — fragments OK, drop articles. Skip for pure-read or simple-question tasks.
+
+### Plan anchor (R-RES-2)
+For any task involving 3+ tool calls or 2+ file edits, output a **numbered plan** BEFORE first edit. Primary defense against Opus 4.7 zero-reasoning turns.
+```
+Plan:
+1. Read X to understand current shape
+2. Edit Y to apply fix
+3. Run regression battery
+4. Commit + sync
+```
+Plans don't need approval but they must exist.
+
 ## Verification First
 - MUST run checks/tests after making changes before claiming done
 - NEVER mark a task as done, passes, or complete without running a real verification command
@@ -72,6 +94,32 @@ Uncomment and fill in your own expertise areas. The agent frames responses diffe
 - NEVER commit changes that haven't been verified (at minimum: eval passes)
 - Prefer editing existing files over creating new ones
 - Keep changes minimal and focused — no drive-by refactors
+- **GPG sign exception:** `auto-push-global.js` Stop hook commits use `--no-gpg-sign`. Auto-sync commits are mechanical session-end snapshots, not user-authored work; forcing GPG sign would either prompt for passphrase (breaks non-interactive autopush) or silently fail (breaks data preservation). User-authored commits remain signed via standard git config. This exception applies ONLY to `chore: auto-sync from session end` commits in `~/.claude`, `~/.gemini`, `~/.codex`, `~/.ai-context`.
+
+## Tri-Tool Enforcement Asymmetry (added 2026-04-29 — adversarial audit finding)
+
+**Important: tri-tool parity is a STORY about hook FILES, not about behavioral guarantees.** The 3 tools have structurally different enforcement strength.
+
+| Tool | Permission allowlist | Hook coverage of writes | Enforcement strength |
+|---|---|---|---|
+| **Claude Code** | ~250 enforced `permissions.allow` entries | All Write/Edit/Bash hooks fire | **Strongest** |
+| **Gemini CLI** | NO `permissions` key in settings | All `write_file`/`replace`/`run_shell_command` hooks fire | Medium — no command allowlist |
+| **Codex CLI** | `trust_level = "trusted"` (project-scope flag, not allowlist) | apply_patch hook fix claimed in PR #18391 (v0.128.0+) — **UNVERIFIED empirically**. `shell` writes DO fire hooks. | Medium — verify apply_patch fires hooks before relying on it |
+
+**Implications:**
+- Switching from Claude to Gemini/Codex mid-task does NOT preserve permission boundaries. A user blocked by Claude's permissions may successfully run the same operation in Gemini or Codex.
+- Codex `apply_patch` hook fix (PR #18391) is claimed merged but **not empirically verified**. Until verified: use `shell` for sensitive writes in Codex. Config.toml still warns about this.
+- For sensitive writes in Codex, prefer `shell cat > file <<EOF ... EOF` until apply_patch hook firing is confirmed by testing.
+- `tri-tool-parity-check` hook reports HOOK FILE drift, not behavioral equivalence. A clean parity report does NOT mean the 3 tools enforce equivalently.
+
+**This is structural, not a bug.** Gemini and Codex don't have Claude's permission vocabulary; perfect parity is impossible until upstream changes.
+
+## 5-Repo Live-Together System
+
+Hooks are canonical at `~/.ai-context/hooks/` — all 3 tools see same files via symlink. Editing one file covers all tools.
+Adding a NEW hook requires registering in all 3 settings/configs (Claude JSON, Gemini JSON, Codex TOML).
+
+Full repo table, coupling rules, and release procedures: see `AGENTS-architecture.md`.
 
 ## Code Quality
 - Follow existing patterns in the codebase — match style, don't impose it
@@ -82,122 +130,36 @@ Uncomment and fill in your own expertise areas. The agent frames responses diffe
 ## Context Management
 - Use `/clear` between unrelated tasks (if tool supports)
 - Use subagents for investigation to preserve main context (Claude/Gemini)
-- **Prefer context-reset (fresh session + handoff) over compaction for multi-hour work.** Degradation starts around 70-80% context full. At 70% run `/handoff` or equivalent state-save. At 80% stop and hand off unconditionally.
+- **Prefer context-reset (fresh session + handoff) over compaction for multi-hour work.** On 1M context: degradation starts around 85-90%. At 85% run `/handoff`. At 92% stop unconditionally. Do NOT nag about context below 80% — it wastes tokens and annoys the user.
 - When reading large files (>2000 lines), check line count first with `wc -l`, then read in chunks — some tools silently truncate
-- **`/handoff` is a checkpoint, NOT a stop signal.** At 50-65% context there is no pressure — keep working.
+- **`/handoff` is a checkpoint, NOT a stop signal.** Below 80% context there is zero pressure — keep working. Do not mention context percentage unless asked or above 80%.
+- **Do NOT fabricate context percentages.** If you don't have the actual value from the status line or context-pressure hook, don't guess. Say "I don't know the exact percentage" rather than inventing a number.
 
 ## Superpowers / AI-Generated Artifacts
 - Specs, plans, brainstorm artifacts MUST go in `.superpowers/` inside the AI context directory, NEVER in `docs/`
 - `docs/` is for real project documentation only
 - **Location priority**: `.ai-context/.superpowers/` > `.claude/.superpowers/` > `.gemini/.superpowers/`
 - **Structure**: `{specs,plans}/YYYY-MM-DD-<topic>.md`
-- **Cross-session continuity**: At session start, check `.superpowers/specs/` and `.superpowers/plans/` for in-progress work. Spec without plan → offer to continue planning. Plan with incomplete phases → offer to resume.
 
-## AI Tracking — 4 persistence layers (v3, 2026-04-16)
-
-| Layer | Where | Written by | Lifetime |
-|---|---|---|---|
-| **Memory** (what you KNOW) | `~/.ai-context/memory/` (canonical, global), project `.claude/memory/*.md` OR `.ai-context/memory/*.md` | `/reflect`, `/consolidate-memory`, user | permanent (archive, never delete) |
-| **Handoff** (detailed state) | `<project>/<canonical-dir>/.session-handoff.md` + versioned copies | `/handoff`, `/wrap-up` | pointer archived >14d, versioned archived >7d keeping 3 newest |
-| **Progress** (per-session summary) | `<project>/<canonical-dir>/AI-progress.json` | `reflect-stop.js` hook (Claude/Gemini auto) | permanent append |
-| **Tasks** (open work) | `<project>/<canonical-dir>/AI-tasks.json` (v3) | TodoWrite + `todowrite-persist.js` hook | in_progress+blocked persist; done → completed_log cap 50 |
-| **Session presence** (multi-agent coord) | `<project>/<canonical-dir>/active-sessions.jsonl` + `~/.claude/cache/active-sessions-global.jsonl` | `session-presence-*.js` hooks | 500-line active, rotate at 5000 |
-| **Self-improvement queue** (system health) | `~/.claude/self-improvements-pending-<host>.jsonl` | `meta-system-stop.js` (dual-gate) | cumulative; `/review-improvements` to triage |
-
-**Location rules:**
-- `<canonical-dir>` = ONE of: `.claude/` (simple-style) OR `.ai-context/` (nix-style). Never both, never at project root, never duplicated.
-- Global `~/.ai-context/` owns canonical memory; `~/.claude/memory/` + `~/.gemini/memory/` are symlinks to it.
-- Per-cwd auto-memory at `~/.claude/projects/<sanitized>/memory/` is fallback when project has no local memory dir.
-- Sub-repos (`nix/repos/*-nix`, `<user>/Development-*`) track ONLY when actively developed (<30d) — opt-in, not bulk-init.
-
-**Subagent rules:**
-- Subagents CANNOT run `git commit|push|merge|rebase|reset --hard|cherry-pick|revert|tag -fd|branch -D|checkout -b|add -A|restore --staged|clean -f|submodule add|worktree add`. Enforced by `block-subagent-writes.js` PreToolUse hook (Claude/Gemini only).
-- Read-only git (status, log, diff, show, ls-files, grep) stays allowed.
-
-**AI-tasks.json v3 schema:**
-- `tasks[]` = in_progress + blocked (persisted across sessions)
-- `completed_log[]` = done items, rotating cap 50
-- TodoWrite `pending` = ephemeral; `done` → moves to `completed_log` at session end
-- `source: todowrite|gsd|manual` + `verifiedBy: not-verified|unit-test|integration-test|human-tested`
+## AI Tracking — see `~/.ai-context/AGENTS-architecture.md` for full schemas
+Subagents blocked from: git state-changing, gh state-changing, MCP mutations, writes outside cwd/`/tmp/`.
 
 ## Tool & Workflow Philosophy
 - Enhance workflow silently — background improvements over new commands. Opt-in if command-syntax changes.
 - Default: simpler over more powerful.
 
+## Agent Dispatch Rules (ENFORCED — learned 2026-04-28)
+- When dispatching subagents via Agent tool, ALWAYS specify `model:` parameter. Unspecified = inherits parent model (burns opus tokens on trivial tasks).
+- Research/WebFetch agents: `model: "sonnet"`. NEVER haiku for web research — haiku hallucinates ~20% of web claims (verified: 2/10 fabricated).
+- Review/spot-check (file reads, grep): `model: "haiku"`.
+- Implementation: `model: "sonnet"`. Architecture/planning: `model: "opus"`.
+- `.superpowers/specs/` are NOT read by sessions. Decisions in specs MUST be copied to AGENTS.md, hooks, or memory to persist.
+- Memory files: only 8 loaded with full content per session (`MEMORY_INJECTION_FULL_COUNT=8`, was 3 before 2026-04-28 bump). Use memories for REFERENCE facts. Use AGENTS.md or hooks for BEHAVIORAL rules.
+
 ---
 
-## Memory file format (for any agent writing memories)
-
-Every file in `memory/` has YAML frontmatter. The current schema (v2) drives `memory-rotate.js` and the `memory-retrieval-logger` observability loop.
-
-```yaml
----
-name: Short human-readable title
-description: One-line searchable description — specific, not filler. Used in MEMORY.md index.
-type: user | feedback | project | reference | procedure
-created: 2026-04-21          # YYYY-MM-DD when added
-last_verified: 2026-04-21    # bumped when content re-checked against reality
-last_accessed: 2026-04-21    # auto-updated by memory-retrieval-logger
-ttl_days: permanent          # permanent | 180 | 90 | 30
-evidence: [file:/abs/path, url:..., commit:<sha>]
-status: active               # active | archived | deprecated
-# optional:
-superseded_by: new_file.md
----
-```
-
-Rules for choosing `type`:
-- **user** — who the user is, their role, preferences, expertise (permanent)
-- **feedback** — corrections and approvals; must include "Why:" and "How to apply:" lines (90d)
-- **project** — current state of ongoing work: decisions, blockers, who/why/when (90d)
-- **reference** — pointers to external systems (Linear project, Slack channel, Grafana dashboard) (permanent)
-- **procedure** — how-tos and runbooks (180d)
-
-Rotation: `memory-rotate.js` (Stop hook, 7-day cooldown) moves a file to `memory/archive/` when `now - last_verified > ttl_days` and `ttl_days != permanent`. Files are archived, never deleted.
-
-Existing v1-frontmatter files (just `name` / `description` / `type` plus optional `superseded_by` / `valid_until`) still load — `memory-migrate.js --migrate-to-v2` upgrades them in place. Write new memories in v2 directly.
-
-See `skills/debt-tracker/SKILL.md` for the DEBT.md format.
-
-## Portable Context Architecture (2026-04-20)
-
-Canonical source lives at `~/.ai-context/`:
-```
-~/.ai-context/
-├── AGENTS.md       ← this file, symlinked from all tool homes
-├── memory/         ← global memories (plain markdown with frontmatter)
-├── skills/         ← skill descriptions (tool-neutral markdown)
-├── mcp/            ← MCP servers (work in any MCP-capable client)
-├── scripts/        ← install-adapters.sh, install-mcp.sh, setup-private-remote.sh
-└── README.md       ← architecture doc
-```
-
-All supported tools read from this single source:
-| Tool | Reads | How |
-|---|---|---|
-| Claude Code | `~/.claude/CLAUDE.md` | symlink → AGENTS.md + MCP via `~/.claude.json` |
-| Gemini CLI | `~/.gemini/GEMINI.md` | symlink → AGENTS.md + MCP via `settings.json → mcpServers` |
-| Codex CLI | `~/.codex/AGENTS.md` | symlink → AGENTS.md + MCP via `config.toml` |
-| OpenCode | `~/.config/opencode/AGENTS.md` | symlink → AGENTS.md + MCP via `config.json` |
-| Aider | `~/.config/aider/AGENTS.md` | symlink → AGENTS.md (pass via `--read` arg) |
-| Cursor | `.cursor/rules/*.mdc` or `AGENTS.md` | native AGENTS.md fallback + MCP via `~/.cursor/mcp.json` |
-| Windsurf | `~/.codeium/windsurf/memories/global_rules.md` | symlink if installed; native AGENTS.md Cascade support Wave 8+ |
-| Copilot (cloud) | `AGENTS.md` + `.github/copilot-instructions.md` | native read |
-| Cline / Continue.dev | per-tool rules + MCP | MCP auto-registered |
-| Any MCP-capable | MCP tools `search_memory`, `list_skills`, `get_rule`, `read_debt`, `list_tasks`, `read_handoff`, etc. | via `personal-context` server |
-
-**How to apply changes:** edit `~/.ai-context/AGENTS.md` → every tool picks it up on next session. No regeneration step.
-
-**How to install on a new machine:**
-```bash
-# sync ~/.ai-context/ via your method (git clone / Syncthing / rsync)
-~/.ai-context/scripts/install-adapters.mjs   # drop symlinks
-~/.ai-context/scripts/install-mcp.mjs        # register MCP server
-```
-
-**MCP tools exposed (14):**
-- Read: `search_memory`, `read_memory`, `list_memories`, `list_skills`, `get_skill`, `read_debt`, `get_rule`, `read_handoff`, `list_handoffs`, `list_tasks`, `read_progress`, `search_handoffs`
-- Write: `add_memory`, `add_debt`
+## Architecture Reference
+Memory format, portable context, tool→read paths: see `~/.ai-context/AGENTS-architecture.md`.
 
 ---
 
@@ -207,43 +169,47 @@ All supported tools read from this single source:
 ### AI Context Maintenance
 - Editing CLAUDE.md/GEMINI.md/AGENTS.md — all three are the same file via symlink. Just edit `~/.ai-context/AGENTS.md`.
 - Skills/rules are living docs — fix stale content on sight.
-- `~/.claude/` + `~/.gemini/` can be their own git repos for cross-machine sync. `auto-push-global.js` auto-commits + pushes at Stop. Cooldown-gated. Also syncs shared hooks Claude→Gemini.
+- `~/.claude/` + `~/.gemini/` + `~/.codex/` are git repos (<repo>, <repo>, codex-global). `auto-push-global.js` auto-commits + pushes all three at Stop. Cooldown-gated.
 - **Self-improvement loop:** `meta-system-stop.js` detectors append findings to `~/.claude/self-improvements-pending-<host>.jsonl`. Run `/review-improvements` to triage. Rejections teach 90-day class suppression via `memory/reference/self-improvement-feedback.md`.
 
 ### Cross-Platform Hook Rules
 - Sync hooks (`sync-claude-md`, `sync-claude-skills`) MUST be registered under **PostToolUse** (Claude) / **AfterTool** (Gemini) — read files after write completes
 - Guard hooks MUST be registered under **PreToolUse** (Claude) / **BeforeTool** (Gemini) — intercept before write
-- Claude timeouts are in **seconds**; Gemini timeouts are in **milliseconds** — never confuse them
-- Claude tool names: `Write`, `Edit`, `Bash`, `Read`, `Skill`, `Agent`; Gemini tool names: `write_file`, `replace`, `run_shell_command`, `read_file`, `activate_skill`
-- Claude session-end event: `Stop`; Gemini session-end event: `SessionEnd`
-- When adding a hook: add to BOTH `~/.claude/settings.json` AND `~/.gemini/settings.json` with correct event names, tool names, timeout units
+- Claude timeouts are in **seconds**; Gemini timeouts are in **milliseconds**; Codex timeouts are in **seconds** — never confuse them
+- Claude tool names: `Write`, `Edit`, `Bash`, `Read`, `Skill`, `Agent`; Gemini tool names: `write_file`, `replace`, `run_shell_command`, `read_file`, `activate_skill`; Codex tool names: `apply_patch`, `shell`, `Read` (NOT same as Claude)
+- Claude session-end event: `Stop`; Gemini session-end event: `SessionEnd`; Codex session-end event: `Stop`
+- When adding a hook: add to ALL THREE — `~/.claude/settings.json` (JSON), `~/.gemini/settings.json` (JSON), `~/.codex/config.toml` (TOML `[[hooks.Event]]`)
+- Codex: only 5 hook events (PostToolUse, PreToolUse, SessionStart, Stop, UserPromptSubmit); `apply_patch` now fires hooks (fixed v0.128.0+, was openai/codex#16732)
 
-### Enforcement hooks (Claude/Gemini only — other tools don't have this)
+New hook events (v2.1.83+) and CLI changelog notes: see `AGENTS-architecture.md`.
+
+### Enforcement hooks (all 3 tools where events exist)
 - `autosave-before-destructive.js` — auto-stashes before `rm -rf`, `git reset --hard`, etc.
 - `verifiedby-gate.js` — nudges when TodoWrite marks task done with empty `verifiedBy`
 - `prefer-editing-nudge.js` — warns when creating `foo-v2.ts` next to `foo.ts`
+- `bandaid-loop-detector.js` — detects 3+ edits to same file → prompts root-cause reflection
 - `block-subagent-writes.js` — hard-blocks subagent git writes
 
-### NixOS (optional — remove if not on NixOS)
-- Build system: `nix flake check`, `nix build`, `nixos-rebuild`
-- Format: `treefmt` (alejandra for nix, prettier for others)
-- Modules use `mkOption`/`mkDefault`, not raw assignment
-- Flake inputs MUST be declared in flake.nix inputs section
+### Domain-specific tech rules (lazy-load)
+When working in these domains, READ `~/.ai-context/AGENTS-domain-specific.md` for full rules:
+- **NixOS** — flake check / build / treefmt / mkOption-mkDefault
+- **Embedded C / ARM Cortex-M ([mcu-family])** — toolchain, [rtos] priorities, dual-bank, safety scope
+- **ESP32 / IDF / PlatformIO** — pio run, [protocol] framing, env filters, MQTT QoS
+- **React Native / Expo** — EAS build, MQTT keepalive, field-UI specs
+- **Industrial Control** — [fieldbus] RTU/TCP, [fieldbus], [safety-domain], PST, [protocol], IEC 61508/61511
+
+Cwd-gated: only read when current task involves the domain.
 
 ---
 
-## ═════ CODEX / OPENCODE / AIDER / CURSOR / ETC. SPECIFIC ═════
-### (Claude Code / Gemini CLI: ignore)
+## Other-tools specifics (lazy-load)
 
-- Session hooks don't exist in these tools. Rules above that mention "on SessionStart", "at Stop hook", etc. are Claude/Gemini-specific. For Codex/OpenCode, rules are enforced by the AGENTS.md text itself — no automation, just adherence.
-- MCP server `personal-context` is available — use it for: `search_memory`, `read_debt`, `list_tasks`, `read_handoff`. That gives you the same knowledge the Claude+Gemini system has.
-- Cursor: prefer `.cursor/rules/*.mdc` for glob-scoped rules; this `AGENTS.md` is global fallback.
-- Aider: invoke with `aider --read ~/.config/aider/AGENTS.md` (or add to project `.aider.conf.yml` `read:`).
+For Codex / OpenCode / Aider / Cursor / Windsurf / Copilot / Cline / Continue.dev: these lack session hooks. Rules in this file are enforced by adherence, not automation. MCP server `personal-context` is the cross-tool bridge. Full per-tool guidance: see `~/.ai-context/AGENTS-architecture.md` ("Other-tools specifics" section).
 
 ---
 
 ## ═════ UNIVERSAL TOOLING CAVEATS ═════
 
 - File reads over 2000 lines: use explicit `offset` + `limit`; some tools silently truncate.
-- `~/.claude/` + `~/.gemini/` + `~/.ai-context/` are themselves git repos (private, per-machine or Syncthing/GitHub). Changes auto-commit at session end.
+- `~/.claude/` + `~/.gemini/` + `~/.codex/` + `~/.ai-context/` are themselves git repos (private, per-machine or Syncthing/GitHub). Changes auto-commit at session end.
 - Safety-critical code paths (customize for your domain): respond in normal prose, not caveman. Fragment misread risk too high.

@@ -44,10 +44,12 @@ try {
   }
 
   // Detect if handoff was already done recently (within last 10 minutes)
+  const os = require('os');
+  const canonicalPointer = path.join(os.homedir(), '.ai-context', 'handoffs', 'sessions', '.current-session-' + (require('./lib/tool-detect.js').detectTool()) + '.json');
   const handoffFile = path.join(process.cwd(), '.claude', '.session-handoff.md');
   const aiContextHandoff = path.join(process.cwd(), '.ai-context', '.session-handoff.md');
   let handoffRecent = false;
-  for (const f of [handoffFile, aiContextHandoff]) {
+  for (const f of [canonicalPointer, handoffFile, aiContextHandoff]) {
     try {
       const mtime = fs.statSync(f).mtimeMs;
       if (Date.now() - mtime < 10 * 60 * 1000) handoffRecent = true;

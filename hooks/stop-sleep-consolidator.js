@@ -44,9 +44,10 @@ try {
 
   const home = os.homedir();
   const scriptDir = __dirname;
-  const isGemini = scriptDir.includes('.gemini');
-  const configDir = path.join(home, isGemini ? '.gemini' : '.claude');
-  const cacheDir = path.join(home, '.claude', 'cache'); // single shared cache dir
+  const { detectTool, toolHomeDir } = require('./lib/tool-detect.js');
+  const tool = detectTool();
+  const configDir = toolHomeDir(tool);
+  const cacheDir = path.join(configDir, 'cache');
   try { fs.mkdirSync(cacheDir, { recursive: true }); } catch {}
 
   // Dual-gate reuse — same counters as dream-auto for consistency

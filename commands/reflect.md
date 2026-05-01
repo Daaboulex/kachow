@@ -64,7 +64,7 @@ ls .gemini/skills/ .gemini/rules/ .gemini/memory/ 2>/dev/null
 | **NixOS variant** | `.ai-context/.claude/` (symlinked) | `.ai-context/.gemini/` (symlinked) | This repo |
 | **Claude global memory** | `~/.claude/projects/<path-encoded>/memory/` | — | This project, persists across sessions |
 
-Note the project memory directory path for Claude global memory — it encodes the project path (e.g., `~/.claude/projects/-home-user-Documents-[project]/memory/`).
+Note the project memory directory path for Claude global memory — it encodes the project path (e.g., `~/.claude/projects/-home-user-[project-dir]/memory/`).
 
 ## Phase 2: Scan for Signals
 
@@ -118,7 +118,7 @@ A hook is appropriate when the learning is a **deterministic, repeatable action*
 → **HOOK** (`~/.claude/hooks/<name>.js` + register in `settings.json`)
 Examples:
 - "After editing .claude/AI-tasks.json, also copy to .gemini/" → PostToolUse hook
-- "When editing SafetyCritical/ files, warn about safety" → PreToolUse hook
+- "When editing [safety-module]/ files, warn about safety" → PreToolUse hook
 - "At session start, show active tasks and git status" → SessionStart hook
 - "At session end, clean up stale completed tasks" → SessionStart hook
 
@@ -143,7 +143,7 @@ Examples: "When adding a new protocol message, follow these 8 steps across 2 pla
 A rule is appropriate when the learning is a **code pattern that must ALWAYS be followed** when touching files matching a specific path glob. Rules are auto-loaded by path scope.
 
 → **RULE** (`.claude/rules/<scope>.md`) — path-scoped, always loaded for matching files
-Examples: "ESP32 WiFi files must use FreeRTOS dual-core pattern", "Dotnet V2 uses Avalonia not WinForms"
+Examples: "ESP32 WiFi files must use [rtos] dual-core pattern", "Dotnet V2 uses Avalonia not WinForms"
 
 When creating rules, check existing rules first:
 ```bash
@@ -338,7 +338,7 @@ type: user | feedback | project | reference
 If the session modified `~/.claude/hooks/`, `~/.claude/commands/`, or global skills:
 - `auto-push-global.js` hook auto-commits+pushes `~/.claude/` and `~/.gemini/` on session end
 - Shared hooks are auto-synced Claude→Gemini by the same hook
-- Both dirs are git repos (claude-global, gemini-global)
+- Both dirs are git repos ([claude-repo], [gemini-repo])
 
 ## Hard Rules
 

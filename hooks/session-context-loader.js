@@ -53,6 +53,41 @@ try {
     }
   } catch {}
 
+  // Behavioral rules summary (Layer C) — inject ALL feedback-type memory rule names.
+  // Ensures every behavioral rule is visible every session regardless of FULL_N.
+  try {
+    const memDirs = [
+      path.join(os.homedir(), '.ai-context', 'memory'),
+      path.join(cwd, '.ai-context', 'memory'),
+      path.join(cwd, '.claude', 'memory'),
+    ];
+    const sanitized = cwd.replace(/^\//, '').replace(/[/\\]/g, '-').replace(/^([A-Z]):/i, '$1');
+    const globalMemDir = path.join(os.homedir(), '.claude', 'projects', sanitized, 'memory');
+    memDirs.push(globalMemDir);
+
+    for (const memDir of memDirs) {
+      if (!fs.existsSync(memDir)) continue;
+      const ruleNames = [];
+      try {
+        for (const f of fs.readdirSync(memDir)) {
+          if (!f.startsWith('feedback_') || !f.endsWith('.md')) continue;
+          const fp = path.join(memDir, f);
+          try {
+            const head = fs.readFileSync(fp, 'utf8').split('\n').slice(0, 8).join('\n');
+            const nameMatch = head.match(/^name:\s*(.+)/im);
+            if (nameMatch) {
+              ruleNames.push(nameMatch[1].trim().slice(0, 40));
+            }
+          } catch {}
+        }
+      } catch {}
+      if (ruleNames.length > 0) {
+        parts.push(`Rules (${ruleNames.length}): ${ruleNames.join(' · ')}`);
+        break;
+      }
+    }
+  } catch {}
+
   // Self-improvement queue banner — fit into the AI "check if they can improve themselves" vision
   try {
     const queue = require('./lib/self-improvement/queue.js');
@@ -64,15 +99,6 @@ try {
       if (s.OBSERVE) tiers.push(`${s.OBSERVE} OBSERVE`);
       parts.push(`⚙ System: ${tiers.join(', ')} pending self-improvement${s.total > 1 ? 's' : ''} — run /review-improvements`);
     }
-  } catch {}
-
-  // Stale-process detection — surface orphan shells, old task outputs, stale session dirs.
-  // Prevents Claude from forgetting about leftover background processes.
-  try {
-    const { analyze, summaryBadge } = require('./lib/stale-process-detector.js');
-    const report = analyze({ currentSid: input.session_id });
-    const badge = summaryBadge(report);
-    if (badge) parts.push(badge);
   } catch {}
 
   // Check AI-tasks.json (search both .claude/ and .gemini/ for cross-platform)
@@ -241,9 +267,35 @@ try {
     } catch {}
   } catch {}
 
-  // Check for session handoff file (from /handoff or context-pressure save) — primary read path
+  // === NEW: Project-index-based handoff discovery (Phase 3) ===
+  // Reads from ~/.ai-context/handoffs/projects/<key>.json. Falls back to old
+  // filesystem scan if index doesn't exist yet (parallel operation period).
   let handoffFound = false;
-  for (const handoffPath of [
+  try {
+    const { deriveProjectKeyCached } = require('./lib/project-key.js');
+    const { latestSessions } = require('./lib/project-index.js');
+    const { HANDOFFS_ROOT } = require('./lib/handoff-state.js');
+    const proj = deriveProjectKeyCached(cwd);
+    const recent = latestSessions(proj.key, 3);
+    if (recent.length > 0) {
+      const latest = recent[recent.length - 1];
+      const age = Math.floor((Date.now() - new Date(latest.ended_at || latest.at).getTime()) / 3600000);
+      if (latest.has_prose) {
+        const prosePath = path.join(HANDOFFS_ROOT, 'sessions', latest.session_id + '.md');
+        parts.push(`⚡ HANDOFF from ${latest.tool} session (${age}h ago): ${latest.summary || 'no summary'}. Read ${prosePath}`);
+      } else {
+        parts.push(`⚡ Previous ${latest.tool} session (${age}h ago): ${latest.summary || 'no summary'}. ${latest.files_touched || 0} files changed.`);
+      }
+      if (recent.length > 1) {
+        parts.push(`${recent.length} sessions touched this project recently.`);
+      }
+      handoffFound = true;
+    }
+  } catch {}
+  // === END NEW — falls through to old scan if handoffFound is still false ===
+
+  // Check for session handoff file (from /handoff or context-pressure save) — legacy read path
+  if (!handoffFound) for (const handoffPath of [
     path.join(cwd, '.session-handoff.md'),
     path.join(cwd, '.ai-context', '.session-handoff.md'),
     path.join(cwd, '.claude', '.session-handoff.md'),
@@ -357,11 +409,33 @@ try {
             (s || '').toLowerCase().split(/[^a-z0-9]+/).filter(t => t.length >= 3 && !STOP.has(t))
           );
           const cwdTokens = tokenize(cwd);
+          // Type-priority boost: behavioral rules (feedback) always outrank project notes.
+          // Reads frontmatter type: field from each memory file (first 10 lines).
+          const TYPE_BOOST = { feedback: 5, reference: 2, user: 3, project: 0 };
+          // observation_level boost: inductive knowledge (derived from patterns) > deductive > explicit.
+          const OBS_LEVEL_BOOST = { inductive: 3, deductive: 1, explicit: 0 };
+          const getTypeInfo = (entry) => {
+            try {
+              const m = entry.match(/\(([^)]+\.md)\)/);
+              if (!m) return { boost: 0, memType: 'unknown' };
+              const fp = path.join(path.dirname(memPath), m[1]);
+              if (!fs.existsSync(fp)) return { boost: 0, memType: 'unknown' };
+              const head = fs.readFileSync(fp, 'utf8').split('\n').slice(0, 10).join('\n');
+              const typeMatch = head.match(/^type:\s*(\w+)/im);
+              const memType = typeMatch ? typeMatch[1] : 'unknown';
+              const typeBoost = TYPE_BOOST[memType] || 0;
+              const obsMatch = head.match(/^observation_level:\s*(\w+)/im);
+              const obsBoost = obsMatch ? (OBS_LEVEL_BOOST[obsMatch[1]] || 0) : 0;
+              return { boost: typeBoost + obsBoost, memType };
+            } catch { return { boost: 0, memType: 'unknown' }; }
+          };
           const scored = allEntries.map(e => {
             const eTokens = tokenize(e);
             let score = 0;
             for (const t of cwdTokens) if (eTokens.has(t)) score++;
-            return { entry: e, score };
+            const info = getTypeInfo(e);
+            score += info.boost;
+            return { entry: e, score, memType: info.memType };
           });
           scored.sort((a, b) => (b.score - a.score) || a.entry.localeCompare(b.entry));
 
@@ -380,22 +454,42 @@ try {
           // Restore old behavior with: MEMORY_INJECTION_FULL_COUNT=5 MEMORY_INJECTION_TITLE_COUNT=15
           const FULL_N = parseInt(process.env.MEMORY_INJECTION_FULL_COUNT, 10) || 3;
           const TITLE_N = parseInt(process.env.MEMORY_INJECTION_TITLE_COUNT, 10) || 10;
+          // 40/60 budget ratio: 40% of FULL_N slots go to synthesized memories (feedback/user),
+          // 60% to recent/explicit memories (project/reference). Override: MEMORY_SUMMARY_RATIO=0.5
+          const SUMMARY_RATIO = parseFloat(process.env.MEMORY_SUMMARY_RATIO) || 0.40;
 
-          // Section 1: top N with full description (most relevant)
-          const topFull = scored.slice(0, FULL_N).map(s => s.entry);
+          // Section 1: top N with full description — split by synthesized vs recent
+          // 40/60 budget: allocate 40% of FULL_N slots to synthesized (feedback/user),
+          // 60% to recent (project/reference). Ensures synthesized knowledge isn't crowded out.
+          const synthSlots = Math.min(Math.max(1, Math.round(FULL_N * SUMMARY_RATIO)), FULL_N - 1 || 1);
+          const recentSlots = FULL_N - synthSlots;
+          const synthEntries = scored.filter(s => s.memType === 'feedback' || s.memType === 'user');
+          const recentEntries = scored.filter(s => s.memType !== 'feedback' && s.memType !== 'user');
+          const topFull = [
+            ...synthEntries.slice(0, synthSlots).map(s => s.entry),
+            ...recentEntries.slice(0, recentSlots).map(s => s.entry),
+          ];
 
           // Section 2: titles-only for next N cwd-relevant
           const titleOnly = (e) => {
             const m = e.match(/^\[([^\]]+)\]\(([^)]+)\)/);
             return m ? `${m[1]} (${m[2]})` : e.split(' — ')[0];
           };
-          const nextTitles = scored.slice(FULL_N, FULL_N + TITLE_N).map(s => titleOnly(s.entry));
+          const topFullSet = new Set(topFull);
+          const nextTitles = scored
+            .filter(s => !topFullSet.has(s.entry))
+            .slice(0, TITLE_N)
+            .map(s => titleOnly(s.entry));
 
           // Section 3: total inventory awareness (so AI knows what else exists)
           // Categorize by file prefix convention (feedback_/project_/standard_/reference_/etc.)
           const cats = {};
           for (const s of scored) {
-            const m = s.entry.match(/\(([^)]+)\)/);
+            // Match the .md filename group specifically — earlier regex caught the
+            // FIRST paren, which fails when titles contain parens like "(renamed
+            // from foo)". Bug fixed 2026-04-29 — was producing categories like
+            // "renamed from foo:1", "session start 27K tokens:1" etc.
+            const m = s.entry.match(/\(([^()]+\.md)\)/);
             const fname = m ? m[1] : '';
             const prefix = fname.includes('_') ? fname.split('_')[0] : fname.split('-')[0].split('.')[0];
             cats[prefix] = (cats[prefix] || 0) + 1;
@@ -487,6 +581,19 @@ try {
     }
     if (ceParts.length > 0) {
       parts.push(`CE artifacts — ${ceParts.join(', ')}. Read on demand: \`docs/<type>/\`.`);
+    }
+  } catch {}
+
+  // Repo-map pointer (v3 Phase E) — cwd-gated: only when [safety-project] firmware work visible
+  // Don't inject full map (141KB). Inject pointer so model reads on demand.
+  try {
+    const repomapPath = path.join(cwd, '.ai-context', 'repomap.md');
+    const dl2Dir = path.join(cwd, '[project-dir]');
+    if (fs.existsSync(repomapPath) && fs.existsSync(dl2Dir)) {
+      const st = fs.statSync(repomapPath);
+      const sizeKb = Math.round(st.size / 1024);
+      const ageHours = Math.round((Date.now() - st.mtimeMs) / (3600 * 1000));
+      parts.push(`[safety-project] repo-map: .ai-context/repomap.md (${sizeKb}KB, age ${ageHours}h). Read when hunting a function/struct/enum by name — faster than grep+read.`);
     }
   } catch {}
 
@@ -635,7 +742,40 @@ try {
         } catch {}
       }
       if (peers.size > 0) {
-        parts.push(`⚠ Peer agent(s) active in last 5min: ${[...peers].join(', ')} — file conflicts possible, check active-sessions.jsonl`);
+        // Anti-skew rule 1: write to SIDE-CHANNEL, never to systemMessage.
+        // PreToolUse hook (peer-conflict-check.js) reads this + surfaces via permission prompt.
+        try {
+          const peerDir = path.join(os.homedir(), '.ai-context', 'instances');
+          fs.mkdirSync(peerDir, { recursive: true });
+          fs.writeFileSync(path.join(peerDir, 'active-peers.json'), JSON.stringify({
+            peers: [...peers],
+            timestamp: new Date().toISOString(),
+            session_id: input.session_id || 'unknown',
+            cwd: cwd,
+          }));
+        } catch {}
+      }
+    }
+  } catch {}
+
+  // Skill awareness injection (jcode pattern: skills as memory entries)
+  // Surface available skills so the model knows what tools exist without explicit /slash
+  try {
+    const commandsDir = path.join(os.homedir(), '.claude', 'commands');
+    if (fs.existsSync(commandsDir)) {
+      const skills = [];
+      for (const f of fs.readdirSync(commandsDir)) {
+        if (!f.endsWith('.md')) continue;
+        const name = f.replace(/\.md$/, '');
+        try {
+          const content = fs.readFileSync(path.join(commandsDir, f), 'utf8');
+          const descMatch = content.match(/description:\s*(.+)/i) || content.match(/^#\s*(.+)/m);
+          const desc = descMatch ? descMatch[1].trim().slice(0, 80) : '';
+          if (desc) skills.push(`/${name}: ${desc}`);
+        } catch {}
+      }
+      if (skills.length > 0) {
+        parts.push(`Custom skills (${skills.length}): ${skills.slice(0, 5).join(' | ')}${skills.length > 5 ? ` (+${skills.length - 5} more — /help for full list)` : ''}`);
       }
     }
   } catch {}
@@ -700,6 +840,14 @@ try {
     }
   } catch {}
 
+  // Stale-process detection — LAST in output (low priority, truncated first)
+  try {
+    const { analyze, summaryBadge } = require('./lib/stale-process-detector.js');
+    const report = analyze({ currentSid: input.session_id });
+    const badge = summaryBadge(report);
+    if (badge) parts.push(badge);
+  } catch {}
+
   if (parts.length > 0) {
     // R-CTX hard byte cap: prevent runaway SessionStart token cost.
     // Default 1500B; override via SESSION_CTX_MAX_BYTES env var.
@@ -713,6 +861,22 @@ try {
       // Buffer.toString may have trimmed trailing partial; safe.
       msg = truncated + ` ... [TRUNCATED ${parts.length} sections — /memory + Read for more]`;
     }
+    // D2 instrumentation — Discovery 2026-04-28
+    // Log per-session SessionStart byte size for per-prompt overhead measurement.
+    // Failure of this block must NOT break the loader.
+    try {
+      const logDir = path.join(os.homedir(), '.ai-context', 'instances');
+      fs.mkdirSync(logDir, { recursive: true });
+      const logPath = path.join(logDir, 'per-prompt-overhead.jsonl');
+      const entry = {
+        timestamp: new Date().toISOString(),
+        session_id: input.session_id || process.env.SESSION_ID || 'unknown',
+        cwd: cwd,
+        bytes: Buffer.byteLength(msg, 'utf8'),
+        source: 'session-context-loader',
+      };
+      fs.appendFileSync(logPath, JSON.stringify(entry) + '\n');
+    } catch { /* never break the loader */ }
     process.stdout.write(JSON.stringify({
       continue: true,
       systemMessage: msg

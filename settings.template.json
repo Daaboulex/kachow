@@ -1,5 +1,5 @@
 {
-  "_": "Template settings — run scripts/customize.mjs to populate env/allow/hooks for your stack. Add optional add-ons from settings.embedded.json.example / settings.nix.json.example / etc.",
+  "_": "Template settings — run scripts/customize.sh to populate env/allow/hooks for your stack. Add optional add-ons from settings.embedded.json.example / settings.nix.json.example / etc.",
   "env": {
     "OTEL_EXPORTER_OTLP_ENDPOINT": ""
   },
@@ -8,7 +8,6 @@
     "pr": ""
   },
   "permissions": {
-    "defaultMode": "acceptEdits",
     "allow": [
       "Read",
       "Glob",
@@ -196,7 +195,6 @@
       "Bash(git config --list*)",
       "Bash(git remote get-url*)",
       "Bash(git worktree list*)",
-      "Bash(tr *)",
       "Bash(paste *)",
       "Bash(join *)",
       "Bash(column *)",
@@ -326,12 +324,15 @@
       "Bash(ssh * rm*)",
       "Bash(ssh * sudo*)",
       "Bash(rsync * --delete*)"
-    ]
+    ],
+    "defaultMode": "acceptEdits"
   },
   "statusLine": {
     "type": "command",
     "command": "node \"$HOME/.claude/hooks/enhanced-statusline.js\""
   },
+  "effortLevel": "xhigh",
+  "editorMode": "vim",
   "hooks": {
     "SessionStart": [
       {
@@ -348,8 +349,7 @@
           {
             "type": "command",
             "command": "node \"$HOME/.claude/hooks/plugin-update-checker.js\"",
-            "timeout": 10,
-            "async": true
+            "timeout": 10
           }
         ]
       },
@@ -376,8 +376,7 @@
           {
             "type": "command",
             "command": "node \"$HOME/.claude/hooks/skill-upstream-checker.js\"",
-            "timeout": 10,
-            "async": true
+            "timeout": 10
           }
         ]
       },
@@ -395,36 +394,7 @@
           {
             "type": "command",
             "command": "node \"$HOME/.claude/hooks/validate-instructions-sync.js\"",
-            "timeout": 5,
-            "async": true
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/injection-size-monitor.js\"",
             "timeout": 5
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/gsd-check-update.js\"",
-            "timeout": 5
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/tri-tool-parity-check.js\"",
-            "timeout": 5,
-            "async": true
           }
         ]
       }
@@ -440,27 +410,6 @@
           }
         ],
         "matcher": "Write|Edit|MultiEdit|Bash|Read|Grep|Glob|TodoWrite"
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/bandaid-loop-detector.js\"",
-            "timeout": 3
-          }
-        ],
-        "matcher": "Write|Edit|MultiEdit"
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/skill-drift-guard.js\"",
-            "timeout": 3,
-            "async": true
-          }
-        ],
-        "matcher": "Bash|Edit|Write|Read|Grep|Glob"
       },
       {
         "hooks": [
@@ -552,29 +501,31 @@
         "hooks": [
           {
             "type": "command",
+            "command": "node \"$HOME/.claude/hooks/skill-drift-guard.js\"",
+            "timeout": 3
+          }
+        ],
+        "matcher": "Bash|Edit|Write|Read|Grep|Glob"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/bandaid-loop-detector.js\"",
+            "timeout": 3
+          }
+        ],
+        "matcher": "Write|Edit|MultiEdit"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
             "command": "node \"$HOME/.claude/hooks/research-lint.js\"",
             "timeout": 3
           }
         ],
         "matcher": "Write|Edit"
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/skill-completion-correlator.js\"",
-            "timeout": 5
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/rule-enforcement-check.js\"",
-            "timeout": 5
-          }
-        ]
       }
     ],
     "Notification": [
@@ -613,6 +564,21 @@
         "hooks": [
           {
             "type": "command",
+            "command": "node \"$HOME/.claude/hooks/pre-write-combined-guard.js\"",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/scrub-sentinel.js\"",
+            "timeout": 3
+          }
+        ],
+        "matcher": "Write|Edit|MultiEdit"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
             "command": "node \"$HOME/.claude/hooks/prefer-editing-nudge.js\"",
             "timeout": 3
           }
@@ -642,37 +608,12 @@
       {
         "hooks": [
           {
-            "name": "block-subagent-non-bash-writes",
             "type": "command",
             "command": "node \"$HOME/.claude/hooks/block-subagent-non-bash-writes.js\"",
             "timeout": 3
           }
         ],
         "matcher": "Write|Edit|MultiEdit|NotebookEdit|mcp__.*"
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/pre-write-combined-guard.js\"",
-            "timeout": 5
-          },
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/scrub-sentinel.js\"",
-            "timeout": 3
-          }
-        ],
-        "matcher": "Write|Edit|MultiEdit"
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/peer-conflict-check.js\"",
-            "timeout": 5
-          }
-        ]
       }
     ],
     "SubagentStart": [
@@ -693,7 +634,11 @@
             "type": "command",
             "command": "node \"$HOME/.claude/hooks/subagent-quality-gate.js\"",
             "timeout": 3
-          },
+          }
+        ]
+      },
+      {
+        "hooks": [
           {
             "type": "command",
             "command": "node \"$HOME/.claude/hooks/task-verification-gate.js\"",
@@ -787,16 +732,6 @@
             "async": true
           }
         ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/skill-auto-updater.js\"",
-            "timeout": 30,
-            "async": true
-          }
-        ]
       }
     ],
     "PreCompact": [
@@ -808,67 +743,20 @@
             "timeout": 5
           }
         ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/caveman-precompact.js\"",
-            "timeout": 5
-          }
-        ]
       }
     ],
     "UserPromptSubmit": [
       {
         "hooks": [
           {
-            "name": "slash-command-logger",
             "type": "command",
             "command": "node \"$HOME/.claude/hooks/slash-command-logger.js\"",
             "timeout": 3
           },
           {
-            "name": "prompt-clarity-check",
             "type": "command",
             "command": "node \"$HOME/.claude/hooks/prompt-clarity-check.js\"",
             "timeout": 3
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/per-prompt-overhead.js\"",
-            "timeout": 5
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/prompt-hash-logger.js\"",
-            "timeout": 5
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/prompt-item-tracker.js\"",
-            "timeout": 5
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/caveman-post-compact-reinject.js\"",
-            "timeout": 5
           }
         ]
       }
@@ -877,7 +765,6 @@
       {
         "hooks": [
           {
-            "name": "session-end-logger",
             "type": "command",
             "command": "node \"$HOME/.claude/hooks/session-end-logger.js\"",
             "timeout": 3

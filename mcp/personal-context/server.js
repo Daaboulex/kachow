@@ -73,8 +73,9 @@ function extractFrontmatter(content) {
   return { meta, body: content.slice(end + 3).trimStart() };
 }
 
-// SEC-2 (v0.2.0): caller-supplied cwd must canonicalize + fall inside
-// approved roots. Prevents crafted cwd escaping to system paths via .. segments.
+// SEC-2: caller-supplied cwd must canonicalize + fall inside approved roots.
+// Approved roots = home + explicit AI-context paths. Prevents crafted cwd
+// escaping to system paths (e.g., /root) via .. segments + existsSync probe.
 const APPROVED_CWD_ROOTS = [
   os.homedir(),
   AI_CONTEXT,
@@ -130,7 +131,9 @@ function slugifyName(name) {
     .replace(/^_+|_+$/g, '');
 }
 
-// SEC-1 (v0.2.0): get_skill name must stay inside SKILLS_DIR.
+// SEC-1: get_skill name must stay inside SKILLS_DIR. path.join accepts
+// .. segments which escape. Apply slugifyName (allow a-z0-9_-) then
+// verify containment.
 function safeSkillName(name) {
   const slug = slugifyName(name);
   if (!slug) return null;
@@ -140,9 +143,9 @@ function safeSkillName(name) {
   return target;
 }
 
-// SEC-3 (v0.2.0): MCP write tools reject when any subagent marker <30min
-// old exists. MCP server has no caller session_id, so marker-dir presence
-// is proxy. Trade-off: while any subagent runs, parent writes blocked too.
+// SEC-3: MCP write tools must reject when any subagent marker < 30min old
+// exists. MCP server has no caller session_id, so use marker-dir presence as
+// proxy. While any subagent runs, parent MCP writes are also blocked.
 const SUBAGENT_MARKER_DIR = path.join(os.homedir(), '.claude', 'cache', 'subagent-active');
 const SUBAGENT_MARKER_TTL_MS = 30 * 60 * 1000;
 
@@ -453,7 +456,7 @@ const TOOLS = {
       if (activeSubagentPresent()) {
         return { content: [{ type: 'text', text: 'mcp_write_blocked: active subagent session — parent-only writes permitted. Wait for subagent completion.' }], isError: true };
       }
-      // Enforce schema-required fields explicitly — MCP arg validation varies by client.
+      // Enforce required fields explicitly — MCP client arg validation varies.
       const missing = [];
       if (!title || typeof title !== 'string') missing.push('title');
       if (!symptom || typeof symptom !== 'string') missing.push('symptom');

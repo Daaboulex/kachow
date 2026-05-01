@@ -11,7 +11,7 @@ Configuration is deliberately split across three per-user directories. They have
 
 | Dir | Owns | Git remote | Cross-machine sync |
 |---|---|---|---|
-| `~/.ai-context/` | `AGENTS.md`, `memory/`, `skills/`, `mcp/`, `scripts/`, `VERSION` | **Your choice.** Syncthing, private git, or nothing. | User decides — `scripts/setup-private-remote.mjs` lists the common options. |
+| `~/.ai-context/` | `AGENTS.md`, `memory/`, `skills/`, `mcp/`, `scripts/`, `VERSION` | **Your choice.** Syncthing, private git, or nothing. | User decides — `scripts/setup-private-remote.sh` lists the common options. |
 | `~/.claude/` | Claude Code: `hooks/`, `commands/`, `settings.json`, `.notifications.jsonl` | Typically a private GitHub repo (`<you>/claude-global`). | Automatic via the `auto-push-global.js` Stop hook. |
 | `~/.gemini/` | Gemini CLI: `hooks/`, `commands/`, `settings.json` | Typically a private GitHub repo (`<you>/gemini-global`). | Same — `auto-push-global.js` covers both. |
 
@@ -27,19 +27,27 @@ Every Stop hook runs in a known order (see `settings.template.json → hooks.Sto
 | Hook | Scope | What it does | Cooldown |
 |---|---|---|---|
 | `auto-push-global` | `~/.claude/` + `~/.gemini/` (+ `~/.ai-context/` opt-in) | Commits locally always; pushes every 5 min or when commits pile up. | 5 min (push only) |
+| `mirror-kachow` (maintainer-only) | `~/.ai-context/` + `~/.claude/` + `~/.gemini/` | Scrubs all three into the public framework mirror, deep-verifies, commits locally. Pushes only if `KACHOW_AUTO_PUSH=1`. | 15 min |
 
-Upstream framework maintainers typically also run a private mirror hook that scrubs `~/.ai-context/` + `~/.claude/` + `~/.gemini/` into a separate release tree, deep-verifies the output, and pushes to the public repo on a cooldown. That hook is **not shipped in the public framework** — every maintainer's publishing tree is personal. The public framework ships `scripts/scrub-check.mjs` as the fast pre-push gate; publish manually with `bump-version` + `scrub-check` + `git push` as covered below.
+`mirror-kachow` fires on **any** of:
+- `~/.ai-context/` HEAD changed (e.g. you committed a rule change)
+- `~/.claude/` HEAD changed (e.g. `auto-push-global` just committed a hook edit)
+- `~/.gemini/` HEAD changed (e.g. Gemini-side hook edit)
+- `~/.ai-context/` working-tree content-hash changed (e.g. you edited `AGENTS.md` but haven't committed yet)
+
+This catches the common "I edited a hook but nothing in `~/.ai-context/` changed" case where the older trigger model would silently no-op.
 
 ## Machine scenarios
 
 ### Primary (where you maintain the framework)
 
-Day-to-day edits of `AGENTS.md`, hooks, or skills. Most of it is automatic:
+Day-to-day edits of `AGENTS.md`, hooks, or skills. Everything is automatic:
 
 1. You edit a file.
 2. Session ends (Stop hook chain fires).
 3. `auto-push-global` commits `~/.claude/` + `~/.gemini/` and pushes them to your private repos.
-4. When you want to publish a framework release, run the scrub + bump + push steps manually (see *Publishing releases* below).
+4. `mirror-kachow` sees the change, re-scrubs, updates `~/.kachow-mirror/` locally.
+5. If you've opted in (`KACHOW_AUTO_PUSH=1`), that mirror is pushed to the public repo.
 
 ### Secondary machine (another personal install)
 
@@ -59,25 +67,15 @@ If the Windows box is just using the framework and not maintaining it:
 
 If Developer Mode is off, symlinks fall back to plain file copies — you just have to re-run `bootstrap.ps1` after canonical edits. Instructions for enabling Developer Mode are printed by the script.
 
-### Publishing releases
+### Publishing releases from Windows
 
-The shipped release helpers are:
-
-- `scripts/bump-version.mjs` / `scripts/bump-version.ps1` — semver bump from Conventional Commits; writes `VERSION` + updates `CHANGELOG.md`.
-- `scripts/scrub-check.mjs` — fast pre-push scrub verifier; install as `.git/hooks/pre-push` for automatic enforcement.
-
-Typical release flow (cross-platform):
+The release pipeline (`scripts/publish.sh`, scrub gate, `bump-version.sh`) is bash-only today. On Windows you need Git-Bash (bundled with [Git for Windows](https://git-scm.com/download/win)) or WSL. Run:
 
 ```bash
-node scripts/bump-version.mjs          # or .ps1 on Windows
-node scripts/scrub-check.mjs           # fails loud on hard findings
-git add VERSION CHANGELOG.md
-git commit -m "release: $(cat VERSION)"
-git tag "v$(cat VERSION)"
-git push --follow-tags origin main
+bash scripts/publish.sh --set-version 0.2.0
 ```
 
-A Node-native single-command publish pipeline is on the roadmap.
+A Node-native publish pipeline is on the v0.2.0 roadmap.
 
 ## Offline and conflict handling
 
@@ -90,32 +88,18 @@ A Node-native single-command publish pipeline is on the roadmap.
 Everything is in git. If a release introduces a bad hook:
 
 ```bash
-cd <your-public-mirror-working-copy>
+cd ~/.kachow-mirror     # or wherever your mirror lives
 git log --oneline       # find the bad commit
 git revert <sha>        # make a clean revert commit
 git push origin main
 ```
 
-Users running `auto-pull-global` pick up the revert on the next session start. Because the scrub pipeline is deterministic, re-running `bump-version` + `scrub-check` from a known-good source state produces the same output as a fresh clone.
-
-## Branch protection
-
-Branch protection on `main` is configured by `scripts/setup-branch-protection.sh`.
-Idempotent — safe to re-run.
-
-```bash
-./scripts/setup-branch-protection.sh OWNER/REPO
-```
-
-Required status checks: CI on ubuntu+macos+windows. Force-pushes blocked. Linear
-history required. Conversation resolution required.
-
-Run once after creating your fork's public repo.
+Users running `auto-pull-global` pick up the revert on the next session start. Because the scrub pipeline is deterministic, re-running `publish.sh --set-version <patch>` from a known-good source state produces the same output as a fresh clone.
 
 ## Quick health check
 
 ```bash
-node scripts/health-check.mjs    # Linux / macOS / Git-Bash
+bash scripts/health-check.sh    # Linux / macOS / Git-Bash
 pwsh scripts/health-check.ps1   # Windows PowerShell
 ```
 

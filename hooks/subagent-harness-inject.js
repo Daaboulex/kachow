@@ -27,10 +27,15 @@ try {
     try {
       const markerDir = path.join(os.homedir(), '.claude', 'cache', 'subagent-active');
       fs.mkdirSync(markerDir, { recursive: true });
+      // Key by session_id + pid to avoid blocking parent session.
+      // Old key was session_id alone — parent's own git commands got blocked
+      // when subagent marker wasn't cleaned up by SubagentStop.
+      const markerKey = `${sessionId}-${process.pid}`;
       fs.writeFileSync(
-        path.join(markerDir, `${sessionId}.json`),
+        path.join(markerDir, `${markerKey}.json`),
         JSON.stringify({
           session_id: sessionId,
+          marker_key: markerKey,
           agent_type: agentType,
           ts: new Date().toISOString(),
           pid: process.pid,

@@ -58,7 +58,7 @@ description: One sentence explaining WHEN to activate it — specific enough tha
 
 ## Handling per-AI differences
 
-kachow symlinks `~/.ai-context/skills/<name>/` into each tool's skill directory. The SAME file serves every tool. If a tool needs a slightly different body, add it as additional sections under per-tool headings inside the SKILL.md:
+**For now (v0.1.0):** kachow symlinks `~/.ai-context/skills/<name>/` into each tool's skill directory. The SAME file serves every tool. If a tool needs a slightly different body, you add it as additional sections under per-tool headings inside the SKILL.md:
 
 ```markdown
 ## Claude-specific notes
@@ -70,13 +70,13 @@ Use the `Skill` tool with argument `{}`...
 When invoked via `activate_skill`, the tool ID is ...
 ```
 
-**Planned:** per-AI skill adapters. `skills/<name>/SKILL.md` stays the source of truth, and `install-adapters` generates:
+**Planned for v0.2.0:** per-AI skill adapters. `skills/<name>/SKILL.md` stays the source of truth, and `install-adapters.sh` generates:
 
 - `~/.claude/skills/<name>/SKILL.md` — Claude-formatted
 - `~/.gemini/skills/<name>/SKILL.md` — Gemini-formatted (frontmatter translated via `lib/platform-map.js`)
 - `.cursor/rules/<name>.mdc` — Cursor-formatted (if a `.cursor/` dir exists in the project)
 
-Until adapters ship, use the per-tool heading convention above when a skill needs to behave differently across tools.
+Until then, if you author a skill that behaves differently across tools, use the per-tool heading convention above.
 
 ## Validating a skill
 
@@ -119,7 +119,7 @@ description: One concrete sentence about when to activate this skill.
 ...
 EOF
 
-node scripts/bootstrap.mjs       # re-runs install-adapters to symlink into all tools
+bash scripts/bootstrap.sh       # re-runs install-adapters to symlink into all tools
 ```
 
 The new skill lands in every installed tool's skill directory on next session start.

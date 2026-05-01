@@ -30,9 +30,43 @@ const PUSH_COOLDOWN_MS = 5 * 60 * 1000;  // 5 minutes between pushes
 // Temp file cleanup (session-start-combined.js)
 const TEMP_FILE_STALE_MS = 24 * 60 * 60 * 1000;  // /tmp files considered stale after 24 hours
 
+// Tool-call p95 regression detector (meta-system-stop.js / detectors.js R18)
+const TOOL_CALL_P95_CEILING_MS = 200;
+
 // Skill regression detector (meta-system-stop.js)
 const SKILL_REGRESSION_DROP_THRESHOLD = 0.5;  // 50% frequency drop flags regression
 const SKILL_MIN_INVOCATIONS = 5;               // Skip skills with <5 total invocations
+const MIN_SESSIONS_PER_WINDOW = 5;             // Skip analysis if either window has <5 sessions
+const SKILL_REGRESSION_EXEMPT = new Set([
+  'wrap-up', 'superpowers:brainstorming', 'handoff', 'reflect',
+  'consolidate-memory', 'verify-sync'
+]);
+
+// Agent model selection policy (rule-enforcement-check.js + observability)
+// Maps task categories to recommended models. Used by:
+//   - rule-enforcement-check.js: warns when dispatch doesn't match policy
+//   - observability-logger.js: tracks model usage per category for cost analysis
+// Rationale from AGENTS.md § Agent Dispatch Rules + Hermes auxiliary-model pattern.
+const MODEL_POLICY = {
+  research:       'sonnet',   // WebFetch/WebSearch — haiku hallucinates ~20% web claims
+  implementation: 'sonnet',   // Code generation
+  review:         'haiku',    // File reads, grep, spot-checks — 5x cheaper
+  architecture:   'opus',     // Planning, design decisions
+  telemetry:      'haiku',    // Background logging, consolidation
+  verification:   'sonnet',   // Blind verification agents
+};
+
+// Model cost multipliers (relative to haiku=1) for cost tracking
+const MODEL_COST_MULTIPLIER = {
+  haiku:  1,
+  sonnet: 5,
+  opus:   25,
+};
+
+// System overhead accounting (jcode pattern: reserve tokens for system prompt + tools)
+// Estimated: ~8k system prompt + ~10k for tool definitions = ~18k tokens
+// Used by context-pressure-enforce.js to account for overhead in threshold calculations
+const SYSTEM_OVERHEAD_TOKENS = 18000;
 
 module.exports = {
   DREAM_COOLDOWN_MS,
@@ -48,6 +82,12 @@ module.exports = {
   REFLECT_COOLDOWN_MS,
   PUSH_COOLDOWN_MS,
   TEMP_FILE_STALE_MS,
+  TOOL_CALL_P95_CEILING_MS,
   SKILL_REGRESSION_DROP_THRESHOLD,
   SKILL_MIN_INVOCATIONS,
+  MIN_SESSIONS_PER_WINDOW,
+  SKILL_REGRESSION_EXEMPT,
+  MODEL_POLICY,
+  MODEL_COST_MULTIPLIER,
+  SYSTEM_OVERHEAD_TOKENS,
 };
