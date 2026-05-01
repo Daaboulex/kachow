@@ -109,6 +109,36 @@
             "timeout": 5000
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/injection-size-monitor.js\"",
+            "name": "injection-size-monitor",
+            "timeout": 5000
+          }
+        ],
+        "matcher": ""
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/tri-tool-parity-check.js\"",
+            "name": "tri-tool-parity-check",
+            "timeout": 5000
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/handoff-triage-gate.js\"",
+            "timeout": 5000
+          }
+        ]
       }
     ],
     "BeforeTool": [
@@ -192,6 +222,18 @@
           }
         ],
         "matcher": "write_file|replace|mcp__.*"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/peer-conflict-check.js\"",
+            "name": "peer-conflict-check",
+            "timeout": 5000,
+            "async": true
+          }
+        ],
+        "matcher": "write_file|replace|run_shell_command"
       }
     ],
     "SessionEnd": [
@@ -263,6 +305,15 @@
             "type": "command",
             "command": "node \"$HOME/.gemini/hooks/session-end-logger.js\"",
             "timeout": 3000
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/handoff-session-end.js\"",
+            "timeout": 10000
           }
         ]
       }
@@ -387,6 +438,41 @@
           }
         ],
         "matcher": "write_file|replace"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/skill-completion-correlator.js\"",
+            "name": "skill-completion-correlator",
+            "timeout": 5000,
+            "async": true
+          }
+        ],
+        "matcher": ""
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/rule-enforcement-check.js\"",
+            "name": "rule-enforcement-check",
+            "timeout": 5000,
+            "async": true
+          }
+        ],
+        "matcher": "activate_skill"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/handoff-auto-save.js\"",
+            "timeout": 5000,
+            "async": true
+          }
+        ],
+        "matcher": "write_file|replace|run_shell_command"
       }
     ],
     "Notification": [

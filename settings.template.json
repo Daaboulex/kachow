@@ -397,6 +397,35 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/injection-size-monitor.js\"",
+            "timeout": 5
+          }
+        ],
+        "matcher": ""
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/tri-tool-parity-check.js\"",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/handoff-triage-gate.js\"",
+            "timeout": 5
+          }
+        ],
+        "matcher": ""
       }
     ],
     "PostToolUse": [
@@ -526,6 +555,39 @@
           }
         ],
         "matcher": "Write|Edit"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/skill-completion-correlator.js\"",
+            "timeout": 5,
+            "async": true
+          }
+        ],
+        "matcher": ""
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/rule-enforcement-check.js\"",
+            "timeout": 5,
+            "async": true
+          }
+        ],
+        "matcher": "Agent"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/handoff-auto-save.js\"",
+            "timeout": 5,
+            "async": true
+          }
+        ],
+        "matcher": "Write|Edit|MultiEdit|Bash|TaskCreate|TaskUpdate"
       }
     ],
     "Notification": [
@@ -614,6 +676,17 @@
           }
         ],
         "matcher": "Write|Edit|MultiEdit|NotebookEdit|mcp__.*"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/peer-conflict-check.js\"",
+            "timeout": 5,
+            "async": true
+          }
+        ],
+        "matcher": "Write|Edit|MultiEdit|Bash"
       }
     ],
     "SubagentStart": [
@@ -643,6 +716,16 @@
             "type": "command",
             "command": "node \"$HOME/.claude/hooks/task-verification-gate.js\"",
             "timeout": 3
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/subagent-claim-logger.js\"",
+            "timeout": 3,
+            "async": true
           }
         ]
       }
@@ -732,6 +815,16 @@
             "async": true
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/handoff-session-end.js\"",
+            "timeout": 10
+          }
+        ],
+        "matcher": ""
       }
     ],
     "PreCompact": [
@@ -743,6 +836,40 @@
             "timeout": 5
           }
         ]
+      }
+    ],
+    "PostCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/memory-post-compact.js\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "CwdChanged": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/cwd-changed-watcher.js\"",
+            "timeout": 3
+          }
+        ]
+      }
+    ],
+    "FileChanged": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/file-changed-notify.js\"",
+            "timeout": 3
+          }
+        ],
+        "matcher": "CLAUDE.md|AGENTS.md|GEMINI.md|.envrc"
       }
     ],
     "UserPromptSubmit": [
@@ -759,6 +886,36 @@
             "timeout": 3
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/per-prompt-overhead.js\"",
+            "timeout": 5
+          }
+        ],
+        "matcher": ""
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/prompt-hash-logger.js\"",
+            "timeout": 5
+          }
+        ],
+        "matcher": ""
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/prompt-item-tracker.js\"",
+            "timeout": 5
+          }
+        ],
+        "matcher": ""
       }
     ],
     "SessionEnd": [
