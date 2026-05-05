@@ -79,7 +79,19 @@ try {
       // If content actually conflicts, warn user to resolve manually.
       const merged = run(`git merge origin/${branch} --no-edit -m "chore: auto-merge remote changes" --no-gpg-sign`, dir);
       if (merged !== null) {
-        pullOk = true;
+        // Credential guard on pull merge path (mirrors auto-push ADV-005 fix)
+        const pullMergeFiles = run('git diff --name-only HEAD~1', dir) || '';
+        const pullCredFiles = pullMergeFiles.split('\n').filter(line => {
+          const fname = line.trim().split('/').pop();
+          return /^(\.credentials|oauth_creds|auth|\.env|\.secret|api[_-]?key|.*\.pem|id_rsa|kubeconfig)/i.test(fname);
+        });
+        if (pullCredFiles.length > 0) {
+          run('git reset --hard HEAD~1', dir);
+          messages.push(`${label}: PULL MERGE REVERTED — credential file in remote: ${pullCredFiles.join(', ')}`);
+          pullOk = false;
+        } else {
+          pullOk = true;
+        }
       } else {
         // Real content conflict — abort, warn user (don't auto-resolve)
         run('git merge --abort', dir);

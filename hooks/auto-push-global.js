@@ -137,7 +137,12 @@ function autoPush(dir, label) {
         return /^(\.credentials|oauth_creds|auth|\.env|\.secret|api[_-]?key|.*\.pem|id_rsa|kubeconfig)/i.test(fname);
       });
       if (mergedCredFiles.length > 0) {
+        // Stash any uncommitted work before reverting merge (Q1 safety)
+        const stashResult = run('git stash --include-untracked', dir);
         run('git reset --hard HEAD~1', dir);
+        if (stashResult && !stashResult.includes('No local changes')) {
+          run('git stash pop', dir);
+        }
         warnings.push(`${label}: MERGE REVERTED — credential file detected in remote: ${mergedCredFiles.join(', ')}. Resolve manually.`);
         return;
       }
