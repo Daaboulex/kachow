@@ -199,6 +199,17 @@ try {
       messages.push(`[self-improvement] ${enqueued} new finding(s); queue: ${summary.BLOCKER} BLOCKER, ${summary.SUGGEST} SUGGEST, ${summary.OBSERVE} OBSERVE. Run /review-improvements.`);
     }
     logEvent(cwd, { type: 'self_improvement_scan_run', source: 'meta-system-stop', meta: { findings_count: allFindings.length, enqueued_count: enqueued, ...summary } });
+
+    // Auto-resolve OBSERVE entries whose signal disappeared (14d+ age gate).
+    // MUST run inside gated path — needs allFindings for comparison.
+    // Running on every Stop would mass-resolve because allFindings would be empty.
+    try {
+      const activeIds = new Set(allFindings.map(f => queue.hashId(f.rule, f.target?.path || f.target?.type || 'global', '')));
+      const autoResolved = queue.autoResolveStaleObserve((id) => activeIds.has(id));
+      if (autoResolved > 0) {
+        logEvent(cwd, { type: 'self_improvement_auto_resolved', source: 'meta-system-stop', meta: { count: autoResolved } });
+      }
+    } catch {}
   }
 } catch (e) {
   try { process.stderr.write(`meta-system-stop self-improvement: ${e.message}\n`); } catch {}

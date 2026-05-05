@@ -251,6 +251,7 @@ module.exports = {
   resolve,
   markSurfaced,
   autoResolveStaleObserve,
+  hashId: _hashId,
   PENDING_PATH: PENDING,
   RESOLVED_PATH: RESOLVED,
   FEEDBACK_PATH: FEEDBACK,
