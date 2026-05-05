@@ -34,9 +34,9 @@ const codexDir = path.join(home, '.codex');
 const aiContextDir = path.join(home, '.ai-context');
 const lastPush = path.join(claudeDir, '.auto-push-last');
 const PUSH_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes (push only, not commit)
-// ai-context auto-commit/push: ON by default. Syncthing handles real-time sync;
-// git provides version history + GitHub backup. Merge strategy (-X theirs) prevents
-// divergence when both machines push auto-sync commits.
+// ai-context auto-commit/push: ON by default. Syncthing handles real-time sync
+// (working tree only, .git excluded). Git provides version history + GitHub backup.
+// ff-only merge preferred; real conflicts warn user (never auto-resolved).
 const AI_CONTEXT_AUTOCOMMIT = process.env.AI_CONTEXT_AUTOCOMMIT !== '0';
 const AI_CONTEXT_AUTOPUSH = process.env.AI_CONTEXT_AUTOPUSH !== '0';
 
@@ -128,6 +128,17 @@ function autoPush(dir, label) {
       if (merged === null) {
         run('git merge --abort', dir);
         warnings.push(`${label}: committed locally but push skipped — real content conflict with remote. Run: cd ${dir} && git pull origin ${branch} (resolve manually to preserve both edits)`);
+        return;
+      }
+      // ADV-005: credential guard on merge path — check if merge brought in credential files
+      const postMergeStatus = run('git diff --name-only HEAD~1', dir) || '';
+      const mergedCredFiles = postMergeStatus.split('\n').filter(line => {
+        const fname = line.trim().split('/').pop();
+        return /^(\.credentials|oauth_creds|auth|\.env|\.secret|api[_-]?key|.*\.pem|id_rsa|kubeconfig)/i.test(fname);
+      });
+      if (mergedCredFiles.length > 0) {
+        run('git reset --hard HEAD~1', dir);
+        warnings.push(`${label}: MERGE REVERTED — credential file detected in remote: ${mergedCredFiles.join(', ')}. Resolve manually.`);
         return;
       }
     }

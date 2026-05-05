@@ -78,7 +78,7 @@ try {
       // NEVER use -X theirs — it silently drops local user edits.
       // If content actually conflicts, warn user to resolve manually.
       const merged = run(`git merge origin/${branch} --no-edit -m "chore: auto-merge remote changes" --no-gpg-sign`, dir);
-      if (merged !== null || merged === '') {
+      if (merged !== null) {
         pullOk = true;
       } else {
         // Real content conflict — abort, warn user (don't auto-resolve)
