@@ -834,6 +834,15 @@
           }
         ],
         "matcher": ""
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/session-end-logger.js\"",
+            "timeout": 3
+          }
+        ]
       }
     ],
     "PreCompact": [
@@ -936,17 +945,6 @@
           }
         ],
         "matcher": ""
-      }
-    ],
-    "SessionEnd": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/session-end-logger.js\"",
-            "timeout": 3
-          }
-        ]
       }
     ]
   }
