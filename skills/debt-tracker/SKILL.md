@@ -1,6 +1,7 @@
 ---
 name: debt-tracker
 description: Track known technical debt, bugs, and blocked work per repo via DEBT.md. Use when you identify a bug you can't fix now, a hack that needs revisiting, or work blocked waiting on hardware/info. Prevents drift — per the project pattern, bugs in session transcripts get lost; DEBT.md keeps them visible.
+allowed-tools: Read, Write, Edit, Grep, Glob, mcp__personal-context__add_debt, mcp__personal-context__read_debt
 ---
 
 # DEBT Tracker

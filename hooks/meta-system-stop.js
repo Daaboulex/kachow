@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(__dirname + '/lib/safety-timeout.js');
 // Stop hook: meta-system detectors (skill regression + research scheduler)
 // Phase 8 REQ-08-02, REQ-08-03
 // Advisory only — writes findings to semantic files, never auto-modifies.

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(__dirname + '/lib/safety-timeout.js');
 // Combined SessionStart hook: merges 7 lightweight hooks into 1 process
 // Replaces: reflect-enabled, consolidate-memory-session-counter, stale-task-cleanup,
 //           sync-hook-versions, ensure-portable-memory, sync-memory-dirs, session-catchup

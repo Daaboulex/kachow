@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 require(__dirname + "/lib/emit-simple-timing.js").start(__filename);
+require(__dirname + '/lib/safety-timeout.js');
+const { decayConfidence } = require('./lib/confidence-decay.js');
 // SessionStart hook: Auto-display AI-tasks + AI-progress + git status summary.
 // Replaces LLM spending turns reading these files manually at session start.
 // Outputs a systemMessage with the key state so the LLM has it immediately.
@@ -347,17 +349,24 @@ try {
           const getTypeInfo = (entry) => {
             try {
               const m = entry.match(/\(([^)]+\.md)\)/);
-              if (!m) return { boost: 0, memType: 'unknown' };
+              if (!m) return { boost: 0, memType: 'unknown', decayedConfidence: null };
               const fp = path.join(path.dirname(memPath), m[1]);
-              if (!fs.existsSync(fp)) return { boost: 0, memType: 'unknown' };
-              const head = fs.readFileSync(fp, 'utf8').split('\n').slice(0, 10).join('\n');
+              if (!fs.existsSync(fp)) return { boost: 0, memType: 'unknown', decayedConfidence: null };
+              const head = fs.readFileSync(fp, 'utf8').split('\n').slice(0, 20).join('\n');
               const typeMatch = head.match(/^type:\s*(\w+)/im);
               const memType = typeMatch ? typeMatch[1] : 'unknown';
               const typeBoost = TYPE_BOOST[memType] || 0;
               const obsMatch = head.match(/^observation_level:\s*(\w+)/im);
               const obsBoost = obsMatch ? (OBS_LEVEL_BOOST[obsMatch[1]] || 0) : 0;
-              return { boost: typeBoost + obsBoost, memType };
-            } catch { return { boost: 0, memType: 'unknown' }; }
+              const confMatch = head.match(/^confidence:\s*([0-9.]+)/im);
+              const accessMatch = head.match(/^last_accessed:\s*(\S+)/im);
+              const rawConf = confMatch ? parseFloat(confMatch[1]) : null;
+              const rawAccess = accessMatch ? accessMatch[1] : null;
+              const dc = (rawConf !== null || rawAccess !== null)
+                ? decayConfidence(rawConf !== null ? rawConf : 1.0, rawAccess)
+                : null;
+              return { boost: typeBoost + obsBoost, memType, decayedConfidence: dc };
+            } catch { return { boost: 0, memType: 'unknown', decayedConfidence: null }; }
           };
           const scored = allEntries.map(e => {
             const eTokens = tokenize(e);
@@ -365,9 +374,18 @@ try {
             for (const t of cwdTokens) if (eTokens.has(t)) score++;
             const info = getTypeInfo(e);
             score += info.boost;
-            return { entry: e, score, memType: info.memType };
+            return { entry: e, score, memType: info.memType, decayedConfidence: info.decayedConfidence };
           });
-          scored.sort((a, b) => (b.score - a.score) || a.entry.localeCompare(b.entry));
+          // Primary sort: decayed confidence descending (entries with frontmatter confidence field).
+          // Fallback for entries without confidence/last_accessed: sort by existing cwd+type score.
+          scored.sort((a, b) => {
+            const aHasDc = a.decayedConfidence !== null;
+            const bHasDc = b.decayedConfidence !== null;
+            if (aHasDc && bHasDc) return b.decayedConfidence - a.decayedConfidence;
+            if (aHasDc) return -1;
+            if (bHasDc) return 1;
+            return (b.score - a.score) || a.entry.localeCompare(b.entry);
+          });
 
           // ── Awareness-first model (Rule M-AWARE) ──
           // NEVER drop content silently. AI must know:

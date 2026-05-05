@@ -5,6 +5,7 @@
 // Cross-platform (Linux, macOS, Windows)
 
 const { detectTool } = require('./lib/tool-detect.js');
+require(__dirname + '/lib/safety-timeout.js');
 const isGemini = detectTool() === 'gemini';
 
 const TIMER_START = process.hrtime.bigint();

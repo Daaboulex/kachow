@@ -842,9 +842,20 @@
           {
             "type": "command",
             "command": "node \"$HOME/.claude/hooks/reflect-precompact.js\"",
+            "timeout": 10
+          }
+        ],
+        "matcher": "manual"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/reflect-precompact.js\"",
             "timeout": 5
           }
-        ]
+        ],
+        "matcher": "auto"
       }
     ],
     "PostCompact": [

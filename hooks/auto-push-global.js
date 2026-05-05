@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(__dirname + '/lib/safety-timeout.js');
 // Stop hook: auto-commit and push ~/.claude/ and ~/.gemini/ to GitHub.
 // ALWAYS commits locally (no cooldown for commits — data safety first).
 // Push has a 5-minute cooldown to prevent network spam.
