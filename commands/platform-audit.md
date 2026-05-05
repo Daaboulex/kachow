@@ -155,7 +155,7 @@ done
 Expected differences (NOT bugs):
 - `claude-gemini-json-sync.js` — different pattern order per platform
 - Claude-only: sync-gemini-md, sync-gemini-skills, reflect-stop, reflect-stop-failure, validate-instructions-sync, plugin-update-checker, enhanced-statusline, sync-hook-versions
-- Gemini-only: sync-claude-md, sync-claude-skills, reflect-session-end
+- Gemini-only: sync-claude-md, sync-claude-skills, reflect-stop
 
 Any OTHER shared hook that differs = bug. Fix by copying Claude version to Gemini.
 

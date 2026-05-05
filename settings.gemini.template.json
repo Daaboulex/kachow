@@ -20,8 +20,9 @@
   "env": {
     "OTEL_EXPORTER_OTLP_ENDPOINT": ""
   },
-  "experimental": {
-    "enableAgents": true
+  "hooksConfig": {
+    "enabled": true,
+    "notifications": false
   },
   "telemetry": {
     "enabled": false,
@@ -254,7 +255,7 @@
           {
             "name": "auto-reflect",
             "type": "command",
-            "command": "node \"$HOME/.gemini/hooks/reflect-session-end.js\"",
+            "command": "node \"$HOME/.gemini/hooks/reflect-stop.js\"",
             "timeout": 5000
           },
           {
@@ -399,17 +400,6 @@
       {
         "hooks": [
           {
-            "name": "post-commit-sync-reminder",
-            "type": "command",
-            "command": "node \"$HOME/.gemini/hooks/post-commit-sync-reminder.js\"",
-            "timeout": 3000
-          }
-        ],
-        "matcher": "run_shell_command"
-      },
-      {
-        "hooks": [
-          {
             "name": "task-verification-gate",
             "type": "command",
             "command": "node \"$HOME/.gemini/hooks/task-verification-gate.js\"",
@@ -529,6 +519,16 @@
           }
         ],
         "matcher": "write_file|replace|run_shell_command"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/post-write-sync.js\"",
+            "timeout": 5000
+          }
+        ],
+        "matcher": "write_file|replace"
       }
     ],
     "Notification": [
@@ -547,9 +547,9 @@
       {
         "hooks": [
           {
-            "name": "subagent-harness-inject",
+            "name": "sub[agent-skill]-inject",
             "type": "command",
-            "command": "node \"$HOME/.gemini/hooks/subagent-harness-inject.js\"",
+            "command": "node \"$HOME/.gemini/hooks/sub[agent-skill]-inject.js\"",
             "timeout": 3000
           }
         ]
@@ -563,6 +563,15 @@
             "type": "command",
             "command": "node \"$HOME/.gemini/hooks/subagent-quality-gate.js\"",
             "timeout": 3000
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/subagent-claim-logger.js\"",
+            "timeout": 5000
           }
         ]
       }

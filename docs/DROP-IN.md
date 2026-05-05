@@ -38,7 +38,7 @@ The framework's `customize.sh` writes the user section once during first install
 ~/.claude/hooks/lib/       ← shared libs (both use these)
 ```
 
-Framework hooks are named generically (`validate-symlinks.js`, `memory-rotate.js`, etc.). If you want your own hook that shouldn't be overwritten by framework updates, name it with a `user-` prefix:
+Framework hooks are named generically (`bandaid-loop-detector.js`, `memory-rotate.js`, etc.). If you want your own hook that shouldn't be overwritten by framework updates, name it with a `user-` prefix:
 
 ```
 ~/.claude/hooks/user-my-custom-hook.js

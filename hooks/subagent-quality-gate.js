@@ -3,7 +3,7 @@ require(__dirname + "/lib/emit-simple-timing.js").start(__filename);
 // SubagentStop hook: Quality gate — check subagent output before accepting.
 // Warns if subagent touched safety-critical files or produced empty output.
 // Also removes the subagent-active marker file (counterpart to the write in
-// subagent-harness-inject.js). Does NOT block — injects systemMessage.
+// sub[agent-skill]-inject.js). Does NOT block — injects systemMessage.
 
 const fs = require('fs');
 const path = require('path');
@@ -20,7 +20,7 @@ try {
   const sessionId = input.session_id || '';
 
   // ── Remove subagent-active marker ──
-  // Counterpart to marker creation in subagent-harness-inject.js.
+  // Counterpart to marker creation in sub[agent-skill]-inject.js.
   // Markers keyed by session_id-pid. Clean up both new format and legacy format.
   if (sessionId) {
     try {

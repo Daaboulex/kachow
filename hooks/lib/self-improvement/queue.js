@@ -1,6 +1,6 @@
 // queue.js — self-improvement queue
 // Append-only JSONL. Dedup by id (sha1 of rule+target+evidence_key).
-// Spec: ~/Documents/.superpowers/specs/2026-04-14-self-improvement-handoff.md
+// Spec: [spec-ref] 2026-04-14-self-improvement-handoff.md
 
 const fs = require('fs');
 const path = require('path');

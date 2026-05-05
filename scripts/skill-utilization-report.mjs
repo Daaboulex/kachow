@@ -68,9 +68,9 @@ function classify(skillPath) {
   //   .claude/plugins/marketplaces/<mp>/plugins/<plugin>/skills/<name>/.cursor/skills/<name>/SKILL.md  — IDE mirror
   //   .claude/plugins/marketplaces/<mp>/<plugin>/<ver>/skills/<name>/SKILL.md — cache
   //   .gemini/extensions/<ext>/skills/<name>/SKILL.md        extension-shipped
-  //   .claude/plugins/marketplaces/<mp>/plugins/<plugin>/agent-harness/<...>/skills/SKILL.md — scaffold
+  //   .claude/plugins/marketplaces/<mp>/plugins/<plugin>/[agent-skill]/<...>/skills/SKILL.md — scaffold
 
-  if (parts.includes('agent-harness')) {
+  if (parts.includes('[agent-skill]')) {
     return { source: 'scaffold', name, logical_id: null, mirror_of: null, path: skillPath, skip: true };
   }
 
@@ -282,7 +282,7 @@ console.log(`| Total invocations | ${reportJson.counts.total_invocations} |`);
 console.log(`| Utilization | **${reportJson.utilization_pct}%** |`);
 console.log('');
 console.log('Skipped (not invocable):');
-console.log(`- Scaffold SKILL.md (agent-harness internals): ${reportJson.counts.scaffold_skipped}`);
+console.log(`- Scaffold SKILL.md ([agent-skill] internals): ${reportJson.counts.scaffold_skipped}`);
 console.log(`- IDE-mirror SKILL.md (.cursor/.gemini/.opencode/ etc.): ${reportJson.counts.ide_mirror_skipped}`);
 console.log(`- Plugin-cache SKILL.md (duplicate of marketplace version): ${reportJson.counts.plugin_cache_skipped}`);
 console.log('');

@@ -82,7 +82,7 @@ try {
         }
       } catch {}
       if (ruleNames.length > 0) {
-        parts.push(`Rules (${ruleNames.length}): ${ruleNames.join(' · ')}`);
+        parts.push(`Rules: ${ruleNames.length} active (feedback memories). Run \`/memory\` to search.`);
         break;
       }
     }
@@ -142,76 +142,6 @@ try {
       break;
     }
   }
-
-  // Handoff retention (updated 2026-04-16): prune BOTH per-session variants AND
-  // stale unsuffixed pointers. Pointer gets archived if >14d old — fixes the
-  // "stale handoff never cleared" bug where pointer files 9-16d old kept showing
-  // up in session-context banners forever.
-  //
-  // (Prior bug: explicit "NEVER touch the unsuffixed pointer" rule caused nix
-  // pointer to go 9d stale, linux-corecycler 16d stale. Users had to manually
-  // clean. Fixed in Wave 2.1 of unified-tracking migration.)
-  try {
-    const retentionDirs = [cwd, path.join(cwd, '.ai-context'), path.join(cwd, '.claude')];
-    const versionedAgeCutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
-    const pointerAgeCutoff = Date.now() - 14 * 24 * 60 * 60 * 1000;
-    const KEEP_LAST = 3;
-    const ARCHIVE_MAX = 20;
-
-    for (const d of retentionDirs) {
-      if (!fs.existsSync(d)) continue;
-      const archiveDir = path.join(d, 'handoff-archive');
-
-      // ── (A) Versioned variants: keep 3 newest, archive rest if >7d ──
-      let versioned = [];
-      try {
-        for (const f of fs.readdirSync(d)) {
-          if (!f.startsWith('.session-handoff-') || !f.endsWith('.md')) continue;
-          const fp = path.join(d, f);
-          try { versioned.push({ path: fp, name: f, mtime: fs.statSync(fp).mtimeMs }); } catch {}
-        }
-      } catch { continue; }
-      versioned.sort((a, b) => b.mtime - a.mtime);
-      if (versioned.length > KEEP_LAST) {
-        const stale = versioned.slice(KEEP_LAST).filter(e => e.mtime < versionedAgeCutoff);
-        if (stale.length > 0) {
-          try { fs.mkdirSync(archiveDir, { recursive: true }); } catch {}
-          for (const s of stale) {
-            try { fs.renameSync(s.path, path.join(archiveDir, s.name)); } catch {}
-          }
-        }
-      }
-
-      // ── (B) Unsuffixed pointer: archive if >14d stale ──
-      // The .session-handoff.md pointer represents the always-latest handoff.
-      // If >14d with no refresh, it's stale — work was abandoned or superseded.
-      const pointerPath = path.join(d, '.session-handoff.md');
-      if (fs.existsSync(pointerPath)) {
-        try {
-          const pmtime = fs.statSync(pointerPath).mtimeMs;
-          if (pmtime < pointerAgeCutoff) {
-            try { fs.mkdirSync(archiveDir, { recursive: true }); } catch {}
-            const ts = new Date(pmtime).toISOString().replace(/[:.]/g, '-').slice(0, 19);
-            const archiveName = `.session-handoff-stale-pointer-${ts}.md`;
-            fs.renameSync(pointerPath, path.join(archiveDir, archiveName));
-          }
-        } catch {}
-      }
-
-      // ── (C) Archive size cap: keep newest 20, remove older ──
-      if (fs.existsSync(archiveDir)) {
-        try {
-          const archived = fs.readdirSync(archiveDir)
-            .filter(f => f.startsWith('.session-handoff') && f.endsWith('.md'))
-            .map(f => ({ path: path.join(archiveDir, f), mtime: fs.statSync(path.join(archiveDir, f)).mtimeMs }))
-            .sort((a, b) => b.mtime - a.mtime);
-          for (const old of archived.slice(ARCHIVE_MAX)) {
-            try { fs.unlinkSync(old.path); } catch {}
-          }
-        } catch {}
-      }
-    }
-  } catch {}
 
   // Concurrent-session handoff support: scan ALL .session-handoff-*.md files in known
   // locations + the unsuffixed pointer. Show top 2 most recent (last 24h) so multiple

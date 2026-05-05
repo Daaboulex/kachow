@@ -3,12 +3,13 @@ require(__dirname + "/lib/emit-simple-timing.js").start(__filename);
 // PostToolUse hook: Enforces context pressure thresholds documented in CLAUDE.md.
 //
 // gsd-context-monitor.js WARNS at 35%/25% remaining. This hook ENFORCES
-// at 30%/20% remaining (70%/80% used), matching the rule:
-//   "At 70% context: run /handoff (soft-pause, suggest save)"
-//   "At 80% context: stop unconditionally (hard-block, require save)"
+// at 20%/15%/8% remaining (80%/85%/92% used), matching the rule:
+//   "At 80% context: advance notice (early warn)"
+//   "At 85% context: run /handoff (soft-pause, suggest save)"
+//   "At 92% context: stop unconditionally (hard-block, require save)"
 //
-// Soft-pause (30% remaining): exit 0 with systemMessage strongly urging /handoff.
-// Hard-block (20% remaining): exit 2 with stderr — blocks the tool call entirely.
+// Soft-pause (15% remaining): exit 0 with systemMessage strongly urging /handoff.
+// Hard-block (8% remaining): exit 2 with stderr — blocks the tool call entirely.
 //
 // Checks if handoff was saved within last 10 min to avoid spamming after save.
 // Disable: CLAUDE_SKIP_CONTEXT_ENFORCE=1 env var.
@@ -80,8 +81,8 @@ try {
   if (remaining <= HARD_THRESHOLD) {
     // HARD BLOCK — exit 2 stops the tool call, stderr shown to agent + user
     const msg = handoffRecent
-      ? `[CONTEXT 80%+ USED] Handoff exists (${Math.round(remaining)}% remaining). Compaction imminent — consider /wrap-up now.`
-      : `[CONTEXT 80%+ USED — HARD STOP] Only ${Math.round(remaining)}% remaining. RUN /handoff NOW before any more tool calls. Set CLAUDE_SKIP_CONTEXT_ENFORCE=1 to override.`;
+      ? `[CONTEXT 92%+ USED] Handoff exists (${Math.round(remaining)}% remaining). Compaction imminent — consider /wrap-up now.`
+      : `[CONTEXT 92%+ USED — HARD STOP] Only ${Math.round(remaining)}% remaining. RUN /handoff NOW before any more tool calls. Set CLAUDE_SKIP_CONTEXT_ENFORCE=1 to override.`;
     process.stderr.write(msg);
     try { fs.writeFileSync(fireFile, String(Date.now())); } catch {}
     if (!handoffRecent) process.exit(2);  // Block
@@ -91,15 +92,15 @@ try {
     if (Date.now() - lastFire < 5 * 60 * 1000) passthrough();
     try { fs.writeFileSync(fireFile, String(Date.now())); } catch {}
     const msg = handoffRecent
-      ? `[CONTEXT 70% USED] ${Math.round(remaining)}% remaining. Handoff recent — OK to continue but be concise.`
-      : `[CONTEXT 70% USED] ${Math.round(remaining)}% remaining. Run /handoff to save state while context is still abundant. At 80% the next tool call will be BLOCKED.`;
+      ? `[CONTEXT 85% USED] ${Math.round(remaining)}% remaining. Handoff recent — OK to continue but be concise.`
+      : `[CONTEXT 85% USED] ${Math.round(remaining)}% remaining. Run /handoff to save state while context is still abundant. At 92% the next tool call will be BLOCKED.`;
     process.stdout.write(JSON.stringify({ continue: true, systemMessage: msg }));
     process.exit(0);
   } else if (remaining <= EARLY_THRESHOLD) {
     // EARLY NOTICE — low-key, infrequent (once per 5 min). Absorbed from gsd-context-monitor.
     if (Date.now() - lastFire < 5 * 60 * 1000) passthrough();
     try { fs.writeFileSync(fireFile, String(Date.now())); } catch {}
-    const msg = `[context ${Math.round(remaining)}% remaining] Wrap up current task soon — /handoff at 30%.`;
+    const msg = `[context ${Math.round(remaining)}% remaining] Wrap up current task soon — /handoff at 20%.`;
     process.stdout.write(JSON.stringify({ continue: true, systemMessage: msg }));
     process.exit(0);
   }

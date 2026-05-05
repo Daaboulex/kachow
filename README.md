@@ -15,10 +15,13 @@
 [![Node](https://img.shields.io/badge/node-%E2%89%A520-brightgreen.svg)](https://nodejs.org)
 [![CI](https://github.com/Daaboulex/kachow/actions/workflows/ci.yml/badge.svg)](https://github.com/Daaboulex/kachow/actions/workflows/ci.yml)
 
-> One `AGENTS.md`. Every AI tool on your machine reads it.
-> 36 hooks. 14-tool MCP server. Full bash + PowerShell parity. *Ka-chow.*
+> AI coding agents forget everything between sessions, run destructive commands without checking, and every tool needs separate configuration.
+>
+> **kachow** is a cross-tool AI agent infrastructure framework. It unifies Claude Code, Gemini CLI, and Codex CLI under one configuration with 60+ behavioral hooks for session continuity, safety guards, and observability.
+>
+> Three pillars: **Unify** (write rules once, symlinks distribute) · **Protect** (safety hooks block destructive commands) · **Remember** (memory management and handoff automation across sessions).
 
-Write your rules **once**. Claude Code, Gemini CLI, Codex CLI, OpenCode, Aider, Cursor, Windsurf — they all follow. Ship hooks that automate memory, context pressure, safety nets, verification. Expose memory, debt, tasks, and skills via MCP to any client that supports it.
+One `AGENTS.md`. Every AI tool on your machine reads it. Write your rules **once** — Claude Code, Gemini CLI, Codex CLI, OpenCode, Aider, Cursor, Windsurf all follow. Ship hooks that automate memory, context pressure, safety nets, verification. Expose memory, debt, tasks, and skills via MCP to any client that supports it.
 
 ## Contents
 
@@ -93,10 +96,10 @@ Every script reads `AI_CONTEXT` with a fallback to `$HOME/.ai-context`. Useful i
 | Surface | Lives at | Installed by | Cross-platform |
 |---|---|---|---|
 | Canonical rules (`AGENTS.md`) | `~/.ai-context/AGENTS.md` | `install-adapters.sh` / `.ps1` | yes — symlinks (or copy fallback on Windows without Dev Mode) |
-| 36 hooks | `~/.claude/hooks/` | copied on first bootstrap | yes — all pure Node, no shell deps |
-| 14 library helpers | `~/.claude/hooks/lib/` | same | yes |
+| 60+ hooks | `~/.claude/hooks/` | symlinked on first bootstrap | yes — all pure Node, no shell deps |
+| 28 library helpers | `~/.claude/hooks/lib/` | same | yes |
 | MCP server (`personal-context`) | `~/.ai-context/mcp/personal-context/server.js` | `install-mcp.sh` / `.ps1` | yes — zero-dep Node |
-| Slash commands (17) | `~/.claude/commands/` | bootstrap | yes — Markdown with frontmatter |
+| Slash commands (13) | `~/.claude/commands/` | bootstrap | yes — Markdown with frontmatter |
 | Skills (shipped: `debt-tracker`) | `~/.ai-context/skills/debt-tracker/` | symlinked by bootstrap | yes — but per-AI format differs, see [SKILLS.md](./docs/SKILLS.md) |
 | Memory v2 schema + TTL rotation | `~/.ai-context/memory/` (personal) + `memory-rotate.js` hook | example at `memory/example.md` | yes |
 | `/preview <image>` | `~/.claude/commands/preview.md` + chafa | `customize.sh` asks | yes — requires `chafa` on PATH |
@@ -108,7 +111,7 @@ Every script reads `AI_CONTEXT` with a fallback to `$HOME/.ai-context`. Useful i
 ┌─────────────────────────────────────────────────────────────────┐
 │                     ~/.ai-context/  (canonical source)          │
 │                                                                 │
-│  AGENTS.md   memory/   skills/   mcp/   scripts/   VERSION      │
+│  AGENTS.md   memory/   skills/   mcp/   scripts/   VERSION*     │
 └──────────────┬────────────┬─────────────┬─────────────┬─────────┘
                │            │             │             │
          symlinks      symlinks       registered     bootstrap
@@ -124,6 +127,8 @@ Every script reads `AI_CONTEXT` with a fallback to `$HOME/.ai-context`. Useful i
 ```
 
 Edit `~/.ai-context/AGENTS.md`. Every tool picks up the change on next session start because their rule file is a symlink.
+
+*`VERSION`* is generated at build time by `scripts/publish.sh` — it is not present in source checkouts.
 
 ## Where things live
 
@@ -161,7 +166,7 @@ Your private memory, personal hook additions in `~/.claude/hooks/` that aren't i
 - **macOS** — tested via CI (macos-latest); `brew install chafa` for `/preview`.
 - **Windows** — tested via CI (windows-latest); PowerShell 7+ with Developer Mode for symlinks (or copy-mode fallback); `scoop install chafa` for `/preview`.
 
-Using the framework as a **consumer** requires zero bash on Windows. Publishing your own fork as a release (running `scripts/publish.sh`) currently needs bash + rsync, so Windows maintainers use Git-Bash (bundled with [Git for Windows](https://git-scm.com/download/win)) or WSL. A Node-native publish pipeline is planned for v0.2.0 — see the roadmap.
+Using the framework as a **consumer** requires zero bash on Windows. Publishing your own fork as a release (running `scripts/publish.sh`) currently needs bash + rsync, so Windows maintainers use Git-Bash (bundled with [Git for Windows](https://git-scm.com/download/win)) or WSL. A Node-native publish pipeline is planned for a future release — see the roadmap.
 
 ## Opt-out
 
@@ -211,7 +216,6 @@ kachow ships a small set of skills and slash commands that survive across Claude
 |---|---|---|
 | `/platform-audit` | Monthly: check Claude Code + Gemini CLI releases, hook parity, settings drift, agent frontmatter validity. | Fetches latest releases, compares against pinned `VERSION-DEPS`, runs settings-template diff, validates all agent frontmatter, flags new features worth adopting. |
 | `/verify-sync` | Claude → Gemini one-way sync hooks can fail silently; rules/skills/commands diverge over time. | Diffs `.claude/` vs `.gemini/` for commands, skills, rules, hooks — reports drift without auto-fixing. |
-| `/sync-all` | After editing any single context artifact you shouldn't have to remember which 3 sync scripts to run. | One command sweeps hooks, skills, rules, memories, commands, settings between Claude and Gemini canonical locations. |
 | `/preview <path>` | Terminal image preview without reaching for a GUI. | Renders via `chafa` (NixOS / Linux / macOS). Opt-in, manual invocation. |
 
 Full command source lives in [`commands/`](./commands/). Skill source lives in [`skills/`](./skills/).
@@ -243,8 +247,11 @@ Inspired-by, not forked: kachow's hooks, commands, skills, and memory schema are
 
 ## Roadmap
 
-- [ ] **v0.2.0** — Node-native publish pipeline (`scripts/publish.ps1`), hooks consolidation into `~/.ai-context/hooks/` with cross-tool symlinks, per-AI skill adapters
-- [ ] **v0.3.0** — Scheduled CI job to detect Claude Code / Gemini CLI version drift and file a release-prep issue
+- [x] **v0.1.0** — Initial release: hooks, MCP server, cross-platform scripts
+- [x] **v0.2.x–v0.4.0** — Hook parity, tri-tool symmetric architecture, .mjs migration, performance optimization
+- [x] **v0.5.0** — Documentation rewrite (60+ hooks documented, identity refresh, scrub leak fixes, context-pressure code fix)
+- [ ] **v0.6.0** — Single hook dispatcher (consolidate session-start processes), domain-specific AGENTS.md templates
+- [ ] **v0.7.0** — Scheduled CI for version drift detection, SubagentStop post-task processing
 - [ ] **v1.0.0** — API stability promise for hook interface + settings template shape
 
 ## Contributing

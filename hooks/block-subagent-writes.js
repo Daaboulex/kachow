@@ -4,7 +4,7 @@ require(__dirname + "/lib/emit-simple-timing.js").start(__filename);
 // Universal — applies to every project, not just safety-critical.
 //
 // Mechanism:
-//   1. SubagentStart hook (subagent-harness-inject.js) writes
+//   1. SubagentStart hook (sub[agent-skill]-inject.js) writes
 //      ~/.claude/cache/subagent-active/<session_id>.json marker
 //   2. This hook (PreToolUse on Bash) checks if marker exists for current session_id
 //   3. If yes AND command matches blocked regex → return {decision: "block", reason}

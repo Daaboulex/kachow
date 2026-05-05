@@ -9,6 +9,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
+const { toolHomeDir, toolCacheDir } = require('./lib/tool-detect.js');
 const home = os.homedir();
 const cooldownFile = path.join(toolHomeDir(), 'cache', 'tri-tool-parity-last.json');
 const COOLDOWN_MS = 24 * 60 * 60 * 1000;
@@ -94,6 +95,20 @@ try {
   const gemini = getGeminiHooks();
   const codex = getCodexHooks();
 
+  // Hooks bound to events that don't exist in Gemini — exclude from parity count.
+  // These are structurally non-portable, not missing registrations.
+  const GEMINI_STRUCTURAL_EXCLUSIONS = new Set([
+    'caveman-post-compact-reinject.js',
+    'cwd-changed-watcher.js',
+    'file-changed-notify.js',
+    'memory-post-compact.js',
+    'per-prompt-overhead.js',
+    'prompt-clarity-check.js',
+    'prompt-hash-logger.js',
+    'prompt-item-tracker.js',
+    'slash-command-logger.js',
+  ]);
+
   // Hooks that SHOULD be in all tools (core shared hooks)
   // Codex has fewer events, so only check hooks for events Codex supports
   const CODEX_PORTABLE = new Set([
@@ -112,7 +127,7 @@ try {
   const warnings = [];
 
   // Check Claude↔Gemini parity (should be close)
-  const claudeOnly = [...claude].filter(h => !gemini.has(h) && !h.includes('block-subagent'));
+  const claudeOnly = [...claude].filter(h => !gemini.has(h) && !h.includes('block-subagent') && !GEMINI_STRUCTURAL_EXCLUSIONS.has(h));
   const geminiOnly = [...gemini].filter(h => !claude.has(h) && !h.includes('sync-claude'));
   if (claudeOnly.length > 3) warnings.push(`${claudeOnly.length} hooks in Claude but not Gemini`);
   if (geminiOnly.length > 3) warnings.push(`${geminiOnly.length} hooks in Gemini but not Claude`);
@@ -127,7 +142,6 @@ try {
     if (fs.existsSync(gitDir)) {
       try {
         const { execSync } = require('child_process');
-const { toolHomeDir, toolCacheDir } = require('./lib/tool-detect.js');
         const remote = execSync('git remote get-url origin', { cwd: path.join(home, dir), encoding: 'utf8', timeout: 2000 }).trim();
         if (!remote) warnings.push(`${name}-global: no remote`);
       } catch {

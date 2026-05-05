@@ -323,7 +323,7 @@ const home = require('os').homedir();
 const claudeHooks = path.join(home, '.claude/hooks');
 const geminiHooks = path.join(home, '.gemini/hooks');
 const claudeOnly = new Set(['sync-gemini-md.js','sync-gemini-skills.js','reflect-stop.js','reflect-stop-failure.js','validate-instructions-sync.js','plugin-update-checker.js','enhanced-statusline.js','sync-hook-versions.js']);
-const geminiOnly = new Set(['sync-claude-md.js','sync-claude-skills.js','reflect-session-end.js']);
+const geminiOnly = new Set(['sync-claude-md.js','sync-claude-skills.js']);
 const expectedDiff = new Set(['claude-gemini-json-sync.js']);
 try {
   const files = fs.readdirSync(claudeHooks).filter(f => f.endsWith('.js'));
@@ -341,8 +341,8 @@ try {
 
 Expected differences (direction-specific, NOT bugs):
 - `claude-gemini-json-sync.js` — different pattern order + comment header per platform
-- Claude-only: `sync-gemini-md.js`, `sync-gemini-skills.js`, `reflect-stop.js`, `reflect-stop-failure.js`, `validate-instructions-sync.js`, `plugin-update-checker.js`, `enhanced-statusline.js`, `sync-hook-versions.js`
-- Gemini-only: `sync-claude-md.js`, `sync-claude-skills.js`, `reflect-session-end.js`
+- Claude-only: `sync-gemini-md.js`, `sync-gemini-skills.js`, `reflect-stop-failure.js`, `validate-instructions-sync.js`, `plugin-update-checker.js`, `enhanced-statusline.js`, `sync-hook-versions.js`
+- Gemini-only: `sync-claude-md.js`, `sync-claude-skills.js`
 
 Any OTHER hook that differs is a bug — fix by copying the Claude version to Gemini.
 

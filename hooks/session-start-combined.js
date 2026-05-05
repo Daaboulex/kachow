@@ -165,6 +165,18 @@ try {
           fs.renameSync(pointerPath, path.join(archiveDir, `pointer-${ts}.md`));
         }
       } catch {}
+      // Archive size cap: keep newest 20, delete older
+      if (fs.existsSync(archiveDir)) {
+        try {
+          const archived = fs.readdirSync(archiveDir)
+            .filter(f => f.startsWith('.session-handoff') && f.endsWith('.md'))
+            .map(f => ({ path: path.join(archiveDir, f), mtime: fs.statSync(path.join(archiveDir, f)).mtimeMs }))
+            .sort((a, b) => b.mtime - a.mtime);
+          for (const old of archived.slice(20)) {
+            try { fs.unlinkSync(old.path); } catch {}
+          }
+        } catch {}
+      }
     } catch {}
   }
 } catch (e) {
