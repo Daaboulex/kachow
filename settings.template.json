@@ -341,91 +341,53 @@
             "type": "command",
             "command": "node \"$HOME/.claude/hooks/auto-pull-global.js\"",
             "timeout": 20
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/plugin-update-checker.js\"",
-            "timeout": 10
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/session-start-combined.js\"",
-            "timeout": 10
-          }
-        ]
-      },
-      {
-        "hooks": [
+          },
           {
             "type": "command",
             "command": "node \"$HOME/.claude/hooks/session-context-loader.js\"",
             "timeout": 5
-          }
-        ]
-      },
-      {
-        "hooks": [
+          },
           {
             "type": "command",
-            "command": "node \"$HOME/.claude/hooks/skill-upstream-checker.js\"",
+            "command": "node \"$HOME/.claude/hooks/session-start-combined.js\"",
             "timeout": 10
-          }
-        ]
-      },
-      {
-        "hooks": [
+          },
           {
             "type": "command",
             "command": "node \"$HOME/.claude/hooks/session-presence-start.js\"",
             "timeout": 3
-          }
-        ]
-      },
-      {
-        "hooks": [
+          },
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/plugin-update-checker.js\"",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/skill-upstream-checker.js\"",
+            "timeout": 10
+          },
           {
             "type": "command",
             "command": "node \"$HOME/.claude/hooks/validate-instructions-sync.js\"",
             "timeout": 5
-          }
-        ]
-      },
-      {
-        "hooks": [
+          },
           {
             "type": "command",
             "command": "node \"$HOME/.claude/hooks/injection-size-monitor.js\"",
             "timeout": 5
-          }
-        ],
-        "matcher": ""
-      },
-      {
-        "hooks": [
+          },
           {
             "type": "command",
             "command": "node \"$HOME/.claude/hooks/tri-tool-parity-check.js\"",
             "timeout": 5
-          }
-        ]
-      },
-      {
-        "hooks": [
+          },
           {
             "type": "command",
             "command": "node \"$HOME/.claude/hooks/handoff-triage-gate.js\"",
             "timeout": 5
           }
-        ],
-        "matcher": ""
+        ]
       }
     ],
     "PostToolUse": [
@@ -438,7 +400,27 @@
             "async": true
           }
         ],
-        "matcher": "Write|Edit|MultiEdit|Bash|Read|Grep|Glob|TodoWrite"
+        "matcher": "Bash|Edit|Glob|Grep|MultiEdit|Read|TodoWrite|Write"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/bandaid-loop-detector.js\"",
+            "timeout": 3
+          },
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/context-pressure-enforce.js\"",
+            "timeout": 3
+          },
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/research-lint.js\"",
+            "timeout": 3
+          }
+        ],
+        "matcher": "Bash|Edit|MultiEdit|Write"
       },
       {
         "hooks": [
@@ -449,28 +431,17 @@
             "async": true
           }
         ],
-        "matcher": "TodoWrite"
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/context-pressure-enforce.js\"",
-            "timeout": 3
-          }
-        ],
-        "matcher": "Write|Edit|MultiEdit|Bash"
+        "matcher": "TodoWrite|write_todos"
       },
       {
         "hooks": [
           {
             "type": "command",
             "command": "node \"$HOME/.claude/hooks/post-write-sync.js\"",
-            "if": "Write(*.claude/*)|Write(*.gemini/*)|Write(*CLAUDE.md)|Write(*GEMINI.md)|Write(*.ai-context/*)|Edit(*.claude/*)|Edit(*.gemini/*)|Edit(*CLAUDE.md)|Edit(*GEMINI.md)|Edit(*.ai-context/*)",
-            "timeout": 5
+            "timeout": 5,
+            "if": "Write(*.claude/*)|Write(*.gemini/*)|Write(*CLAUDE.md)|Write(*GEMINI.md)|Write(*.ai-context/*)|Edit(*.claude/*)|Edit(*.gemini/*)|Edit(*CLAUDE.md)|Edit(*GEMINI.md)|Edit(*.ai-context/*)"
           }
-        ],
-        "matcher": "Write|Edit"
+        ]
       },
       {
         "hooks": [
@@ -481,29 +452,17 @@
             "async": true
           }
         ],
-        "matcher": "Skill"
+        "matcher": "Bash|Skill"
       },
       {
         "hooks": [
           {
             "type": "command",
             "command": "node \"$HOME/.claude/hooks/hook-doc-drift-detector.js\"",
-            "if": "Write(*.claude/hooks/*.js)",
-            "timeout": 5
+            "timeout": 5,
+            "if": "Write(*.claude/hooks/*.js)|Edit(*.claude/hooks/*.js)"
           }
-        ],
-        "matcher": "Write"
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/hook-doc-drift-detector.js\"",
-            "if": "Edit(*.claude/hooks/*.js)",
-            "timeout": 5
-          }
-        ],
-        "matcher": "Edit"
+        ]
       },
       {
         "hooks": [
@@ -513,7 +472,7 @@
             "timeout": 5
           }
         ],
-        "matcher": "Write|Edit"
+        "matcher": "Edit|Write"
       },
       {
         "hooks": [
@@ -524,7 +483,7 @@
             "async": true
           }
         ],
-        "matcher": "Read"
+        "matcher": "Bash|Read"
       },
       {
         "hooks": [
@@ -534,38 +493,7 @@
             "timeout": 3
           }
         ],
-        "matcher": "Bash|Edit|Write|Read|Grep|Glob"
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/bandaid-loop-detector.js\"",
-            "timeout": 3
-          }
-        ],
-        "matcher": "Write|Edit|MultiEdit"
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/research-lint.js\"",
-            "timeout": 3
-          }
-        ],
-        "matcher": "Write|Edit"
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/skill-completion-correlator.js\"",
-            "timeout": 5,
-            "async": true
-          }
-        ],
-        "matcher": ""
+        "matcher": "Bash|Edit|Glob|Grep|Read|Write"
       },
       {
         "hooks": [
@@ -576,7 +504,17 @@
             "async": true
           }
         ],
-        "matcher": "Agent"
+        "matcher": "Agent|Skill"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/skill-completion-correlator.js\"",
+            "timeout": 5,
+            "async": true
+          }
+        ]
       },
       {
         "hooks": [
@@ -587,21 +525,51 @@
             "async": true
           }
         ],
-        "matcher": "Write|Edit|MultiEdit|Bash|TaskCreate|TaskUpdate"
+        "matcher": "Bash|Edit|MultiEdit|TaskCreate|TaskUpdate|Write"
       }
     ],
-    "Notification": [
+    "PreToolUse": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$HOME/.claude/hooks/notify-with-fallback.js\"",
-            "timeout": 5
+            "command": "node \"$HOME/.claude/hooks/block-subagent-writes.js\"",
+            "timeout": 3
+          },
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/autosave-before-destructive.js\"",
+            "timeout": 8
           }
-        ]
-      }
-    ],
-    "PreToolUse": [
+        ],
+        "matcher": "Bash"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/validate-settings-on-write.js\"",
+            "timeout": 3
+          },
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/peer-conflict-check.js\"",
+            "timeout": 5,
+            "async": true
+          },
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/pre-write-combined-guard.js\"",
+            "timeout": 3
+          },
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/scrub-sentinel.js\"",
+            "timeout": 3
+          }
+        ],
+        "matcher": "Bash|Edit|MultiEdit|Write"
+      },
       {
         "hooks": [
           {
@@ -610,32 +578,7 @@
             "timeout": 3
           }
         ],
-        "matcher": "TodoWrite"
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/validate-settings-on-write.js\"",
-            "timeout": 3
-          }
-        ],
-        "matcher": "Write"
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/pre-write-combined-guard.js\"",
-            "timeout": 5
-          },
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/scrub-sentinel.js\"",
-            "timeout": 3
-          }
-        ],
-        "matcher": "Write|Edit|MultiEdit"
+        "matcher": "TodoWrite|write_todos"
       },
       {
         "hooks": [
@@ -651,42 +594,134 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$HOME/.claude/hooks/block-subagent-writes.js\"",
-            "timeout": 3
-          },
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/pre-write-combined-guard.js\"",
-            "timeout": 3
-          },
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/autosave-before-destructive.js\"",
-            "timeout": 8
-          }
-        ],
-        "matcher": "Bash"
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
             "command": "node \"$HOME/.claude/hooks/block-subagent-non-bash-writes.js\"",
             "timeout": 3
           }
         ],
-        "matcher": "Write|Edit|MultiEdit|NotebookEdit|mcp__.*"
-      },
+        "matcher": "Edit|MultiEdit|NotebookEdit|Write|mcp__.*"
+      }
+    ],
+    "ConfigChange": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$HOME/.claude/hooks/peer-conflict-check.js\"",
+            "command": "node \"$HOME/.claude/hooks/tri-tool-parity-check.js\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/session-presence-end.js\"",
+            "timeout": 3
+          },
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/todowrite-persist.js\"",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/reflect-stop.js\"",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/dream-auto.js\"",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/auto-push-global.js\"",
+            "timeout": 20
+          },
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/track-skill-usage.js\"",
             "timeout": 5,
             "async": true
+          },
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/stop-sleep-consolidator.js\"",
+            "timeout": 5,
+            "async": true
+          },
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/meta-system-stop.js\"",
+            "timeout": 15
+          },
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/skill-auto-updater.js\"",
+            "timeout": 30,
+            "async": true
+          },
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/memory-rotate.js\"",
+            "timeout": 10,
+            "async": true
+          },
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/session-end-logger.js\"",
+            "timeout": 3
+          },
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/handoff-session-end.js\"",
+            "timeout": 10
           }
-        ],
-        "matcher": "Write|Edit|MultiEdit|Bash"
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/per-prompt-overhead.js\"",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/prompt-hash-logger.js\"",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/prompt-item-tracker.js\"",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/prompt-clarity-check.js\"",
+            "timeout": 3
+          },
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/slash-command-logger.js\"",
+            "timeout": 3
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/notify-with-fallback.js\"",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "SubagentStart": [
@@ -707,140 +742,17 @@
             "type": "command",
             "command": "node \"$HOME/.claude/hooks/subagent-quality-gate.js\"",
             "timeout": 3
-          }
-        ]
-      },
-      {
-        "hooks": [
+          },
           {
             "type": "command",
             "command": "node \"$HOME/.claude/hooks/task-verification-gate.js\"",
             "timeout": 3
-          }
-        ]
-      },
-      {
-        "hooks": [
+          },
           {
             "type": "command",
             "command": "node \"$HOME/.claude/hooks/subagent-claim-logger.js\"",
             "timeout": 3,
             "async": true
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/session-presence-end.js\"",
-            "timeout": 3
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/todowrite-persist.js\"",
-            "timeout": 5
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/reflect-stop.js\"",
-            "timeout": 5
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/dream-auto.js\"",
-            "timeout": 5
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/memory-rotate.js\"",
-            "timeout": 10,
-            "async": true
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/auto-push-global.js\"",
-            "timeout": 20
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/track-skill-usage.js\"",
-            "timeout": 5,
-            "async": true
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/meta-system-stop.js\"",
-            "timeout": 15
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/stop-sleep-consolidator.js\"",
-            "timeout": 5,
-            "async": true
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/skill-auto-updater.js\"",
-            "timeout": 30,
-            "async": true
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/handoff-session-end.js\"",
-            "timeout": 10
-          }
-        ],
-        "matcher": ""
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/session-end-logger.js\"",
-            "timeout": 3
           }
         ]
       }
@@ -851,20 +763,10 @@
           {
             "type": "command",
             "command": "node \"$HOME/.claude/hooks/reflect-precompact.js\"",
-            "timeout": 10
-          }
-        ],
-        "matcher": "manual"
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/reflect-precompact.js\"",
             "timeout": 5
           }
         ],
-        "matcher": "auto"
+        "matcher": "auto|manual"
       }
     ],
     "PostCompact": [
@@ -898,53 +800,7 @@
             "timeout": 3
           }
         ],
-        "matcher": "CLAUDE.md|AGENTS.md|GEMINI.md|.envrc"
-      }
-    ],
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/slash-command-logger.js\"",
-            "timeout": 3
-          },
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/prompt-clarity-check.js\"",
-            "timeout": 3
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/per-prompt-overhead.js\"",
-            "timeout": 5
-          }
-        ],
-        "matcher": ""
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/prompt-hash-logger.js\"",
-            "timeout": 5
-          }
-        ],
-        "matcher": ""
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/prompt-item-tracker.js\"",
-            "timeout": 5
-          }
-        ],
-        "matcher": ""
+        "matcher": ".envrc|AGENTS.md|CLAUDE.md|GEMINI.md"
       }
     ]
   }
