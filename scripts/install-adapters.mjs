@@ -44,8 +44,16 @@ const CORE_TARGETS = [
   { label: 'claude',   dest: path.join(HOME, '.claude',          'CLAUDE.md') },
   { label: 'gemini',   dest: path.join(HOME, '.gemini',          'GEMINI.md') },
   { label: 'codex',    dest: path.join(HOME, '.codex',           'AGENTS.md') },
+  { label: 'crush',    dest: path.join(HOME, '.crush',           'AGENTS.md') },
   { label: 'opencode', dest: path.join(HOME, '.config/opencode', 'AGENTS.md') },
   { label: 'aider',    dest: path.join(HOME, '.config/aider',    'AGENTS.md') },
+];
+
+// Extra symlinks for tools whose configs/hooks are centralized in ai-context
+const EXTRA_SYMLINKS = [
+  { label: 'crush-hooks',    src: path.join(AI_CONTEXT, 'hooks'),                dest: path.join(HOME, '.crush', 'hooks') },
+  { label: 'crush-config',   src: path.join(AI_CONTEXT, 'configs', 'crush.json'),    dest: path.join(HOME, '.config/crush', 'crush.json') },
+  { label: 'opencode-config',src: path.join(AI_CONTEXT, 'configs', 'opencode.json'), dest: path.join(HOME, '.config/opencode', 'config.json') },
 ];
 
 const OPTIONAL_TARGETS = [
@@ -139,6 +147,31 @@ for (const t of OPTIONAL_TARGETS) {
   } else {
     console.log(`- ${t.label}: skipped (dir not present: ${path.dirname(t.dest)})`);
   }
+}
+
+console.log('');
+console.log('== Extra symlinks (configs + hooks centralized in ai-context) ==');
+for (const { label, src, dest } of EXTRA_SYMLINKS) {
+  const dir = path.dirname(dest);
+  fs.mkdirSync(dir, { recursive: true });
+  if (!fs.existsSync(src)) {
+    console.log(`- ${label}: skipped (source not present: ${src})`);
+    continue;
+  }
+  let existing;
+  try { existing = fs.lstatSync(dest); } catch { existing = null; }
+  if (existing && existing.isSymbolicLink() && fs.readlinkSync(dest) === src) {
+    console.log(`✓ ${label}: already linked → ${src}`);
+    continue;
+  }
+  if (existing) {
+    const bak = dest + '.bak-' + Date.now();
+    fs.renameSync(dest, bak);
+    console.log(`↻ ${label}: backed up existing to ${path.basename(bak)}`);
+  }
+  const type = fs.statSync(src).isDirectory() ? 'dir' : 'file';
+  fs.symlinkSync(src, dest, type);
+  console.log(`+ ${label}: linked → ${src}`);
 }
 
 console.log('');

@@ -10,7 +10,7 @@
 //   makeFrontmatter(name, desc, type, sessionCount) → YAML frontmatter block string
 //   buildSummary(semanticDir, sessionCount, episodicCount, profileCount) → SUMMARY.md string
 //
-// Phase 7 REQ-07-03. Spec: [spec-ref] 2026-04-12-memory-architecture.md Sections 4 + 6
+// Phase 7 REQ-07-03. Spec: ~/Documents/.superpowers/specs/2026-04-12-memory-architecture.md Sections 4 + 6
 
 const fs = require('fs');
 const path = require('path');

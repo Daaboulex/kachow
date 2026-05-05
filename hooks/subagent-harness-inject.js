@@ -2,7 +2,7 @@
 require(__dirname + "/lib/emit-simple-timing.js").start(__filename);
 // SubagentStart hook: Auto-inject harness rules into every subagent +
 // write subagent-active marker for PreToolUse commit-block enforcement.
-// This replaces the model needing to REMEMBER to consult [agent-skill] skill.
+// This replaces the model needing to REMEMBER to consult agent-harness skill.
 // Zero context cost in main conversation — injected directly into subagent.
 
 const fs = require('fs');
@@ -44,7 +44,7 @@ try {
       );
     } catch (e) {
       // Log to stderr so silent failures are observable — but don't block
-      try { process.stderr.write('sub[agent-skill]-inject (marker): ' + e.message + '\n'); } catch {}
+      try { process.stderr.write('subagent-harness-inject (marker): ' + e.message + '\n'); } catch {}
     }
   }
 
@@ -138,6 +138,6 @@ try {
     process.stdout.write('{"continue":true}');
   }
 } catch (e) {
-  process.stderr.write('sub[agent-skill]-inject: ' + e.message + '\n');
+  process.stderr.write('subagent-harness-inject: ' + e.message + '\n');
   process.stdout.write('{"continue":true}');
 }

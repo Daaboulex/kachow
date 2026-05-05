@@ -4,14 +4,13 @@
 // Falls back to silent timestamp if cooldown hasn't elapsed.
 // Cross-platform (Linux, macOS, Windows)
 
-
 const TIMER_START = process.hrtime.bigint();
 function __emitTiming(errCount) {
   try {
     const total_ms = Number(process.hrtime.bigint() - TIMER_START) / 1e6;
     require('./lib/observability-logger.js').logEvent(process.cwd(), {
       type: 'hook_timing',
-      source: 'reflect-stop',
+      source: 'reflect-session-end',
       meta: { total_ms: +total_ms.toFixed(3), error_count: errCount || 0 },
     });
   } catch {}
@@ -93,17 +92,14 @@ try {
     }
   }
 
-  // Observability: emit session-end event
-  try { require('./lib/observability-logger.js').logEvent(cwd, { type: 'session_end', source: 'reflect-stop', meta: { claudeChanged, geminiChanged, wrapUpRecent } }); } catch {}
-
   if (claudeChanged || geminiChanged) {
     __emitTiming(0); process.stdout.write(JSON.stringify({
       continue: true,
-      systemMessage: '[session-end] Changes detected. State auto-saved by handoff-session-end hook. For learnings capture, run /wrap-up before exiting.'
+      systemMessage: '[session-end] Changes detected. Run /wrap-up (comprehensive) or /handoff (fast) to capture state and learnings before this session ends. Without either, only a timestamp is saved — session context and learnings are lost.'
     }));
   } else {
     __emitTiming(0); process.stdout.write('{"continue":true}');
   }
 } catch {
-  __emitTiming(0); process.stdout.write('{"continue":true}');
+  __emitTiming(1); process.stdout.write('{"continue":true}');
 }

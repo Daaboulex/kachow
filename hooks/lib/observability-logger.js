@@ -11,7 +11,7 @@
 // each host only writes to its own daily file. Reads all daily files for
 // a complete cross-machine picture.
 //
-// Phase 2 REQ-02-03 / REQ-02-04. Spec: [spec-ref] 2026-04-10-ai-system-upgrade.md
+// Phase 2 REQ-02-03 / REQ-02-04. Spec: ~/Documents/.superpowers/specs/2026-04-10-ai-system-upgrade.md
 
 const fs = require('fs');
 const path = require('path');

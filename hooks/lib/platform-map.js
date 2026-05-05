@@ -1,5 +1,5 @@
-// Platform translation map — single source of truth for Claude <-> Gemini mappings
-// Used by all sync hooks to translate between platforms
+// Platform translation map — single source of truth for cross-tool vocabulary
+// Used by sync hooks (runtime) and generate-settings.mjs (config generation)
 
 const toolMap = {
   // Claude -> Gemini
@@ -15,6 +15,27 @@ const toolMap = {
   'WebSearch': 'google_web_search',
   'TodoWrite': 'todo_write',
   'TodoRead': 'todo_read',
+  'MultiEdit': 'replace',
+};
+
+const codexToolMap = {
+  // Claude -> Codex
+  'Read': 'Read',
+  'Edit': 'apply_patch',
+  'Write': 'apply_patch',
+  'MultiEdit': 'apply_patch',
+  'Bash': 'shell',
+  'Glob': null,
+  'Grep': null,
+  'Agent': null,
+  'Skill': null,
+  'WebFetch': null,
+  'WebSearch': null,
+  'TodoWrite': 'write_todos',
+  'TodoRead': null,
+  'NotebookEdit': null,
+  'TaskCreate': null,
+  'TaskUpdate': null,
 };
 
 const reverseToolMap = Object.fromEntries(
@@ -33,7 +54,7 @@ const reverseModelMap = Object.fromEntries(
 );
 
 const eventMap = {
-  // Claude -> Gemini
+  // Claude -> Gemini (events that differ in name)
   'PreToolUse': 'BeforeTool',
   'PostToolUse': 'AfterTool',
   'Stop': 'SessionEnd',
@@ -41,6 +62,66 @@ const eventMap = {
   'SubagentStop': 'AfterAgent',
   'PreCompact': 'PreCompress',
 };
+
+const codexEventMap = {
+  // Claude -> Codex (events that exist in Codex — same name as Claude)
+  'SessionStart': 'SessionStart',
+  'PreToolUse': 'PreToolUse',
+  'PostToolUse': 'PostToolUse',
+  'Stop': 'Stop',
+  'UserPromptSubmit': 'UserPromptSubmit',
+};
+
+// Crush tool names are Claude-compatible (same names for PreToolUse hooks)
+const crushToolMap = {
+  'Read': 'Read',
+  'Edit': 'edit',
+  'Write': 'write',
+  'Bash': 'bash',
+};
+
+const crushEventMap = {
+  // Claude -> Crush (Claude-compatible; only PreToolUse currently supported)
+  'PreToolUse': 'PreToolUse',
+};
+
+// Events that share the same name across Claude+Gemini (no translation needed)
+const sharedEvents = ['SessionStart', 'Notification', 'UserPromptSubmit'];
+
+// All canonical events (Claude names are canonical)
+const ALL_EVENTS = [
+  'SessionStart', 'PreToolUse', 'PostToolUse', 'Stop', 'PreCompact',
+  'PostCompact', 'CwdChanged', 'FileChanged', 'UserPromptSubmit',
+  'Notification', 'SubagentStart', 'SubagentStop', 'ConfigChange',
+];
+
+// Events available per tool
+const TOOL_EVENTS = {
+  claude: ALL_EVENTS,
+  gemini: ['SessionStart', 'BeforeTool', 'AfterTool', 'SessionEnd', 'Notification',
+           'BeforeAgent', 'AfterAgent', 'PreCompress'],
+  codex: ['SessionStart', 'PreToolUse', 'PostToolUse', 'Stop', 'UserPromptSubmit', 'PermissionRequest'],
+  crush: ['PreToolUse'],
+  opencode: [],
+};
+
+// Async hook support per tool (from source-level verification 2026-05-05)
+// Claude: async field works — runs background, stdout delivered next turn, exit(2) non-blocking
+//   asyncRewake: true — re-engages model on exit 2 (documented feature)
+// Gemini: NO async field in schema — silently ignored if present
+// Codex: async field PARSED but SKIPPED with warning ("async hooks not supported yet")
+// Crush: NO async — all hooks fire-and-wait
+// OpenCode: NO hooks at all
+const TOOL_SUPPORTS_ASYNC = {
+  claude: true,
+  gemini: false,
+  codex: false,
+  crush: false,
+  opencode: false,
+};
+
+// Matchers that are Claude-only (no Gemini/Codex equivalent) — pass through as-is
+const PASSTHROUGH_MATCHERS = ['TaskCreate', 'TaskUpdate', 'NotebookEdit', 'mcp__.*'];
 
 const reverseEventMap = Object.fromEntries(
   Object.entries(eventMap).map(([k, v]) => [v, k])
@@ -108,13 +189,37 @@ function translateFrontmatter(content, map, stripFields, mMap) {
   return `---\n${frontmatter}\n---${body}`;
 }
 
+const reverseCodexToolMap = Object.fromEntries(
+  Object.entries(codexToolMap).filter(([, v]) => v !== null).map(([k, v]) => [v, k])
+);
+
+const reverseCodexEventMap = Object.fromEntries(
+  Object.entries(codexEventMap).map(([k, v]) => [v, k])
+);
+
+const reverseCrushEventMap = Object.fromEntries(
+  Object.entries(crushEventMap).map(([k, v]) => [v, k])
+);
+
 module.exports = {
   toolMap,
   reverseToolMap,
+  codexToolMap,
+  reverseCodexToolMap,
+  crushToolMap,
+  crushEventMap,
+  reverseCrushEventMap,
   modelMap,
   reverseModelMap,
   eventMap,
   reverseEventMap,
+  codexEventMap,
+  reverseCodexEventMap,
+  sharedEvents,
+  ALL_EVENTS,
+  TOOL_EVENTS,
+  TOOL_SUPPORTS_ASYNC,
+  PASSTHROUGH_MATCHERS,
   claudeOnlyFields,
   geminiOnlyFields,
   translateFrontmatter,

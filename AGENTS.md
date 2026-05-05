@@ -21,7 +21,7 @@ Your personal rules go between the USER SECTION markers — they survive updates
 > - `~/.claude/CLAUDE.md`, `~/.gemini/GEMINI.md`, `~/.codex/AGENTS.md`, `~/.config/opencode/AGENTS.md`, `~/.config/aider/AGENTS.md` are symlinks here.
 > - Edit this file. Every tool picks up the change automatically.
 > - Tool-specific sections below are labeled — other tools should ignore them.
-> - **Last updated:** 2026-05-01 (Codex apply_patch fix v0.128.0+; new hook events CwdChanged/FileChanged/PostCompact/etc; Gemini v0.40 events)
+> - **Last updated:** 2026-05-05 (Manifest-driven hooks, Crush/OpenCode onboarding, 5+2 tool system)
 > - **Override per-project:** drop `AGENTS.md` at repo root — tools walk from cwd to root, deepest wins.
 
 ## Identity
@@ -96,15 +96,17 @@ Plans don't need approval but they must exist.
 - Keep changes minimal and focused — no drive-by refactors
 - **GPG sign exception:** `auto-push-global.js` Stop hook commits use `--no-gpg-sign`. Auto-sync commits are mechanical session-end snapshots, not user-authored work; forcing GPG sign would either prompt for passphrase (breaks non-interactive autopush) or silently fail (breaks data preservation). User-authored commits remain signed via standard git config. This exception applies ONLY to `chore: auto-sync from session end` commits in `~/.claude`, `~/.gemini`, `~/.codex`, `~/.ai-context`.
 
-## Tri-Tool Enforcement Asymmetry (added 2026-04-29 — adversarial audit finding)
+## Multi-Tool Enforcement Asymmetry (added 2026-04-29 — adversarial audit finding)
 
-**Important: tri-tool parity is a STORY about hook FILES, not about behavioral guarantees.** The 3 tools have structurally different enforcement strength.
+**Important: multi-tool parity is a STORY about hook FILES, not about behavioral guarantees.** The tools have structurally different enforcement strength.
 
 | Tool | Permission allowlist | Hook coverage of writes | Enforcement strength |
 |---|---|---|---|
 | **Claude Code** | ~250 enforced `permissions.allow` entries | All Write/Edit/Bash hooks fire | **Strongest** |
 | **Gemini CLI** | NO `permissions` key in settings | All `write_file`/`replace`/`run_shell_command` hooks fire | Medium — no command allowlist |
 | **Codex CLI** | `trust_level = "trusted"` (project-scope flag, not allowlist) | apply_patch hook fix claimed in PR #18391 (v0.128.0+) — **UNVERIFIED empirically**. `shell` writes DO fire hooks. | Medium — verify apply_patch fires hooks before relying on it |
+| **Crush** | NO `permissions` key | PreToolUse hooks fire (Claude-compatible) | Medium — PreToolUse only, no PostToolUse/Stop |
+| **OpenCode** | NO permissions | NO hooks | Weakest — text-adherence + MCP only |
 
 **Implications:**
 - Switching from Claude to Gemini/Codex mid-task does NOT preserve permission boundaries. A user blocked by Claude's permissions may successfully run the same operation in Gemini or Codex.
@@ -114,10 +116,11 @@ Plans don't need approval but they must exist.
 
 **This is structural, not a bug.** Gemini and Codex don't have Claude's permission vocabulary; perfect parity is impossible until upstream changes.
 
-## 5-Repo Live-Together System
+## 5+2 Repo Live-Together System
 
-Hooks are canonical at `~/.ai-context/hooks/` — all 3 tools see same files via symlink. Editing one file covers all tools.
-Adding a NEW hook requires registering in all 3 settings/configs (Claude JSON, Gemini JSON, Codex TOML).
+Hooks are canonical at `~/.ai-context/hooks/` — all hook-capable tools (Claude, Gemini, Codex, Crush) see same files via symlink. Editing one file covers all tools.
+Hook registration is manifest-driven. Edit `scripts/MANIFEST.yaml`, run `scripts/generate-settings.mjs --apply --all`. SF-5 shipped as v0.7.0.
+Crush and OpenCode configs are centralized at `~/.ai-context/configs/` (no separate repos).
 
 Full repo table, coupling rules, and release procedures: see `AGENTS-architecture.md`.
 
@@ -169,7 +172,7 @@ Memory format, portable context, tool→read paths: see `~/.ai-context/AGENTS-ar
 ### AI Context Maintenance
 - Editing CLAUDE.md/GEMINI.md/AGENTS.md — all three are the same file via symlink. Just edit `~/.ai-context/AGENTS.md`.
 - Skills/rules are living docs — fix stale content on sight.
-- `~/.claude/` + `~/.gemini/` + `~/.codex/` are git repos (<repo>, <repo>, codex-global). `auto-push-global.js` auto-commits + pushes all three at Stop. Cooldown-gated.
+- `~/.claude/` + `~/.gemini/` + `~/.codex/` + `~/.ai-context/` are git repos (<repo>, <repo>, codex-global, ai-context). `auto-push-global.js` auto-commits + pushes all four at Stop. Cooldown-gated. Crush and OpenCode configs live inside `~/.ai-context/configs/` (no separate repos).
 - **Self-improvement loop:** `meta-system-stop.js` detectors append findings to `~/.claude/self-improvements-pending-<host>.jsonl`. Run `/review-improvements` to triage. Rejections teach 90-day class suppression via `memory/reference/self-improvement-feedback.md`.
 
 ### Cross-Platform Hook Rules
@@ -178,8 +181,8 @@ Memory format, portable context, tool→read paths: see `~/.ai-context/AGENTS-ar
 - Claude timeouts are in **seconds**; Gemini timeouts are in **milliseconds**; Codex timeouts are in **seconds** — never confuse them
 - Claude tool names: `Write`, `Edit`, `Bash`, `Read`, `Skill`, `Agent`; Gemini tool names: `write_file`, `replace`, `run_shell_command`, `read_file`, `activate_skill`; Codex tool names: `apply_patch`, `shell`, `Read` (NOT same as Claude)
 - Claude session-end event: `Stop`; Gemini session-end event: `SessionEnd`; Codex session-end event: `Stop`
-- When adding a hook: add to ALL THREE — `~/.claude/settings.json` (JSON), `~/.gemini/settings.json` (JSON), `~/.codex/config.toml` (TOML `[[hooks.Event]]`)
-- Codex: 6 hook events (PostToolUse, PreToolUse, PermissionRequest, SessionStart, Stop, UserPromptSubmit); `apply_patch` now fires hooks (fixed v0.128.0+, was openai/codex#16732)
+- When adding a hook: edit `scripts/MANIFEST.yaml` and run `scripts/generate-settings.mjs --apply --all`. All tools updated automatically.
+- Codex: only 5 hook events (PostToolUse, PreToolUse, SessionStart, Stop, UserPromptSubmit); `apply_patch` now fires hooks (fixed v0.128.0+, was openai/codex#16732)
 
 New hook events (v2.1.83+) and CLI changelog notes: see `AGENTS-architecture.md`.
 
@@ -204,7 +207,9 @@ Cwd-gated: only read when current task involves the domain.
 
 ## Other-tools specifics (lazy-load)
 
-For Codex / OpenCode / Aider / Cursor / Windsurf / Copilot / Cline / Continue.dev: these lack session hooks. Rules in this file are enforced by adherence, not automation. MCP server `personal-context` is the cross-tool bridge. Full per-tool guidance: see `~/.ai-context/AGENTS-architecture.md` ("Other-tools specifics" section).
+For OpenCode / Aider / Cursor / Windsurf / Copilot / Cline / Continue.dev: these lack session hooks. Rules in this file are enforced by adherence, not automation. MCP server `personal-context` is the cross-tool bridge. Full per-tool guidance: see `~/.ai-context/AGENTS-architecture.md` ("Other-tools specifics" section).
+
+Crush has PreToolUse hooks (Claude Code compatible). Config at `~/.config/crush/crush.json`. Hook enforcement: medium (PreToolUse only, no PostToolUse/Stop).
 
 ---
 
