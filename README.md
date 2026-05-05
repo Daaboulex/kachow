@@ -247,11 +247,8 @@ Inspired-by, not forked: kachow's hooks, commands, skills, and memory schema are
 
 ## Roadmap
 
-- [x] **v0.1.0** — Initial release: hooks, MCP server, cross-platform scripts
-- [x] **v0.2.x–v0.4.0** — Hook parity, tri-tool symmetric architecture, .mjs migration, performance optimization
-- [x] **v0.5.0** — Documentation rewrite (60+ hooks documented, identity refresh, scrub leak fixes, context-pressure code fix)
-- [ ] **v0.6.0** — Single hook dispatcher (consolidate session-start processes), domain-specific AGENTS.md templates
-- [ ] **v0.7.0** — Scheduled CI for version drift detection, SubagentStop post-task processing
+- [x] **v0.2.0** — Documentation rewrite (60+ hooks documented, count corrections, identity refresh), context-pressure threshold fix, scrub leak fixes
+- [ ] **v0.3.0** — Scheduled CI job to detect Claude Code / Gemini CLI version drift and file a release-prep issue
 - [ ] **v1.0.0** — API stability promise for hook interface + settings template shape
 
 ## Contributing

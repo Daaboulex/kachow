@@ -6,7 +6,7 @@ All notable changes to this framework. See [Semantic Versioning](https://semver.
 
 ## [Unreleased]
 
-## [0.5.0] — 2026-05-05
+## [0.2.0] — 2026-05-05
 
 ### Changed
 - Documentation rewrite: 60+ hooks now documented (was 33), 28 lib helpers documented (was 14)
@@ -70,9 +70,6 @@ Initial public release. *Ka-chow.*
 - Obfuscated personal-token patterns in CI (printf-concatenated, no literals)
 - `deep-verify-scrub` maintainer tool cross-references a master personal-token list beyond scrub-config
 
-[Unreleased]: https://github.com/Daaboulex/kachow/compare/v0.5.0...HEAD
-[0.5.0]: https://github.com/Daaboulex/kachow/compare/v0.4.0...v0.5.0
-[0.4.0]: https://github.com/Daaboulex/kachow/compare/v0.3.0...v0.4.0
-[0.3.0]: https://github.com/Daaboulex/kachow/compare/v0.2.4...v0.3.0
-[0.2.4]: https://github.com/Daaboulex/kachow/compare/v0.1.0...v0.2.4
+[Unreleased]: https://github.com/Daaboulex/kachow/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/Daaboulex/kachow/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Daaboulex/kachow/releases/tag/v0.1.0
