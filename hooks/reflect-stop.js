@@ -4,6 +4,9 @@
 // Falls back to silent timestamp if cooldown hasn't elapsed.
 // Cross-platform (Linux, macOS, Windows)
 
+const { detectTool } = require('./lib/tool-detect.js');
+require(__dirname + '/lib/safety-timeout.js');
+const isGemini = detectTool() === 'gemini';
 
 const TIMER_START = process.hrtime.bigint();
 function __emitTiming(errCount) {
@@ -11,7 +14,7 @@ function __emitTiming(errCount) {
     const total_ms = Number(process.hrtime.bigint() - TIMER_START) / 1e6;
     require('./lib/observability-logger.js').logEvent(process.cwd(), {
       type: 'hook_timing',
-      source: 'reflect-stop',
+      source: isGemini ? 'reflect-session-end' : 'reflect-stop',
       meta: { total_ms: +total_ms.toFixed(3), error_count: errCount || 0 },
     });
   } catch {}
@@ -99,11 +102,13 @@ try {
   if (claudeChanged || geminiChanged) {
     __emitTiming(0); process.stdout.write(JSON.stringify({
       continue: true,
-      systemMessage: '[session-end] Changes detected. State auto-saved by handoff-session-end hook. For learnings capture, run /wrap-up before exiting.'
+      systemMessage: isGemini
+        ? '[session-end] Changes detected. Run /wrap-up (comprehensive) or /handoff (fast) to capture state and learnings before this session ends. Without either, only a timestamp is saved — session context and learnings are lost.'
+        : '[session-end] Changes detected. State auto-saved by handoff-session-end hook. For learnings capture, run /wrap-up before exiting.'
     }));
   } else {
     __emitTiming(0); process.stdout.write('{"continue":true}');
   }
 } catch {
-  __emitTiming(0); process.stdout.write('{"continue":true}');
+  __emitTiming(isGemini ? 1 : 0); process.stdout.write('{"continue":true}');
 }

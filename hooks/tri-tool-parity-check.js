@@ -109,20 +109,77 @@ try {
     }
   }
 
+  function getCodexHooks() {
+    const p = path.join(home, '.codex', 'config.toml');
+    if (!fs.existsSync(p)) return new Set();
+    const content = fs.readFileSync(p, 'utf8');
+    const scripts = new Set();
+    for (const line of content.split('\n')) {
+      if (!line.includes('command') || !line.includes('.js')) continue;
+      const m = line.match(/([a-z][-a-z0-9]+\.js)/);
+      if (m) scripts.add(m[1]);
+    }
+    return scripts;
+  }
+
+  const claude = getClaudeHooks();
+  const gemini = getGeminiHooks();
+  const codex = getCodexHooks();
+
+  // Hooks bound to events that don't exist in Gemini — exclude from parity count.
+  // These are structurally non-portable, not missing registrations.
+  const GEMINI_STRUCTURAL_EXCLUSIONS = new Set([
+    'caveman-post-compact-reinject.js',
+    'cwd-changed-watcher.js',
+    'file-changed-notify.js',
+    'memory-post-compact.js',
+    'per-prompt-overhead.js',
+    'prompt-clarity-check.js',
+    'prompt-hash-logger.js',
+    'prompt-item-tracker.js',
+    'slash-command-logger.js',
+  ]);
+
+  // Hooks that SHOULD be in all tools (core shared hooks)
+  // Codex has fewer events, so only check hooks for events Codex supports
+  const CODEX_PORTABLE = new Set([
+    'session-context-loader.js', 'session-presence-start.js', 'auto-pull-global.js',
+    'session-start-combined.js', 'injection-size-monitor.js',
+    'autosave-before-destructive.js', 'peer-conflict-check.js',
+    'pre-write-combined-guard.js', 'scrub-sentinel.js',
+    'session-presence-track.js', 'bandaid-loop-detector.js',
+    'context-pressure-enforce.js', 'skill-drift-guard.js', 'rule-enforcement-check.js',
+    'caveman-post-compact-reinject.js', 'per-prompt-overhead.js',
+    'prompt-hash-logger.js', 'prompt-item-tracker.js', 'prompt-clarity-check.js',
+    'session-presence-end.js', 'auto-push-global.js', 'todowrite-persist.js',
+    'ai-snapshot-stop.js', 'meta-system-stop.js', 'skill-auto-updater.js',
+  ]);
+
   const warnings = [];
   const hasCritical = missingCritical.length > 0;
 
-  if (missingCritical.length > 0) {
-    warnings.push(`CRITICAL: ${missingCritical.length} missing critical hook(s): ${missingCritical.slice(0, 3).join('; ')}${missingCritical.length > 3 ? '...' : ''}`);
-  }
-  if (missingOther.length > 0) {
-    warnings.push(`${missingOther.length} missing hook(s): ${missingOther.slice(0, 2).join('; ')}${missingOther.length > 2 ? '...' : ''}`);
-  }
-  if (extras.length > 0) {
-    warnings.push(`${extras.length} extra/unregistered hook(s) (informational)`);
-  }
-  if (timeouts.length > 0) {
-    warnings.push(`${timeouts.length} tool check(s) timed out`);
+  // Check Claude↔Gemini parity (should be close)
+  const claudeOnly = [...claude].filter(h => !gemini.has(h) && !h.includes('block-subagent') && !GEMINI_STRUCTURAL_EXCLUSIONS.has(h));
+  const geminiOnly = [...gemini].filter(h => !claude.has(h) && !h.includes('sync-claude'));
+  if (claudeOnly.length > 3) warnings.push(`${claudeOnly.length} hooks in Claude but not Gemini`);
+  if (geminiOnly.length > 3) warnings.push(`${geminiOnly.length} hooks in Gemini but not Claude`);
+
+  // Check Codex has all portable hooks
+  const codexMissing = [...CODEX_PORTABLE].filter(h => !codex.has(h));
+  if (codexMissing.length > 0) warnings.push(`Codex missing ${codexMissing.length} portable hooks: ${codexMissing.slice(0, 3).join(', ')}${codexMissing.length > 3 ? '...' : ''}`);
+
+  // Check remotes
+  for (const [name, dir] of [['claude', '.claude'], ['gemini', '.gemini'], ['codex', '.codex']]) {
+    const gitDir = path.join(home, dir, '.git');
+    if (fs.existsSync(gitDir)) {
+      try {
+        const { execSync } = require('child_process');
+        const remote = execSync('git remote get-url origin', { cwd: path.join(home, dir), encoding: 'utf8', timeout: 2000 }).trim();
+        if (!remote) warnings.push(`${name}-global: no remote`);
+      } catch {
+        warnings.push(`${name}-global: no remote configured`);
+      }
+    }
   }
 
   // Cache results

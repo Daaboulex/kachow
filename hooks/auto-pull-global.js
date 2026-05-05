@@ -74,13 +74,15 @@ try {
       // Clean fast-forward — safest case
       pullOk = run(`git merge --ff-only origin/${branch}`, dir) !== null;
     } else {
-      // Diverged — attempt rebase (local commits on top of remote)
-      const rebased = run(`git rebase origin/${branch}`, dir);
-      if (rebased !== null) {
+      // Diverged — try normal merge WITHOUT auto-resolve strategy.
+      // NEVER use -X theirs — it silently drops local user edits.
+      // If content actually conflicts, warn user to resolve manually.
+      const merged = run(`git merge origin/${branch} --no-edit -m "chore: auto-merge remote changes" --no-gpg-sign`, dir);
+      if (merged !== null || merged === '') {
         pullOk = true;
       } else {
-        // Rebase conflict — abort, warn user
-        run('git rebase --abort', dir);
+        // Real content conflict — abort, warn user (don't auto-resolve)
+        run('git merge --abort', dir);
         messages.push(`${label}: diverged from remote (${ahead} local, ${behind} remote). Auto-merge failed. Run manually: cd ${dir} && git pull --rebase origin ${branch}`);
       }
     }

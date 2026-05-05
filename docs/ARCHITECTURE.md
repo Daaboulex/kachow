@@ -27,8 +27,11 @@ Every AI tool symlinks into it:
 - **PreToolUse**: safety guards (block-subagent-writes, autosave-before-destructive, verifiedby-gate, pre-write-combined-guard)
 - **PostToolUse**: sync hooks, loggers, drift detectors, pattern enforcement
 - **SubagentStart/Stop**: harness inject + quality gate
-- **Stop**: session-end ritual (presence, todowrite persist, ai-snapshot, reflect, dream-auto, meta-system, auto-push)
+- **Stop**: session-end ritual (presence, todowrite persist, ai-snapshot (excluded from public mirror — user-specific), reflect, dream-auto, meta-system, auto-push)
 - **PreCompact**: reflect-precompact if Claude is about to compact context
+- **Notification**: desktop/headless notification routing (notify-with-fallback)
+- **UserPromptSubmit** (Claude only): per-prompt overhead logging, prompt hashing, scope-drift tracking, slash-command logging
+- **CwdChanged / FileChanged** (Claude only): directory change tracking, external file change notification, post-compaction memory handling
 
 ## MCP protocol
 

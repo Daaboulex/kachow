@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(__dirname + '/lib/safety-timeout.js');
 // Stop hook: auto-commit and push ~/.claude/ and ~/.gemini/ to GitHub.
 // ALWAYS commits locally (no cooldown for commits — data safety first).
 // Push has a 5-minute cooldown to prevent network spam.
@@ -33,11 +34,11 @@ const codexDir = path.join(home, '.codex');
 const aiContextDir = path.join(home, '.ai-context');
 const lastPush = path.join(claudeDir, '.auto-push-last');
 const PUSH_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes (push only, not commit)
-// Opt-in: commit ~/.ai-context/ on each Stop too (off by default because
-// ai-context is often Syncthing-synced and may have no git remote).
-const AI_CONTEXT_AUTOCOMMIT = process.env.AI_CONTEXT_AUTOCOMMIT === '1';
-// Opt-in: push ~/.ai-context/ too (requires a remote configured).
-const AI_CONTEXT_AUTOPUSH = process.env.AI_CONTEXT_AUTOPUSH === '1';
+// ai-context auto-commit/push: ON by default. Syncthing handles real-time sync;
+// git provides version history + GitHub backup. Merge strategy (-X theirs) prevents
+// divergence when both machines push auto-sync commits.
+const AI_CONTEXT_AUTOCOMMIT = process.env.AI_CONTEXT_AUTOCOMMIT !== '0';
+const AI_CONTEXT_AUTOPUSH = process.env.AI_CONTEXT_AUTOPUSH !== '0';
 
 // Shared hooks that must be kept in sync (Claude is source of truth)
 const SHARED_HOOKS = [
@@ -111,14 +112,24 @@ function autoPush(dir, label) {
     return;
   }
 
-  // Check if we're behind
+  // Check if we're behind — try fast-forward first (safe), then merge only
+  // if content is identical (Syncthing already delivered same files).
+  // NEVER auto-resolve real conflicts — warn user instead.
   const behind = run(`git rev-list HEAD..origin/${branch} --count`, dir);
   if (behind && parseInt(behind) > 0) {
-    const rebased = run(`git rebase origin/${branch}`, dir);
-    if (!rebased) {
-      run('git rebase --abort', dir);
-      warnings.push(`${label}: committed locally but push skipped — remote has conflicting changes. Run: cd ${dir} && git pull --rebase origin ${branch}`);
-      return;
+    // Try fast-forward merge first (safest — no content conflict possible)
+    const ffResult = run(`git merge --ff-only origin/${branch}`, dir);
+    if (ffResult !== null) {
+      // Fast-forward succeeded — clean
+    } else {
+      // Diverged — try normal merge WITHOUT auto-resolve strategy.
+      // If there's a real content conflict, merge fails and we warn.
+      const merged = run(`git merge origin/${branch} --no-edit -m "chore: auto-merge remote changes" --no-gpg-sign`, dir);
+      if (merged === null) {
+        run('git merge --abort', dir);
+        warnings.push(`${label}: committed locally but push skipped — real content conflict with remote. Run: cd ${dir} && git pull origin ${branch} (resolve manually to preserve both edits)`);
+        return;
+      }
     }
   }
 

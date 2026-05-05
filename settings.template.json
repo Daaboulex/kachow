@@ -167,7 +167,7 @@
       "Bash(b2sum *)",
       "Bash(md5sum *)",
       "Bash(dig +short*)",
-      "Bash(host *)",
+      "Bash(echo hello)",
       "Bash(nslookup *)",
       "Bash(uptime)",
       "Bash(pgrep -l*)",
@@ -458,16 +458,6 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$HOME/.claude/hooks/post-commit-sync-reminder.js\"",
-            "timeout": 3,
-            "if": "Bash(git commit*)"
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
             "command": "node \"$HOME/.claude/hooks/hook-doc-drift-detector.js\"",
             "timeout": 5,
             "if": "Write(*.claude/hooks/*.js)|Edit(*.claude/hooks/*.js)"
@@ -739,7 +729,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$HOME/.claude/hooks/subagent-harness-inject.js\"",
+            "command": "node \"$HOME/.claude/hooks/sub[agent-skill]-inject.js\"",
             "timeout": 3
           }
         ]

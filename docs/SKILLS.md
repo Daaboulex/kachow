@@ -58,7 +58,7 @@ description: One sentence explaining WHEN to activate it — specific enough tha
 
 ## Handling per-AI differences
 
-**For now (v0.1.0):** kachow symlinks `~/.ai-context/skills/<name>/` into each tool's skill directory. The SAME file serves every tool. If a tool needs a slightly different body, you add it as additional sections under per-tool headings inside the SKILL.md:
+kachow symlinks `~/.ai-context/skills/<name>/` into each tool's skill directory. The SAME file serves every tool. If a tool needs a slightly different body, you add it as additional sections under per-tool headings inside the SKILL.md:
 
 ```markdown
 ## Claude-specific notes
@@ -70,7 +70,7 @@ Use the `Skill` tool with argument `{}`...
 When invoked via `activate_skill`, the tool ID is ...
 ```
 
-**Planned for v0.2.0:** per-AI skill adapters. `skills/<name>/SKILL.md` stays the source of truth, and `install-adapters.sh` generates:
+**Planned for a future release:** per-AI skill adapters. `skills/<name>/SKILL.md` stays the source of truth, and `install-adapters.sh` generates:
 
 - `~/.claude/skills/<name>/SKILL.md` — Claude-formatted
 - `~/.gemini/skills/<name>/SKILL.md` — Gemini-formatted (frontmatter translated via `lib/platform-map.js`)
@@ -91,7 +91,7 @@ CI (`.github/workflows/ci.yml`) validates every shipped skill:
 Run the validator locally:
 
 ```bash
-node scripts/validate-skills.js          # or .ps1 on Windows
+node scripts/validate-skills.js
 ```
 
 Exit code 0 = all skills valid; non-zero = see output for the mismatch.

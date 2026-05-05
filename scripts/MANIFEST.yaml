@@ -734,7 +734,7 @@ hooks:
       - event: UserPromptSubmit
         timeout: 3
 
-  - file: subagent-harness-inject.js
+  - file: sub[agent-skill]-inject.js
     category: meta
     tools: [claude, gemini]
     order: 60
@@ -744,7 +744,7 @@ hooks:
         timeout: 3
     overrides:
       gemini:
-        name: subagent-harness-inject
+        name: sub[agent-skill]-inject
 
   - file: subagent-quality-gate.js
     category: meta

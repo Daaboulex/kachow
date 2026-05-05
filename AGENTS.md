@@ -181,8 +181,8 @@ Memory format, portable context, tool→read paths: see `~/.ai-context/AGENTS-ar
 - Claude timeouts are in **seconds**; Gemini timeouts are in **milliseconds**; Codex timeouts are in **seconds** — never confuse them
 - Claude tool names: `Write`, `Edit`, `Bash`, `Read`, `Skill`, `Agent`; Gemini tool names: `write_file`, `replace`, `run_shell_command`, `read_file`, `activate_skill`; Codex tool names: `apply_patch`, `shell`, `Read` (NOT same as Claude)
 - Claude session-end event: `Stop`; Gemini session-end event: `SessionEnd`; Codex session-end event: `Stop`
-- When adding a hook: edit `scripts/MANIFEST.yaml` and run `scripts/generate-settings.mjs --apply --all`. All tools updated automatically.
-- Codex: only 5 hook events (PostToolUse, PreToolUse, SessionStart, Stop, UserPromptSubmit); `apply_patch` now fires hooks (fixed v0.128.0+, was openai/codex#16732)
+- When adding a hook: add to ALL THREE — `~/.claude/settings.json` (JSON), `~/.gemini/settings.json` (JSON), `~/.codex/config.toml` (TOML `[[hooks.Event]]`)
+- Codex: 6 hook events (PostToolUse, PreToolUse, PermissionRequest, SessionStart, Stop, UserPromptSubmit); `apply_patch` now fires hooks (fixed v0.128.0+, was openai/codex#16732)
 
 New hook events (v2.1.83+) and CLI changelog notes: see `AGENTS-architecture.md`.
 

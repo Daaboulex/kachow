@@ -210,17 +210,6 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$HOME/.gemini/hooks/post-commit-sync-reminder.js\"",
-            "timeout": 3000,
-            "name": "post-commit-sync-reminder"
-          }
-        ],
-        "matcher": "run_shell_command"
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
             "command": "node \"$HOME/.gemini/hooks/memory-retrieval-logger.js\"",
             "timeout": 3000,
             "name": "memory-retrieval-logger"
@@ -439,9 +428,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$HOME/.gemini/hooks/subagent-harness-inject.js\"",
+            "command": "node \"$HOME/.gemini/hooks/sub[agent-skill]-inject.js\"",
             "timeout": 3000,
-            "name": "subagent-harness-inject"
+            "name": "sub[agent-skill]-inject"
           }
         ]
       }

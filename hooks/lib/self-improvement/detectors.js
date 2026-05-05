@@ -1,7 +1,7 @@
 // detectors.js — 10 detection rules for self-improvement queue.
 // Each detector: (ctx) → Finding[]. Pure (reads files, never writes).
 // Ctx provides: cwd, configDir, readEvents (from observability-logger)
-// Spec R1-R10: ~/Documents/.superpowers/specs/2026-04-14-self-improvement-handoff.md
+// Spec R1-R10: [spec-ref] 2026-04-14-self-improvement-handoff.md
 
 const fs = require('fs');
 const path = require('path');
@@ -484,7 +484,7 @@ function detectCrossPlatformAsymmetry(ctx) {
   const ALLOWLIST = {
     claude_only: [
       'skill-routing-injector.js', 'reflect-stop.js', 'reflect-stop-failure.js',
-      'reflect-precompact.js', 'subagent-harness-inject.js', 'subagent-quality-gate.js',
+      'reflect-precompact.js', 'sub[agent-skill]-inject.js', 'subagent-quality-gate.js',
       'task-verification-gate.js',
       // 2026-04-22: Claude-local orchestration tools (not meaningful on Gemini):
       'mirror-kachow.js',       // mirrors Claude hook changes to ~/.kachow-release
@@ -498,7 +498,7 @@ function detectCrossPlatformAsymmetry(ctx) {
       'file-changed-notify.js', // FileChanged event — context file change notification
     ],
     gemini_only: [
-      'reflect-session-end.js',
+      'reflect-stop.js',
       'sync-claude-md.js', 'sync-claude-skills.js', 'sync-claude-agents.js',
       // Absorbed on Claude side (standalone Gemini copy intentional):
       'claude-gemini-json-sync.js',

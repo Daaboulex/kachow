@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(__dirname + '/lib/safety-timeout.js');
 // Combined SessionStart hook: merges 7 lightweight hooks into 1 process
 // Replaces: reflect-enabled, consolidate-memory-session-counter, stale-task-cleanup,
 //           sync-hook-versions, ensure-portable-memory, sync-memory-dirs, session-catchup
@@ -10,6 +11,9 @@ const path = require('path');
 const os = require('os');
 
 const TIMER_START = process.hrtime.bigint();
+const _sectionTimings = {};
+function _startSection(name) { _sectionTimings[name] = process.hrtime.bigint(); }
+function _endSection(name) { if (_sectionTimings[name]) _sectionTimings[name] = Number(process.hrtime.bigint() - _sectionTimings[name]) / 1e6; }
 const home = os.homedir();
 const claudeDir = path.join(home, '.claude');
 const geminiDir = path.join(home, '.gemini');
@@ -47,14 +51,17 @@ try {
 } catch {}
 
 // ── 1. Reflect-enabled (touch marker file) ──
+_startSection('reflect');
 try {
   const enabledFile = path.join(configDir, '.reflect-enabled');
   if (!fs.existsSync(enabledFile)) fs.writeFileSync(enabledFile, '');
+  _endSection('reflect');
 } catch (e) {
   errors.push({ section: 'reflect-enabled', error: e.message, stack: e.stack?.split('\n')[1]?.trim() });
 }
 
 // ── 1b. Stale lock cleanup (RC-003: prevents .dream-lock from blocking all future consolidations) ──
+_startSection('stale-lock');
 try {
   const { DREAM_LOCK_STALE_MS, TEMP_FILE_STALE_MS } = require('./lib/constants.js');
   const dreamLockFile = path.join(claudeDir, '.dream-lock');
@@ -85,11 +92,13 @@ try {
       }
     }
   } catch {}
+  _endSection('stale-lock');
 } catch (e) {
   errors.push({ section: 'stale-state-cleanup', error: e.message, stack: e.stack?.split('\n')[1]?.trim() });
 }
 
 // ── 2. Consolidate-memory session counter (RC-001: atomic increment) ──
+_startSection('consolidate-counter');
 try {
   const { incrementCounter } = require('./lib/atomic-counter.js');
   const { DREAM_COOLDOWN_MS, DREAM_MIN_SESSIONS } = require('./lib/constants.js');
@@ -117,6 +126,7 @@ try {
       try { require('./lib/observability-logger.js').logEvent(projectDir, { type: 'dream_trigger', source: 'session-start-combined', meta: { memCount, sessionCount: count } }); } catch {}
     }
   }
+  _endSection('consolidate-counter');
 } catch (e) {
   errors.push({ section: 'consolidate-memory-counter', error: e.message, stack: e.stack?.split('\n')[1]?.trim() });
 }
@@ -124,6 +134,7 @@ try {
 // ── 2b. Handoff retention (added 2026-04-17) ──
 // Enforces CLAUDE.md rule: versioned handoffs >7d archived, pointer >14d archived, keep 3 newest.
 // Scans all known handoff locations (cwd root, .claude/, .ai-context/).
+_startSection('handoff-retention');
 try {
   const VERSIONED_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
   const POINTER_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
@@ -165,13 +176,27 @@ try {
           fs.renameSync(pointerPath, path.join(archiveDir, `pointer-${ts}.md`));
         }
       } catch {}
+      // Archive size cap: keep newest 20, delete older
+      if (fs.existsSync(archiveDir)) {
+        try {
+          const archived = fs.readdirSync(archiveDir)
+            .filter(f => f.startsWith('.session-handoff') && f.endsWith('.md'))
+            .map(f => ({ path: path.join(archiveDir, f), mtime: fs.statSync(path.join(archiveDir, f)).mtimeMs }))
+            .sort((a, b) => b.mtime - a.mtime);
+          for (const old of archived.slice(20)) {
+            try { fs.unlinkSync(old.path); } catch {}
+          }
+        } catch {}
+      }
     } catch {}
   }
+  _endSection('handoff-retention');
 } catch (e) {
   errors.push({ section: 'handoff-retention', error: e.message, stack: e.stack?.split('\n')[1]?.trim() });
 }
 
 // ── 3. Stale task cleanup ──
+_startSection('stale-task');
 try {
   const MAX_AGE_DAYS = 14;
   const now = Date.now();
@@ -197,11 +222,13 @@ try {
     } catch {}
     break;
   }
+  _endSection('stale-task');
 } catch (e) {
   errors.push({ section: 'stale-task-cleanup', error: e.message, stack: e.stack?.split('\n')[1]?.trim() });
 }
 
 // ── 4. Sync hook versions (GSD version tag patching) ──
+_startSection('sync-versions');
 try {
   const versionFile = path.join(claudeDir, 'get-shit-done', 'VERSION');
   if (fs.existsSync(versionFile)) {
@@ -220,11 +247,13 @@ try {
       }
     }
   }
+  _endSection('sync-versions');
 } catch (e) {
   errors.push({ section: 'sync-hook-versions', error: e.message, stack: e.stack?.split('\n')[1]?.trim() });
 }
 
 // ── 5. Ensure portable memory ──
+_startSection('portable-memory');
 try {
   const sanitized = projectDir.replace(/^\//, '').replace(/[/\\]/g, '-').replace(/^([A-Z]):/i, '$1');
   const memoryDir = path.join(home, agentDir, 'projects', sanitized, 'memory');
@@ -261,11 +290,13 @@ try {
       }
     }
   }
+  _endSection('portable-memory');
 } catch (e) {
   errors.push({ section: 'ensure-portable-memory', error: e.message, stack: e.stack?.split('\n')[1]?.trim(), critical: true });
 }
 
 // ── 6. Sync memory dirs ──
+_startSection('sync-memory');
 try {
   const claudeMemory = path.join(projectDir, '.claude', 'memory');
   const geminiMemory = path.join(projectDir, '.gemini', 'memory');
@@ -287,14 +318,21 @@ try {
       }
       return count;
     }
-    syncDirs(claudeMemory, geminiMemory);
-    syncDirs(geminiMemory, claudeMemory);
+    // Skip if both resolve to same directory (symlinked — copying is a no-op)
+    let skipSync = false;
+    try { skipSync = fs.realpathSync(claudeMemory) === fs.realpathSync(geminiMemory); } catch {}
+    if (!skipSync) {
+      syncDirs(claudeMemory, geminiMemory);
+      syncDirs(geminiMemory, claudeMemory);
+    }
   }
+  _endSection('sync-memory');
 } catch (e) {
   errors.push({ section: 'sync-memory-dirs', error: e.message, stack: e.stack?.split('\n')[1]?.trim() });
 }
 
 // ── 7. Session catchup (missed reflect detection) ──
+_startSection('catchup');
 try {
   const historyFile = path.join(configDir, 'history.jsonl');
   const lastReflect = path.join(configDir, '.reflect-last');
@@ -330,11 +368,13 @@ try {
       }
     }
   }
+  _endSection('catchup');
 } catch (e) {
   errors.push({ section: 'session-catchup', error: e.message, stack: e.stack?.split('\n')[1]?.trim(), critical: true });
 }
 
 // ── 8. Version-change detector (REQ-08-01) ──
+_startSection('version-change');
 try {
   const versionFile = path.join(claudeDir, '.last-known-version');
 
@@ -397,11 +437,13 @@ try {
     // Always update version file (creates on first run)
     fs.writeFileSync(versionFile, currentVersion);
   }
+  _endSection('version-change');
 } catch (e) {
   errors.push({ section: 'version-change-detector', error: e.message, stack: e.stack?.split('\n')[1]?.trim() });
 }
 
 // ── 9. Research session counter (REQ-08-03 — gate fires in meta-system-stop.js; RC-001: atomic) ──
+_startSection('research-counter');
 try {
   const { incrementCounter } = require('./lib/atomic-counter.js');
   const researchCountFile = path.join(claudeDir, '.research-session-count');
@@ -423,11 +465,13 @@ try {
   } catch {
     try { fs.writeFileSync(dreamLastFile, ''); } catch {}
   }
+  _endSection('research-counter');
 } catch (e) {
   errors.push({ section: 'research-session-counter', error: e.message, stack: e.stack?.split('\n')[1]?.trim() });
 }
 
 // ── 11. Settings schema drift detection ──
+_startSection('settings-drift');
 try {
   const settingsPath = path.join(claudeDir, 'settings.json');
   if (fs.existsSync(settingsPath)) {
@@ -448,11 +492,13 @@ try {
       messages.push(`[settings-drift] ${issues.join(' | ')}`);
     }
   }
+  _endSection('settings-drift');
 } catch (e) {
   errors.push({ section: 'settings-drift', error: e.message, stack: e.stack?.split('\n')[1]?.trim() });
 }
 
 // ── 10. Symlink integrity (merged from validate-symlinks.js) ──
+_startSection('symlink-audit');
 try {
   const audit = require('./lib/symlink-audit.js');
   const report = audit.auditAll();
@@ -464,6 +510,7 @@ try {
     if (loops.length > 0) summary.push(`${loops.length} loop(s)`);
     messages.push(`[symlink-integrity] ${summary.join('; ')}. Run 'node ~/.claude/hooks/lib/symlink-audit.js' for full list.`);
   }
+  _endSection('symlink-audit');
 } catch (e) {
   errors.push({ section: 'symlink-integrity', error: e.message, stack: e.stack?.split('\n')[1]?.trim() });
 }
@@ -489,6 +536,7 @@ try {
       total_ms: +total_ms.toFixed(3),
       error_count: errors.length,
       message_count: messages.length,
+      section_timings: _sectionTimings,
     },
   });
 } catch {}
