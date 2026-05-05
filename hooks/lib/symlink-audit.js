@@ -62,6 +62,10 @@ const SKIP_SEGMENTS = [
   '/node_modules/',
   '/.pytest_cache/',
   '/.venv/',
+  '/projects/',
+  '/data/',
+  '/get-shit-done/',
+  '/marketplaces/',
 ];
 
 function shouldSkip(p) {

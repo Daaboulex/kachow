@@ -100,6 +100,13 @@ function enqueue(finding) {
     return { suppressed: true, id, reason: `fingerprint_class '${finding.fingerprint_class}' suppressed (3+ rejections in 90d)` };
   }
 
+  // Skip if already resolved on any machine (cross-hostname sync)
+  try {
+    const resolvedAll = _readAllJsonl(path.join(CLAUDE_DIR, 'self-improvements-resolved.jsonl'));
+    if (fs.existsSync(LEGACY_RESOLVED)) resolvedAll.push(..._readJsonl(LEGACY_RESOLVED));
+    if (resolvedAll.some(e => e.id === id)) return { suppressed: true, id, reason: 'resolved-cross-machine' };
+  } catch {}
+
   const existing = _readJsonl(PENDING).find(e => e.id === id);
   if (existing) {
     existing.seen_count = (existing.seen_count || 1) + 1;
@@ -151,11 +158,19 @@ function readPending() {
   if (fs.existsSync(LEGACY_PENDING)) all.push(..._readJsonl(LEGACY_PENDING));
   // Dedup by id
   const seen = new Set();
-  return all.filter(e => {
+  let result = all.filter(e => {
     if (!e.id || seen.has(e.id)) return false;
     seen.add(e.id);
     return true;
   });
+  // Cross-hostname resolution: filter out entries already resolved on ANY machine
+  try {
+    const resolvedAll = _readAllJsonl(path.join(CLAUDE_DIR, 'self-improvements-resolved.jsonl'));
+    if (fs.existsSync(LEGACY_RESOLVED)) resolvedAll.push(..._readJsonl(LEGACY_RESOLVED));
+    const resolvedIds = new Set(resolvedAll.map(e => e.id));
+    result = result.filter(e => !resolvedIds.has(e.id));
+  } catch {}
+  return result;
 }
 
 function count(tier) {

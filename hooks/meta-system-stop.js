@@ -188,11 +188,28 @@ try {
   } catch {}
 
   if (shouldRunFull) {
+    // Atomic file lock — only one session runs full detectors.
+    // Lock in /tmp/ to prevent Syncthing propagating to other machine.
+    const lockFile = path.join(os.tmpdir(), 'claude-self-improve-lock');
+    let lockAcquired = false;
+    try {
+      const fd = fs.openSync(lockFile, 'wx');
+      fs.writeSync(fd, String(process.pid));
+      fs.closeSync(fd);
+      lockAcquired = true;
+    } catch {
+      try {
+        const lockAge = Date.now() - fs.statSync(lockFile).mtimeMs;
+        if (lockAge > 5 * 60 * 1000) fs.unlinkSync(lockFile);
+      } catch {}
+    }
+    if (!lockAcquired) { /* another session holds lock — skip */ }
+    else try {
     const allFindings = runAllDetectors(ctx);
     let enqueued = 0;
     for (const f of allFindings) {
       const stored = queue.enqueue(f);
-      if (stored && !stored.suppressed) enqueued++;
+      if (stored && !stored.suppressed && (stored.seen_count || 1) === 1) enqueued++;
     }
     const summary = queue.summary();
     if (enqueued > 0) {
@@ -210,6 +227,7 @@ try {
         logEvent(cwd, { type: 'self_improvement_auto_resolved', source: 'meta-system-stop', meta: { count: autoResolved } });
       }
     } catch {}
+    } finally { try { fs.unlinkSync(lockFile); } catch {} }
   }
 } catch (e) {
   try { process.stderr.write(`meta-system-stop self-improvement: ${e.message}\n`); } catch {}
