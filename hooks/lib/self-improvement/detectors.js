@@ -487,7 +487,7 @@ function detectCrossPlatformAsymmetry(ctx) {
       'reflect-precompact.js', 'sub[agent-skill]-inject.js', 'subagent-quality-gate.js',
       'task-verification-gate.js',
       // 2026-04-22: Claude-local orchestration tools (not meaningful on Gemini):
-      'mirror-kachow.js',       // mirrors Claude hook changes to ~/.kachow-release
+      'mirror-kachow.js',       // mirrors canonical hooks to kachow-mirror/ (scrubbed public)
       'ai-snapshot-stop.js',    // filesystem-specific snapshot logic
       'gsd-check-update.js',    // GSD plugin version check (Claude plugins only)
       'post-commit-sync-reminder.js', // monorepo dual-remote nudge (user's [tooling-dir])

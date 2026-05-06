@@ -133,7 +133,7 @@ Plans don't need approval but they must exist.
 **Sub-project pattern:** Every project gets a `project/.ai-context` symlink → `~/.ai-context/project-state/<name>`. Contains memory/, rules/, project-rules.md. New projects are **auto-provisioned** on first session start (session-start-combined.js creates project-state entry + symlinks). Tool dirs (.claude/memory, .gemini/memory) also symlink to the same target.
 
 Hook registration is manifest-driven. Edit `scripts/MANIFEST.yaml`, run `scripts/generate-settings.mjs --apply --all`.
-Old tool-dir GitHub repos (<repo>, <repo>, codex-global) are archived on GitHub (read-only preservation).
+Old tool-dir GitHub repos (<repo>, <repo>, [codex-repo]) are archived on GitHub (read-only preservation).
 
 Full coupling rules and release procedures: see `AGENTS-architecture.md`.
 
@@ -185,7 +185,7 @@ Memory format, portable context, tool→read paths: see `~/.ai-context/AGENTS-ar
 ### AI Context Maintenance
 - Editing CLAUDE.md/GEMINI.md/AGENTS.md — all three are the same file via symlink. Just edit `~/.ai-context/AGENTS.md`.
 - Skills/rules are living docs — fix stale content on sight.
-- `~/.ai-context/` is the ONLY git repo (ai-context-global). `auto-push-global.js` auto-commits + pushes at Stop. Cooldown-gated. Tool dirs (`~/.claude/`, `~/.gemini/`, `~/.codex/`) have NO `.git` — they are derived state with symlinks to ai-context. All 5 tool configs (Claude, Gemini, Codex, Crush, OpenCode) live in `~/.ai-context/configs/`. Old tool-dir GitHub repos (<repo>, <repo>, codex-global) are archived.
+- `~/.ai-context/` is the ONLY git repo (ai-context-global). `auto-push-global.js` auto-commits + pushes at Stop. Cooldown-gated. Tool dirs (`~/.claude/`, `~/.gemini/`, `~/.codex/`) have NO `.git` — they are derived state with symlinks to ai-context. All 5 tool configs (Claude, Gemini, Codex, Crush, OpenCode) live in `~/.ai-context/configs/`. Old tool-dir GitHub repos (<repo>, <repo>, [codex-repo]) are archived.
 - **Self-improvement loop:** `meta-system-stop.js` detectors append findings to `~/.claude/self-improvements-pending-<host>.jsonl`. Run `/review-improvements` to triage. Rejections teach 90-day class suppression via `memory/reference/self-improvement-feedback.md`.
 
 ### Cross-Platform Hook Rules
