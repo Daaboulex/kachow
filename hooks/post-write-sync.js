@@ -197,9 +197,10 @@ try {
 
       if (isCommand) {
         const cmdName = path.basename(filePath, '.md');
-        const cmdDir = path.dirname(filePath);
-        const projectRoot = cmdDir.replace(/[/\\]\.ai-context[/\\]\.claude[/\\]commands$/, '')
-                                  .replace(/[/\\]\.claude[/\\]commands$/, '');
+        // Canonical source is always ai-context/commands/ (may be reached via symlink)
+        const canonicalCmd = path.join(os.homedir(), '.ai-context', 'commands', cmdName + '.md');
+        const srcFile = fs.existsSync(canonicalCmd) ? canonicalCmd : filePath;
+        const projectRoot = os.homedir();
         const synced = [];
         for (const skillDir of [
           path.join(projectRoot, '.gemini', 'skills', cmdName),
@@ -207,7 +208,7 @@ try {
         ]) {
           if (fs.existsSync(path.dirname(skillDir))) {
             fs.mkdirSync(skillDir, { recursive: true });
-            const content = fs.readFileSync(filePath, 'utf8');
+            const content = fs.readFileSync(srcFile, 'utf8');
             fs.writeFileSync(path.join(skillDir, 'SKILL.md'), translateFrontmatter(content, toolMap, claudeOnlyFields, modelMap), 'utf8');
             synced.push('gemini');
           }
@@ -215,7 +216,7 @@ try {
         const codexSkillDir = path.join(projectRoot, '.codex', 'skills', 'cmd-' + cmdName);
         if (fs.existsSync(path.join(projectRoot, '.codex', 'skills'))) {
           fs.mkdirSync(codexSkillDir, { recursive: true });
-          const content = fs.readFileSync(filePath, 'utf8');
+          const content = fs.readFileSync(srcFile, 'utf8');
           fs.writeFileSync(path.join(codexSkillDir, 'SKILL.md'), translateFrontmatter(content, toolMap, claudeOnlyFields, modelMap), 'utf8');
           synced.push('codex');
         }

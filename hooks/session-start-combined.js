@@ -252,81 +252,88 @@ try {
   errors.push({ section: 'sync-hook-versions', error: e.message, stack: e.stack?.split('\n')[1]?.trim() });
 }
 
-// ── 5. Ensure portable memory ──
+// ── 5. Proactive project-state provisioning ──
+// On EVERY session: ensure project-state/<key>/memory/ exists + symlinked from tool dirs.
+// This replaces the old reactive "ensure-portable-memory" that only worked on session N+1.
 _startSection('portable-memory');
 try {
   const agentRelDir = path.relative(home, configDir);
   const sanitized = projectDir.replace(/^\//, '').replace(/[/\\]/g, '-').replace(/^([A-Z]):/i, '$1');
-  const memoryDir = path.join(home, agentRelDir, 'projects', sanitized, 'memory');
-  // Also check dash-prefixed variant (Claude's internal sanitization keeps leading dash)
   const dashSanitized = projectDir.replace(/[/\\]/g, '-').replace(/^([A-Z]):/i, '$1');
-  const dashMemoryDir = path.join(home, agentRelDir, 'projects', dashSanitized, 'memory');
 
-  // Check both no-dash and dash-prefixed variants (Claude uses dash-prefix internally)
-  function isAlreadyLinked(dir) {
+  // Step 1: Derive project key
+  let projectKey;
+  try {
+    const pk = require('./lib/project-key.js');
+    projectKey = typeof pk.deriveKey === 'function' ? pk.deriveKey(projectDir) : null;
+  } catch {}
+  if (!projectKey) {
+    const parts = projectDir.split(path.sep).filter(Boolean);
+    projectKey = parts[parts.length - 1] || 'default';
+  }
+
+  // Step 2: Ensure project-state/<key>/memory/ exists (proactive)
+  const projectStateMemory = path.join(home, '.ai-context', 'project-state', projectKey, 'memory');
+  if (!fs.existsSync(projectStateMemory)) {
+    fs.mkdirSync(projectStateMemory, { recursive: true });
+    fs.writeFileSync(path.join(projectStateMemory, 'MEMORY.md'),
+      `# Memory Index — ${projectDir}\n\n_Auto-provisioned ${new Date().toISOString().split('T')[0]}_\n`);
+  }
+
+  // Step 3: Helpers
+  function isSymlinked(dir) {
+    try { return fs.lstatSync(dir).isSymbolicLink(); } catch { return false; }
+  }
+  function isRealDirWithContent(dir) {
     try {
       const stat = fs.lstatSync(dir);
-      return (stat.isSymbolicLink() || stat.isDirectory()) && fs.existsSync(path.join(dir, 'MEMORY.md'));
+      if (!stat.isDirectory() || stat.isSymbolicLink()) return false;
+      return fs.readdirSync(dir).some(f => f.endsWith('.md') && f !== 'MEMORY.md');
     } catch { return false; }
   }
-
-  function createSymlink(targetDir, portable) {
-    fs.mkdirSync(path.dirname(targetDir), { recursive: true });
-    try {
-      const stat = fs.lstatSync(targetDir);
-      if (stat.isSymbolicLink()) fs.unlinkSync(targetDir);
-      else if (stat.isDirectory() && fs.readdirSync(targetDir).length === 0) fs.rmdirSync(targetDir);
-    } catch {}
-    if (!fs.existsSync(targetDir)) {
-      fs.symlinkSync(portable, targetDir, os.platform() === 'win32' ? 'junction' : undefined);
-    }
-  }
-
-  if (!isAlreadyLinked(memoryDir) || !isAlreadyLinked(dashMemoryDir)) {
-    const candidates = ['.ai-context/memory', '.claude/memory'];
-    let portable = null;
-    for (const candidate of candidates) {
-      const fullPath = path.join(projectDir, candidate);
-      if (fs.existsSync(fullPath) && fs.existsSync(path.join(fullPath, 'MEMORY.md'))) {
-        portable = fullPath;
-        break;
-      }
-    }
-    if (portable) {
-      if (!isAlreadyLinked(memoryDir)) createSymlink(memoryDir, portable);
-      if (!isAlreadyLinked(dashMemoryDir)) createSymlink(dashMemoryDir, portable);
-    } else {
-      // Auto-capture: if a real memory dir has content, centralize it
-      for (const dir of [dashMemoryDir, memoryDir]) {
+  function atomicMigrate(srcDir, targetDir) {
+    for (const f of fs.readdirSync(srcDir)) {
+      const s = path.join(srcDir, f);
+      const d = path.join(targetDir, f);
+      if (!fs.existsSync(d)) {
         try {
-          const stat = fs.lstatSync(dir);
-          if (stat.isSymbolicLink()) continue;
-          if (!stat.isDirectory()) continue;
-          const mds = fs.readdirSync(dir).filter(f => f.endsWith('.md') && f !== 'MEMORY.md');
-          if (mds.length === 0) continue;
-          // Derive project name and create project-state entry
-          const slug = path.basename(path.dirname(dir));
-          const parts = slug.replace(/^-/, '').split('-');
-          const docsIdx = parts.indexOf('Documents');
-          const name = docsIdx >= 0 ? parts.slice(docsIdx + 1).join('-') : parts.slice(-2).join('-');
-          const target = path.join(home, '.ai-context', 'project-state', name, 'memory');
-          if (fs.existsSync(target)) continue; // already centralized under different path
-          fs.mkdirSync(target, { recursive: true });
-          for (const f of fs.readdirSync(dir)) {
-            const s = path.join(dir, f);
-            const d = path.join(target, f);
-            if (fs.statSync(s).isDirectory()) fs.cpSync(s, d, { recursive: true });
-            else fs.copyFileSync(s, d);
-          }
-          // Ensure MEMORY.md in target
-          if (!fs.existsSync(path.join(target, 'MEMORY.md'))) {
-            fs.writeFileSync(path.join(target, 'MEMORY.md'), `# Memory Index — ${name}\n\n` + mds.map(f => `- [${f}](${f})`).join('\n') + '\n');
-          }
-          fs.rmSync(dir, { recursive: true });
-          fs.symlinkSync(target, dir);
+          if (fs.statSync(s).isDirectory()) fs.cpSync(s, d, { recursive: true });
+          else fs.copyFileSync(s, d);
         } catch {}
       }
     }
+    const backup = srcDir + '.migrating-' + Date.now();
+    fs.renameSync(srcDir, backup);
+    try { fs.rmSync(backup, { recursive: true }); } catch {}
+  }
+  function createSymlinkSafe(target, linkPath) {
+    try {
+      const existing = fs.lstatSync(linkPath);
+      if (existing.isSymbolicLink()) {
+        if (fs.readlinkSync(linkPath) === target) return;
+        fs.unlinkSync(linkPath);
+      } else if (existing.isDirectory() && fs.readdirSync(linkPath).length === 0) {
+        fs.rmdirSync(linkPath);
+      } else {
+        return; // non-empty real dir — handled by atomicMigrate first
+      }
+    } catch {}
+    fs.mkdirSync(path.dirname(linkPath), { recursive: true });
+    fs.symlinkSync(target, linkPath, os.platform() === 'win32' ? 'junction' : undefined);
+  }
+
+  // Step 4: For both sanitized variants, ensure symlink → project-state
+  // Also check project-local .ai-context/memory (existing projects like nix, [user])
+  const projectLocalMemory = ['.ai-context/memory', '.claude/memory'].map(c => path.join(projectDir, c)).find(p =>
+    fs.existsSync(p) && fs.existsSync(path.join(p, 'MEMORY.md'))
+  );
+  const target = projectLocalMemory || projectStateMemory;
+
+  for (const san of [sanitized, dashSanitized]) {
+    const toolMemDir = path.join(home, agentRelDir, 'projects', san, 'memory');
+    if (isSymlinked(toolMemDir)) continue;
+    if (isRealDirWithContent(toolMemDir)) atomicMigrate(toolMemDir, target);
+    createSymlinkSafe(target, toolMemDir);
   }
   _endSection('portable-memory');
 } catch (e) {

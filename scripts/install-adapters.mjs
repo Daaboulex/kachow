@@ -221,5 +221,20 @@ if (fs.existsSync(skillsCanonical)) {
   console.log('- no canonical skills dir found');
 }
 
+// Convert canonical commands to Codex skill format
+console.log('');
+console.log('== Codex command skills ==');
+try {
+  const { execSync } = await import('node:child_process');
+  const convertScript = path.join(AI_CONTEXT, 'scripts', 'convert-commands.mjs');
+  if (fs.existsSync(convertScript) && fs.existsSync(path.join(HOME, '.codex', 'skills'))) {
+    execSync(`node "${convertScript}" --codex-only --force`, { stdio: 'inherit', timeout: 15000 });
+  } else {
+    console.log('- skipped (no convert-commands.mjs or no .codex/skills/)');
+  }
+} catch (e) {
+  console.log(`- codex command conversion: ${e.message}`);
+}
+
 console.log('');
 console.log(`Done. Edit ${CANONICAL} and every tool picks up the change.`);

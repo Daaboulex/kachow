@@ -14,19 +14,31 @@ const path = require('path');
 const os = require('os');
 
 const AI_CONTEXT = process.env.AI_CONTEXT || path.join(os.homedir(), '.ai-context');
-const MEMORY_DIRS = [
-  path.join(AI_CONTEXT, 'memory'),
-  ...(() => {
-    const ps = path.join(AI_CONTEXT, 'project-state');
-    try {
-      return fs.readdirSync(ps, { withFileTypes: true })
-        .filter(d => d.isDirectory())
-        .map(d => path.join(ps, d.name, 'memory'))
-        .filter(p => fs.existsSync(p));
-    } catch { return []; }
-  })(),
-  path.join(os.homedir(), '.claude', 'projects'),
-];
+let _memoryDirsCache = null;
+let _memoryDirsCacheTime = 0;
+const MEMORY_DIRS_TTL = 60000;
+
+function getMemoryDirs() {
+  const now = Date.now();
+  if (_memoryDirsCache && (now - _memoryDirsCacheTime) < MEMORY_DIRS_TTL) return _memoryDirsCache;
+
+  const dirs = [path.join(AI_CONTEXT, 'memory')];
+
+  const psDir = path.join(AI_CONTEXT, 'project-state');
+  try {
+    for (const entry of fs.readdirSync(psDir, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      const memDir = path.join(psDir, entry.name, 'memory');
+      if (fs.existsSync(memDir)) dirs.push(memDir);
+    }
+  } catch {}
+
+  dirs.push(path.join(os.homedir(), '.claude', 'projects'));
+
+  _memoryDirsCache = dirs;
+  _memoryDirsCacheTime = now;
+  return dirs;
+}
 const SKILLS_DIR = path.join(AI_CONTEXT, 'skills');
 const SUPPORTED_PROTOCOL_VERSIONS = ['2025-06-18', '2025-03-26', '2024-11-05'];
 const PROTOCOL_VERSION = SUPPORTED_PROTOCOL_VERSIONS[0];
@@ -189,7 +201,7 @@ const TOOLS = {
       const q = String(query || '').toLowerCase();
       if (!q) return { content: [{ type: 'text', text: 'empty query' }] };
       const files = [];
-      for (const d of MEMORY_DIRS) walkMarkdown(d, files);
+      for (const d of getMemoryDirs()) walkMarkdown(d, files);
       const hits = [];
       for (const f of files) {
         let c;
@@ -233,7 +245,7 @@ const TOOLS = {
     handler: ({ name }) => {
       const base = String(name).replace(/\.md$/, '') + '.md';
       const files = [];
-      for (const d of MEMORY_DIRS) walkMarkdown(d, files);
+      for (const d of getMemoryDirs()) walkMarkdown(d, files);
       const match = files.find(f => path.basename(f) === base);
       if (!match) return { content: [{ type: 'text', text: `memory "${base}" not found` }], isError: true };
       return { content: [{ type: 'text', text: fs.readFileSync(match, 'utf8') }] };
@@ -248,7 +260,7 @@ const TOOLS = {
     },
     handler: ({ type } = {}) => {
       const files = [];
-      for (const d of MEMORY_DIRS) walkMarkdown(d, files);
+      for (const d of getMemoryDirs()) walkMarkdown(d, files);
       const list = [];
       for (const f of files) {
         try {
