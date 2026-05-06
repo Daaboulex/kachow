@@ -134,7 +134,7 @@ hooks:
 
   - file: validate-settings-on-write.js
     category: meta
-    tools: [claude, codex, gemini]
+    tools: [claude, codex, gemini, crush]
     order: 12
     async: false
     events:
@@ -159,7 +159,7 @@ hooks:
 
   - file: verifiedby-gate.js
     category: meta
-    tools: [claude, codex, gemini]
+    tools: [claude, codex, gemini, crush]
     order: 14
     async: false
     events:
@@ -216,7 +216,7 @@ hooks:
 
   - file: peer-conflict-check.js
     category: meta
-    tools: [claude, codex, gemini]
+    tools: [claude, codex, gemini, crush]
     order: 18
     async: true
     events:
@@ -404,7 +404,7 @@ hooks:
 
   - file: prefer-editing-nudge.js
     category: meta
-    tools: [claude, gemini, codex]
+    tools: [claude, gemini, codex, crush]
     order: 33
     async: false
     events:

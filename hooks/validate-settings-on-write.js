@@ -41,7 +41,7 @@ try {
   // file AFTER write would happen — but that's PostToolUse territory.
   // Strategy: only validate Write tool here (full content available); skip Edit.
   const toolName = input.tool_name || '';
-  if (toolName !== 'Write') passthrough();
+  if (toolName !== 'Write' && toolName !== 'apply_patch' && toolName !== 'shell') passthrough();
 
   const newContent = (input.tool_input || {}).content || '';
   if (!newContent.trim()) passthrough();

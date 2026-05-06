@@ -25,7 +25,7 @@ try {
   const normalized = filePath.replace(/\\/g, '/');
 
   // Trigger for .js files inside any hook directory (canonical or symlinked)
-  if ((!normalized.includes('/.claude/hooks/') && !normalized.includes('/.gemini/hooks/') && !normalized.includes('/.ai-context/hooks/')) || !normalized.endsWith('.js')) {
+  if ((!normalized.includes('/.claude/hooks/') && !normalized.includes('/.gemini/hooks/') && !normalized.includes('/.codex/hooks/') && !normalized.includes('/.crush/hooks/') && !normalized.includes('/.ai-context/hooks/')) || !normalized.endsWith('.js')) {
     process.stdout.write('{"continue":true}');
     process.exit(0);
   }
@@ -46,9 +46,17 @@ try {
 
   const home = os.homedir();
   const tp = require('./lib/tool-paths.js');
-  const isGemini = normalized.includes('/.gemini/hooks/');
-  const settingsPath = isGemini
+  const { detectTool } = require('./lib/tool-detect.js');
+  const tool = detectTool();
+  const isGemini = tool === 'gemini';
+  const settingsPath = tool === 'gemini'
     ? path.join(home, '.gemini', 'settings.json')
+    : tool === 'codex'
+    ? path.join(home, '.codex', 'config.toml')
+    : tool === 'crush'
+    ? path.join(home, '.config', 'crush', 'crush.json')
+    : tool === 'opencode'
+    ? path.join(home, '.config', 'opencode', 'config.json')
     : path.join(tp.configDir, 'settings.json');
 
   // Canonical hook events per platform — registrations under other names are dead code.
@@ -62,7 +70,17 @@ try {
     'BeforeAgent', 'AfterAgent', 'PreCompress',
     'Notification', 'UserPromptSubmit',
   ]);
-  const canonicalEvents = isGemini ? CANONICAL_EVENTS_GEMINI : CANONICAL_EVENTS_CLAUDE;
+  const CANONICAL_EVENTS_CODEX = new Set([
+    'PreToolUse', 'PostToolUse', 'UserPromptSubmit',
+    'PermissionRequest', 'SessionStart', 'Stop',
+  ]);
+  const CANONICAL_EVENTS_CRUSH = new Set(['PreToolUse']);
+  const CANONICAL_EVENTS_OPENCODE = new Set([]);
+  const canonicalEvents = tool === 'gemini' ? CANONICAL_EVENTS_GEMINI
+    : tool === 'codex' ? CANONICAL_EVENTS_CODEX
+    : tool === 'crush' ? CANONICAL_EVENTS_CRUSH
+    : tool === 'opencode' ? CANONICAL_EVENTS_OPENCODE
+    : CANONICAL_EVENTS_CLAUDE;
 
   // 1. Collect all hook command paths from settings.json + flag unknown events
   const registeredFiles = new Set();
@@ -70,8 +88,24 @@ try {
   try {
     // Resolve symlink before reading (settings may be symlinked to ai-context/configs/)
     const realSettingsPath = fs.existsSync(settingsPath) ? fs.realpathSync(settingsPath) : settingsPath;
-    const settings = JSON.parse(fs.readFileSync(realSettingsPath, 'utf8'));
-    const hookEvents = settings.hooks || {};
+    const raw = fs.readFileSync(realSettingsPath, 'utf8');
+    let settings, hookEvents;
+    if (tool === 'codex') {
+      hookEvents = {};
+      const eventRe = /^\[hooks\.(\w+)\]/gm;
+      let m;
+      while ((m = eventRe.exec(raw)) !== null) {
+        const ev = m[1];
+        if (!hookEvents[ev]) hookEvents[ev] = [];
+        const cmdRe = /command\s*=\s*"([^"]+)"/g;
+        const slice = raw.slice(m.index, raw.indexOf('\n[', m.index + 1) >>> 0 || raw.length);
+        let cm;
+        while ((cm = cmdRe.exec(slice)) !== null) hookEvents[ev].push({ command: cm[1] });
+      }
+    } else {
+      settings = JSON.parse(raw);
+      hookEvents = settings.hooks || {};
+    }
     for (const eventName of Object.keys(hookEvents)) {
       const entries = hookEvents[eventName];
       if (!Array.isArray(entries)) continue;
@@ -130,7 +164,7 @@ try {
 
   // Unknown-event check — registrations under non-canonical event names never fire.
   if (unknownEvents.length > 0) {
-    const platform = isGemini ? 'Gemini' : 'Claude';
+    const platform = tool.charAt(0).toUpperCase() + tool.slice(1);
     const suffix = `[dead-hook-detector] DEAD EVENTS in ${platform} settings.json: ${unknownEvents.join(', ')}. These events are not in the v2.1.x canonical set — registered hooks never fire. Remove or re-home.`;
     orphanWarning = orphanWarning ? orphanWarning + '\n' + suffix : suffix;
   }

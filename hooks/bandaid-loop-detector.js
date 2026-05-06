@@ -15,6 +15,7 @@ require(__dirname + "/lib/emit-simple-timing.js").start(__filename);
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const { toolHomeDir, toolCacheDir } = require('./lib/tool-detect.js');
 
 const WINDOW = 10;         // look at last 10 edits
 const THRESHOLD = 3;       // 3 edits to same file triggers warning
@@ -72,7 +73,6 @@ try {
   // session and marks them meta.followed_by_bandaid_loop = true.
   try {
     const obs = require('./lib/observability-logger.js');
-const { toolHomeDir, toolCacheDir } = require('./lib/tool-detect.js');
     obs.logEvent(process.cwd(), {
       type: 'bandaid_loop',
       source: 'bandaid-loop-detector',

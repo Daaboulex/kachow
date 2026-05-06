@@ -31,7 +31,7 @@ try {
   const normalized = filePath.replace(/\\/g, '/');
 
   // Trigger for .js files inside any hook directory (canonical or symlinked)
-  if ((!normalized.includes('/.claude/hooks/') && !normalized.includes('/.gemini/hooks/') && !normalized.includes('/.ai-context/hooks/')) || !normalized.endsWith('.js')) {
+  if ((!normalized.includes('/.claude/hooks/') && !normalized.includes('/.gemini/hooks/') && !normalized.includes('/.codex/hooks/') && !normalized.includes('/.crush/hooks/') && !normalized.includes('/.ai-context/hooks/')) || !normalized.endsWith('.js')) {
     process.stdout.write('{"continue":true}');
     process.exit(0);
   }
@@ -40,15 +40,18 @@ try {
   const homeDir = require('os').homedir();
   const docsDir = path.join(homeDir, 'Documents');
 
-  // Find CLAUDE.md files (pure Node.js, cross-platform)
-  const claudeMdFiles = findFiles(docsDir, 'CLAUDE.md', 4, 0);
+  // Find CLAUDE.md and AGENTS.md files (pure Node.js, cross-platform)
+  const claudeMdFiles = [
+    ...findFiles(docsDir, 'CLAUDE.md', 4, 0),
+    ...findFiles(docsDir, 'AGENTS.md', 4, 0),
+  ];
 
   if (claudeMdFiles.length === 0) {
     process.stdout.write('{"continue":true}');
     process.exit(0);
   }
 
-  // Check which CLAUDE.md files reference this hook
+  // Check which CLAUDE.md/AGENTS.md files reference this hook
   const hookBaseName = hookName.replace(/\.js$/, '');
   const affectedFiles = [];
 

@@ -16,7 +16,6 @@ const os = require('os');
 const home = os.homedir();
 
 const { detectTool, toolHomeDir } = require('./lib/tool-detect.js');
-const isGemini = detectTool() === 'gemini';
 const configDir = toolHomeDir();
 
 const lastFile = path.join(configDir, '.dream-last');

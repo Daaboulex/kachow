@@ -19,7 +19,6 @@ const home = os.homedir();
 const claudeDir = path.join(home, '.claude'); // Legacy — only for Claude-specific paths (plugins, file-history)
 const geminiDir = path.join(home, '.gemini');
 const tool = detectTool();
-const isGemini = tool === 'gemini';
 const configDir = toolHomeDir();
 const projectDir = process.cwd();
 
@@ -34,7 +33,7 @@ const errors = [];
 // Observability: emit session-start event
 try {
   const obs = require('./lib/observability-logger.js');
-  obs.logEvent(projectDir, { type: 'session_start', source: 'session-start-combined', agent: isGemini ? 'gemini' : 'claude' });
+  obs.logEvent(projectDir, { type: 'session_start', source: 'session-start-combined', agent: tool });
 } catch {}
 
 // Stale-marker sweep (SEC-3 hygiene 2026-04-23): delete subagent markers
@@ -324,8 +323,7 @@ try {
     if (copyErrors.length > 0) return;
     const backup = srcDir + '.migrating-' + Date.now();
     fs.renameSync(srcDir, backup);
-    // Verify symlink will be created by caller before deleting backup
-    try { fs.rmSync(backup, { recursive: true }); } catch {}
+    return backup; // caller deletes after verifying symlink succeeded
   }
   function createSymlinkSafe(target, linkPath) {
     // Guard: linkPath parent must resolve inside configDir/projects (prevent symlink traversal)
@@ -351,17 +349,30 @@ try {
 
   // Step 4: For both sanitized variants, ensure symlink → project-state
   // Also check project-local .ai-context/memory (existing projects like nix, [user])
-  const projectLocalMemory = ['.ai-context/memory', '.claude/memory'].map(c => path.join(projectDir, c)).find(p =>
-    fs.existsSync(p) && fs.existsSync(path.join(p, 'MEMORY.md'))
-  );
+  // C-003: Use .ai-context/memory when dir exists (even without MEMORY.md — fresh provision)
+  const projectLocalMemory = ['.ai-context/memory', '.claude/memory'].map(c => path.join(projectDir, c)).find(p => {
+    try { return fs.lstatSync(p).isDirectory() || fs.lstatSync(p).isSymbolicLink(); } catch { return false; }
+  });
   const target = projectLocalMemory || projectStateMemory;
 
   if (target) {
     for (const san of [sanitized, dashSanitized]) {
       const toolMemDir = path.join(home, agentRelDir, 'projects', san, 'memory');
       if (isSymlinked(toolMemDir)) continue;
-      if (isRealDirWithContent(toolMemDir)) atomicMigrate(toolMemDir, target);
+      let migrationBackup;
+      if (isRealDirWithContent(toolMemDir)) migrationBackup = atomicMigrate(toolMemDir, target);
       createSymlinkSafe(target, toolMemDir);
+      if (migrationBackup) {
+        try {
+          if (fs.lstatSync(toolMemDir).isSymbolicLink()) {
+            try { fs.rmSync(migrationBackup, { recursive: true }); } catch {}
+          } else {
+            fs.renameSync(migrationBackup, toolMemDir); // restore — symlink failed
+          }
+        } catch {
+          fs.renameSync(migrationBackup, toolMemDir); // lstat failed — restore
+        }
+      }
     }
   }
   // Step 5: Auto-create .ai-context symlink in project dir (if git repo + not already present)
@@ -376,10 +387,20 @@ try {
         try { fs.symlinkSync(projectStateDir, aiCtxLink); } catch {}
       }
     }
-    // Step 6: Ensure instruction file symlinks in project-state (CLAUDE.md, GEMINI.md → project-rules.md)
+    // Step 5b: Ensure cwd CLAUDE.md/GEMINI.md → .ai-context/<name> (first-run chicken-and-egg fix C-005b)
+    if (fs.existsSync(aiCtxLink)) {
+      for (const name of ['CLAUDE.md', 'GEMINI.md']) {
+        const cwdFile = path.join(projectDir, name);
+        const aiCtxFile = path.join(aiCtxLink, name);
+        if (!fs.existsSync(cwdFile) && fs.existsSync(aiCtxFile)) {
+          try { fs.symlinkSync(path.join('.ai-context', name), cwdFile); } catch {}
+        }
+      }
+    }
+    // Step 6: Ensure instruction file symlinks in project-state (CLAUDE.md, GEMINI.md, AGENTS.md → project-rules.md)
     const rulesFile = path.join(projectStateDir, 'project-rules.md');
     if (fs.existsSync(rulesFile)) {
-      for (const name of ['CLAUDE.md', 'GEMINI.md']) {
+      for (const name of ['CLAUDE.md', 'GEMINI.md', 'AGENTS.md']) {
         const psLink = path.join(projectStateDir, name);
         if (!fs.existsSync(psLink)) {
           try { fs.symlinkSync('project-rules.md', psLink); } catch {}
@@ -391,7 +412,7 @@ try {
     try {
       if (fs.existsSync(cwdClaude) && !fs.lstatSync(cwdClaude).isSymbolicLink() && !fs.existsSync(rulesFile)) {
         fs.copyFileSync(cwdClaude, rulesFile);
-        for (const name of ['CLAUDE.md', 'GEMINI.md']) {
+        for (const name of ['CLAUDE.md', 'GEMINI.md', 'AGENTS.md']) {
           const psLink = path.join(projectStateDir, name);
           if (!fs.existsSync(psLink)) fs.symlinkSync('project-rules.md', psLink);
         }
@@ -434,32 +455,43 @@ try {
 // ── 6. Sync memory dirs ──
 _startSection('sync-memory');
 try {
+  function syncDirs(src, dest) {
+    let count = 0;
+    for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+      const srcFile = path.join(src, entry.name);
+      const destFile = path.join(dest, entry.name);
+      try {
+        if (entry.isDirectory()) {
+          fs.mkdirSync(destFile, { recursive: true });
+          count += syncDirs(srcFile, destFile);
+        } else if (entry.isFile()) {
+          if (!fs.existsSync(destFile)) { fs.copyFileSync(srcFile, destFile); count++; }
+          else if (fs.statSync(srcFile).mtimeMs > fs.statSync(destFile).mtimeMs) { fs.copyFileSync(srcFile, destFile); count++; }
+        }
+      } catch {}
+    }
+    return count;
+  }
   const claudeMemory = path.join(projectDir, '.claude', 'memory');
   const geminiMemory = path.join(projectDir, '.gemini', 'memory');
   if (fs.existsSync(claudeMemory) && fs.existsSync(geminiMemory)) {
-    function syncDirs(src, dest) {
-      let count = 0;
-      for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
-        const srcFile = path.join(src, entry.name);
-        const destFile = path.join(dest, entry.name);
-        try {
-          if (entry.isDirectory()) {
-            fs.mkdirSync(destFile, { recursive: true });
-            count += syncDirs(srcFile, destFile);
-          } else if (entry.isFile()) {
-            if (!fs.existsSync(destFile)) { fs.copyFileSync(srcFile, destFile); count++; }
-            else if (fs.statSync(srcFile).mtimeMs > fs.statSync(destFile).mtimeMs) { fs.copyFileSync(srcFile, destFile); count++; }
-          }
-        } catch {}
-      }
-      return count;
-    }
     // Skip if both resolve to same directory (symlinked — copying is a no-op)
     let skipSync = false;
     try { skipSync = fs.realpathSync(claudeMemory) === fs.realpathSync(geminiMemory); } catch {}
     if (!skipSync) {
       syncDirs(claudeMemory, geminiMemory);
       syncDirs(geminiMemory, claudeMemory);
+    }
+  }
+  // C-004: Also sync ~/.codex/memories/ if it exists and isn't already the same target
+  // Crush and OpenCode have no native memory dir — they use MCP personal-context instead.
+  const codexMemory = path.join(home, '.codex', 'memories');
+  if (fs.existsSync(codexMemory) && fs.existsSync(claudeMemory)) {
+    let skipCodex = false;
+    try { skipCodex = fs.realpathSync(codexMemory) === fs.realpathSync(claudeMemory); } catch {}
+    if (!skipCodex) {
+      syncDirs(claudeMemory, codexMemory);
+      syncDirs(codexMemory, claudeMemory);
     }
   }
   _endSection('sync-memory');

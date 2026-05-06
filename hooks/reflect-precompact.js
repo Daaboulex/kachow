@@ -14,7 +14,6 @@ const os = require('os');
 
 const { detectTool, toolHomeDir } = require('./lib/tool-detect.js');
 const home = os.homedir();
-const isGemini = detectTool() === 'gemini';
 const configDir = toolHomeDir();
 const enabledFile = path.join(configDir, '.reflect-enabled');
 const lastFile = path.join(configDir, '.reflect-last');

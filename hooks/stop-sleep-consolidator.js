@@ -46,7 +46,6 @@ try {
   const scriptDir = __dirname;
   const { detectTool, toolHomeDir } = require('./lib/tool-detect.js');
   const tool = detectTool();
-  const isGemini = tool === 'gemini';
   const configDir = toolHomeDir(tool);
   const cacheDir = path.join(configDir, 'cache');
   try { fs.mkdirSync(cacheDir, { recursive: true }); } catch {}
@@ -81,7 +80,7 @@ try {
     fs.writeFileSync(lockFile, String(process.pid) + '\n' + new Date().toISOString(), { flag: 'wx' });
   } catch { passthrough(); }
 
-  const binary = tool === 'gemini' ? 'gemini' : tool === 'codex' ? 'codex' : 'claude';
+  const binary = tool === 'gemini' ? 'gemini' : tool === 'codex' ? 'codex' : tool === 'crush' ? 'crush' : tool === 'opencode' ? 'opencode' : 'claude';
   const prompt = '/consolidate-memory deep';
   const logFile = path.join(cacheDir, `sleep-consolidator-${host}.log`);
 

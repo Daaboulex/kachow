@@ -17,6 +17,7 @@ require(__dirname + "/lib/emit-simple-timing.js").start(__filename);
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const { toolHomeDir } = require('./lib/tool-detect.js');
 
 // Thresholds tuned for 1M context (Opus 4.6/4.7). Previous values (35/30/20)
 // were designed for 200K and fired WAY too early on 1M, wasting tokens nagging.

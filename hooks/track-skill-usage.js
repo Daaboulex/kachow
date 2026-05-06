@@ -10,7 +10,6 @@ const path = require('path');
 const os = require('os');
 
 const { detectTool, toolHomeDir } = require('./lib/tool-detect.js');
-const isGemini = detectTool() === 'gemini';
 const home = process.env.HOME || process.env.USERPROFILE || os.homedir();
 const configDir = toolHomeDir();
 

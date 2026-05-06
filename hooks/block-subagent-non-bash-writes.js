@@ -74,7 +74,7 @@ try {
   // ── F4.C: path-restriction for native Write/Edit/MultiEdit/NotebookEdit ──
   // Tool names: Claude uses Write/Edit/MultiEdit/NotebookEdit;
   // Gemini uses write_file/replace; both supported.
-  const isNativeWrite = /^(Write|Edit|MultiEdit|NotebookEdit|write_file|replace)$/.test(toolName);
+  const isNativeWrite = /^(Write|Edit|MultiEdit|NotebookEdit|write_file|replace|apply_patch)$/.test(toolName);
   if (!isNativeWrite) passthrough();
 
   // Extract file_path. Different tools use different keys.
