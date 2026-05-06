@@ -6,6 +6,103 @@ All notable changes to this framework. See [Semantic Versioning](https://semver.
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-05-05
+
+Manifest-driven hook registration, 5-tool architecture, Syncthing+git safety.
+
+### Added
+- **MANIFEST.yaml** — single source of truth for 72 hook registrations across 5 tools
+- **generate-settings.mjs** — manifest → Claude JSON / Gemini JSON / Codex TOML with event/tool/timeout translation
+- **validate-manifest.mjs** — schema validation with critical-hook gate
+- **bootstrap-manifest.mjs** — reverse-engineer manifest from existing configs
+- **convert-commands.mjs** — 13 Claude commands → Codex skills (cmd-* namespace)
+- **config-backup.mjs** — backup/restore for tool configs
+- **COVERAGE.md** — structural hook asymmetry across 5 tools
+- **Crush (charmbracelet) integration** — PreToolUse hooks, MCP, AGENTS.md
+- **OpenCode (sst/opencode) integration** — MCP + instructions config
+- **ConfigChange event** — real-time drift detection (Claude-only)
+- Pre-commit hooks in all global repos for commit-time drift guard
+- `TOOL_SUPPORTS_ASYNC` capability matrix (only Claude supports async)
+- `PermissionRequest` as 6th Codex event
+- `crushToolMap`, `crushEventMap` in platform-map.js
+
+### Changed
+- **platform-map.js** — extended: codexToolMap (16), ALL_EVENTS (13), TOOL_EVENTS per-tool matrix, PASSTHROUGH_MATCHERS
+- **tri-tool-parity-check.js** — rewritten: manifest-aware via generator --check
+- **auto-push-global.js** — ff-only merge (was rebase), credential guard on merge path, ai-context auto-commit ON by default
+- **auto-pull-global.js** — ff-only merge, credential guard, no -X theirs
+- **install-adapters.mjs** — Crush + OpenCode symlinks (hooks, configs, AGENTS.md)
+- `.stignore` — full `.git` exclusion + `*.sync-conflict-*` (was surgical .git/ exclusion)
+- AGENTS.md — 5+2 tool system, manifest workflow, Crush/OpenCode rows
+- Generator emits async:true only for Claude (Gemini/Codex don't support it)
+
+### Fixed
+- dead-hook-detector.js Gemini timeout: 3000ms → 5000ms
+- mirror-kachow.js Gemini timeout: 30000ms → 20000ms
+- subagent-claim-logger.js Gemini timeout: 5000ms → 3000ms
+- Backup corruption on --apply --all (single backup before any writes)
+- Timeout display showing raw ms as seconds
+- MultiEdit leaking into Gemini matchers
+- Invalid --tool typo silently succeeding
+- OpenCode MCP type: local → stdio
+- research-lint.js + auto-push-global.js: async:true removed (exit(2)/systemMessage discarded when async)
+
+### Security
+- Credential guard covers merge path (was commit-only)
+- Stash before reset --hard in credential guard (prevents work loss)
+
+## [0.6.0] — 2026-05-05
+
+### Added
+- `lib/safety-timeout.js` — 5s global ceiling on hook execution
+- `lib/confidence-decay.js` — Ebbinghaus memory decay
+- `lib/session-state.js` — shared JSON state between hooks
+- `scripts/session-cost-report.mjs` — per-model token spend
+
+### Changed
+- 6 heavy hooks gain safety timeout wrapper
+- Memory injection sorted by confidence (not just recency)
+- PreCompact split: manual vs auto with different export depth
+
+## [0.5.0] — 2026-05-05
+
+### Changed
+- Context-pressure thresholds corrected (80%/85%/92%)
+- Reflect hooks consolidated
+- tri-tool-parity-check accuracy improved
+- session-context-loader output compressed
+- Gemini v0.42 + Codex v0.128 settings applied
+
+### Fixed
+- 4 private-info scrub leaks patched
+
+## [0.4.0] — 2026-05-05
+
+### Changed
+- Hook p95 dropped 6000ms → 141ms
+- 66 hooks, 28 lib modules, 19 self-improvement detectors
+- Passive analytics pipeline
+
+## [0.3.0] — 2026-05-05
+
+### Added
+- Codex CLI as 3rd supported tool (6-event model)
+- `wire-hook-codex.mjs` — TOML-based Codex hook registration
+- `tri-tool-parity-check` — SessionStart drift detection (24h cooldown)
+- 16 hooks added (45→61 total)
+
+### Changed
+- `auto-push-global` extended to commit/push `~/.codex/`
+- Credential regex hardened (filename-only anchored)
+- `install-hooks.mjs` replaces `.sh` (Node ESM, idempotent, manifest-driven)
+
+### Fixed
+- Presence heartbeat bug: no longer overwrites start records
+- session-context-loader memory category regex fixed
+
+### Security
+- P0 scrub: hardcoded project directory names replaced with env vars
+
 ## [0.2.0] — 2026-05-05
 
 ### Changed
