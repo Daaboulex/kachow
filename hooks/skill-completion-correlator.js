@@ -22,8 +22,8 @@ try {
 
   const sessionId = input.session_id || 'unknown';
   const home = process.env.HOME || process.env.USERPROFILE || os.homedir();
-  const tool = require(__dirname + '/lib/tool-detect.js').detectTool();
-  const configDir = path.join(home, tool === 'gemini' ? '.gemini' : '.claude');
+  const tp = require('./lib/tool-paths.js');
+  const configDir = tp.configDir;
   const logPath = path.join(configDir, `.skill-log-${sessionId}.jsonl`);
 
   if (!fs.existsSync(logPath)) passthrough();

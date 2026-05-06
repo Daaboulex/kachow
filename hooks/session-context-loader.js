@@ -740,7 +740,7 @@ try {
   // Skill awareness injection (jcode pattern: skills as memory entries)
   // Surface available skills so the model knows what tools exist without explicit /slash
   try {
-    const commandsDir = path.join(os.homedir(), '.claude', 'commands');
+    const commandsDir = path.join(require('./lib/tool-paths.js').configDir, 'commands');
     if (fs.existsSync(commandsDir)) {
       const skills = [];
       for (const f of fs.readdirSync(commandsDir)) {
@@ -775,7 +775,7 @@ try {
   // Unread notifications (added 2026-04-17): fallback for SSH/headless sessions.
   // notify-send hook fails silently on headless; this surfaces queued notifications.
   try {
-    const notifFile = path.join(os.homedir(), '.claude', '.notifications.jsonl');
+    const notifFile = path.join(require('./lib/tool-paths.js').configDir, '.notifications.jsonl');
     if (fs.existsSync(notifFile)) {
       const lines = fs.readFileSync(notifFile, 'utf8').split('\n').filter(Boolean);
       if (lines.length > 0) {

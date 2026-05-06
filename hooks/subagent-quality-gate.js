@@ -24,7 +24,7 @@ try {
   // Markers keyed by session_id-pid. Clean up both new format and legacy format.
   if (sessionId) {
     try {
-      const markerDir = path.join(os.homedir(), '.claude', 'cache', 'subagent-active');
+      const markerDir = require('./lib/tool-paths.js').subagentMarkerDir;
       // New format: session_id-pid.json
       const markerPath = path.join(markerDir, `${sessionId}-${process.pid}.json`);
       if (fs.existsSync(markerPath)) fs.unlinkSync(markerPath);

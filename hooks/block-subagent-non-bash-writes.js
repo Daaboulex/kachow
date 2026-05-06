@@ -37,7 +37,8 @@ try {
   if (!sessionId || !toolName) passthrough();
 
   // Subagent context check
-  const markerDir = path.join(os.homedir(), '.claude', 'cache', 'subagent-active');
+  const tp = require('./lib/tool-paths.js');
+  const markerDir = tp.subagentMarkerDir;
   const markerPath = path.join(markerDir, `${sessionId}-${process.pid}.json`);
   if (!fs.existsSync(markerPath)) passthrough();
 

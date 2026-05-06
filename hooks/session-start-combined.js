@@ -295,6 +295,37 @@ try {
     if (portable) {
       if (!isAlreadyLinked(memoryDir)) createSymlink(memoryDir, portable);
       if (!isAlreadyLinked(dashMemoryDir)) createSymlink(dashMemoryDir, portable);
+    } else {
+      // Auto-capture: if a real memory dir has content, centralize it
+      for (const dir of [dashMemoryDir, memoryDir]) {
+        try {
+          const stat = fs.lstatSync(dir);
+          if (stat.isSymbolicLink()) continue;
+          if (!stat.isDirectory()) continue;
+          const mds = fs.readdirSync(dir).filter(f => f.endsWith('.md') && f !== 'MEMORY.md');
+          if (mds.length === 0) continue;
+          // Derive project name and create project-state entry
+          const slug = path.basename(path.dirname(dir));
+          const parts = slug.replace(/^-/, '').split('-');
+          const docsIdx = parts.indexOf('Documents');
+          const name = docsIdx >= 0 ? parts.slice(docsIdx + 1).join('-') : parts.slice(-2).join('-');
+          const target = path.join(home, '.ai-context', 'project-state', name, 'memory');
+          if (fs.existsSync(target)) continue; // already centralized under different path
+          fs.mkdirSync(target, { recursive: true });
+          for (const f of fs.readdirSync(dir)) {
+            const s = path.join(dir, f);
+            const d = path.join(target, f);
+            if (fs.statSync(s).isDirectory()) fs.cpSync(s, d, { recursive: true });
+            else fs.copyFileSync(s, d);
+          }
+          // Ensure MEMORY.md in target
+          if (!fs.existsSync(path.join(target, 'MEMORY.md'))) {
+            fs.writeFileSync(path.join(target, 'MEMORY.md'), `# Memory Index — ${name}\n\n` + mds.map(f => `- [${f}](${f})`).join('\n') + '\n');
+          }
+          fs.rmSync(dir, { recursive: true });
+          fs.symlinkSync(target, dir);
+        } catch {}
+      }
     }
   }
   _endSection('portable-memory');

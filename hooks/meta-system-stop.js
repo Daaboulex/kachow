@@ -22,13 +22,14 @@ const path = require('path');
 const os = require('os');
 
 const home = os.homedir();
-const configDir = path.join(home, '.claude');
+const tp = require('./lib/tool-paths.js');
+const configDir = tp.configDir;
 const cwd = process.cwd();
 const messages = [];
 
 // Constants centralized in lib/constants.js (CI-001)
-const { SKILL_REGRESSION_DROP_THRESHOLD, SKILL_MIN_INVOCATIONS, MIN_SESSIONS_PER_WINDOW, SKILL_REGRESSION_EXEMPT, RESEARCH_COOLDOWN_MS: RES_COOLDOWN, RESEARCH_MIN_SESSIONS: RES_MIN_SESSIONS } = require(path.join(configDir, 'hooks', 'lib', 'constants.js'));
-const { readCounter } = require(path.join(configDir, 'hooks', 'lib', 'atomic-counter.js'));
+const { SKILL_REGRESSION_DROP_THRESHOLD, SKILL_MIN_INVOCATIONS, MIN_SESSIONS_PER_WINDOW, SKILL_REGRESSION_EXEMPT, RESEARCH_COOLDOWN_MS: RES_COOLDOWN, RESEARCH_MIN_SESSIONS: RES_MIN_SESSIONS } = require('./lib/constants.js');
+const { readCounter } = require('./lib/atomic-counter.js');
 
 // --- Section A: Skill Regression Detector (v2 — per-session-rate normalized) ---
 // D-05 adapted: frequency analysis with session-count normalization.

@@ -25,10 +25,11 @@ const path = require('path');
 const os = require('os');
 
 const home = os.homedir();
-const claudeDir = path.join(home, '.claude');
-const enabledFile = path.join(claudeDir, '.reflect-enabled');
-const lastFile = path.join(claudeDir, '.reflect-last');
-const wrapUpDone = path.join(claudeDir, '.wrapup-done');
+const { toolHomeDir } = require('./lib/tool-detect.js');
+const configDir = toolHomeDir();
+const enabledFile = path.join(configDir, '.reflect-enabled');
+const lastFile = path.join(configDir, '.reflect-last');
+const wrapUpDone = path.join(configDir, '.wrapup-done');
 const COOLDOWN_MS = 15 * 60 * 1000; // 15 minutes (was 60 — most sessions never got nudged)
 
 try {

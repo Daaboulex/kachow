@@ -45,11 +45,11 @@ try {
   }
 
   const home = os.homedir();
+  const tp = require('./lib/tool-paths.js');
   const isGemini = normalized.includes('/.gemini/hooks/');
   const settingsPath = isGemini
     ? path.join(home, '.gemini', 'settings.json')
-    // ai-context/hooks/ edits use Claude settings (canonical — symlinked everywhere)
-    : path.join(home, '.claude', 'settings.json');
+    : path.join(tp.configDir, 'settings.json');
 
   // Canonical hook events per platform — registrations under other names are dead code.
   const CANONICAL_EVENTS_CLAUDE = new Set([
@@ -97,9 +97,7 @@ try {
 
   // 2. Scan combined hooks for require('./...') references to sub-modules
   const referencedFiles = new Set();
-  const hooksDir = isGemini
-    ? path.join(home, '.gemini', 'hooks')
-    : path.join(home, '.claude', 'hooks');
+  const hooksDir = tp.hooksDir;
   const combinedHooks = [
     'session-start-combined.js',
     'pre-write-combined-guard.js',
@@ -144,7 +142,7 @@ try {
   // ────────────────────────────────────────────────────────────────────────────
   if (!isGemini) {
     const DEAD_CODE_COOLDOWN = 24 * 60 * 60 * 1000; // 24 hours
-    const deadCodeLastFile = path.join(home, '.claude', '.dead-code-last');
+    const deadCodeLastFile = path.join(tp.configDir, '.dead-code-last');
     let deadCodeLastTime = 0;
     try { deadCodeLastTime = fs.statSync(deadCodeLastFile).mtimeMs; } catch {}
 
@@ -227,7 +225,7 @@ function runExtendedScan(home, hooksDir) {
         if (skillName) invokedSkills.add(skillName);
       }
 
-      const commandsDir = path.join(home, '.claude', 'commands');
+      const commandsDir = path.join(tp.configDir, 'commands');
       if (fs.existsSync(commandsDir)) {
         const entries = fs.readdirSync(commandsDir, { withFileTypes: true });
         for (const entry of entries) {
@@ -311,7 +309,7 @@ function runExtendedScan(home, hooksDir) {
     } catch {}
 
     // ── 6. Update cooldown timestamp ──
-    const deadCodeLastFile = path.join(home, '.claude', '.dead-code-last');
+    const deadCodeLastFile = path.join(tp.configDir, '.dead-code-last');
     fs.writeFileSync(deadCodeLastFile, '');
   } catch (e) {
     // Extended scan must never throw — advisory only

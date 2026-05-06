@@ -25,7 +25,7 @@ try {
   // SubagentStop. Fail-open: if write fails, block hook no-ops.
   if (sessionId) {
     try {
-      const markerDir = path.join(os.homedir(), '.claude', 'cache', 'subagent-active');
+      const markerDir = require('./lib/tool-paths.js').subagentMarkerDir;
       fs.mkdirSync(markerDir, { recursive: true });
       // Key by session_id + pid to avoid blocking parent session.
       // Old key was session_id alone — parent's own git commands got blocked

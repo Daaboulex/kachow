@@ -10,9 +10,10 @@ const path = require('path');
 const os = require('os');
 
 const home = os.homedir();
+const tp = require('./lib/tool-paths.js');
 const skillDirs = [
-  path.join(home, '.claude', 'skills'),
-  path.join(home, '.gemini', 'skills'),
+  path.join(tp.configDir, 'skills'),
+  path.join(tp.aiContextDir, 'skills'),
 ];
 const COOLDOWN_DAYS = 7;
 

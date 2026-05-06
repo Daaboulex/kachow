@@ -9,9 +9,10 @@ const os = require('os');
 const { execSync } = require('child_process');
 
 const home = os.homedir();
-const claudeDir = path.join(home, '.claude');
+const tp = require('./lib/tool-paths.js');
+const claudeDir = path.join(home, '.claude'); // Claude-specific: plugin cache is Claude-only
 const codexSkills = path.join(home, '.codex', 'skills');
-const cooldownFile = path.join(claudeDir, 'cache', 'skill-auto-update-last.json');
+const cooldownFile = path.join(tp.cacheDir, 'skill-auto-update-last.json');
 const logFile = path.join(home, '.ai-context', 'instances', 'skill-auto-updates.jsonl');
 const COOLDOWN_MS = 24 * 60 * 60 * 1000;
 

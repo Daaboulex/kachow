@@ -37,7 +37,13 @@ if [ ! -f "$AI/configs/claude-settings.json" ]; then
   fail "configs/claude-settings.json missing. Syncthing sync incomplete."
 fi
 
-ok "ai-context synced (configs/ present)"
+# Verify Syncthing sync is complete (not just configs/ — check hooks have enough files)
+HOOK_COUNT=$(ls "$AI/hooks/"*.js 2>/dev/null | wc -l)
+if [ "$HOOK_COUNT" -lt 60 ]; then
+  fail "Only $HOOK_COUNT hook files found (expected 60+). Syncthing sync likely incomplete. Wait and re-run."
+fi
+
+ok "ai-context synced (configs/ present, $HOOK_COUNT hooks verified)"
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 2. Push any unpushed MacBook commits from tool dirs
@@ -54,7 +60,25 @@ for d in "$HOME/.claude" "$HOME/.gemini" "$HOME/.codex"; do
     fi
     # Push if remote exists
     if git remote get-url origin &>/dev/null; then
-      git push origin main 2>/dev/null && ok "$name: pushed to origin" || warn "$name: push failed (repo may be archived — that's expected)"
+      if git push origin main 2>/dev/null; then
+        ok "$name: pushed to origin"
+      else
+        # Check if repo is archived (push fails but history is preserved on GitHub)
+        REMOTE_URL=$(git remote get-url origin 2>/dev/null || echo "")
+        REPO_NAME=$(echo "$REMOTE_URL" | sed -n 's|.*github.com[:/]\(.*\)\.git|\1|p')
+        if [ -n "$REPO_NAME" ] && command -v gh &>/dev/null; then
+          IS_ARCHIVED=$(gh repo view "$REPO_NAME" --json isArchived -q '.isArchived' 2>/dev/null || echo "unknown")
+          if [ "$IS_ARCHIVED" = "true" ]; then
+            ok "$name: repo archived on GitHub — history preserved, push not needed"
+          elif [ "$IS_ARCHIVED" = "unknown" ]; then
+            warn "$name: push failed and could not verify repo status — check manually before proceeding"
+          else
+            fail "$name: push failed but repo is NOT archived — network/auth issue. Fix before continuing."
+          fi
+        else
+          warn "$name: push failed (repo may be archived or offline)"
+        fi
+      fi
     else
       warn "$name: no remote configured"
     fi
@@ -208,7 +232,16 @@ if [ -d "$NIX" ]; then
   if [ -L "$NIX/.ai-context" ]; then
     ok "nix/.ai-context: already symlinked"
   elif [ -d "$NIX/.ai-context/.git" ]; then
-    warn "nix/.ai-context is still a submodule — needs manual 'git submodule deinit' + symlink"
+    step "Migrating nix .ai-context submodule → symlink"
+    cd "$NIX"
+    git submodule deinit -f .ai-context 2>/dev/null || true
+    git rm -f .ai-context 2>/dev/null || true
+    ln -sf "$AI/project-state/nix" .ai-context
+    git add .ai-context .gitmodules 2>/dev/null || true
+    git commit -m "chore: replace .ai-context submodule with symlink to centralized project-state" --no-gpg-sign 2>/dev/null || true
+    ok "nix/.ai-context: migrated submodule → symlink"
+  elif [ -d "$NIX/.ai-context" ]; then
+    warn "nix/.ai-context exists as a real directory (not submodule, not symlink) — check manually"
   fi
 fi
 

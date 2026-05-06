@@ -1,22 +1,27 @@
 #!/usr/bin/env node
-// Install / verify AGENTS.md symlinks for every supported AI tool.
+// Install / verify symlinks for every supported AI tool.
 // Idempotent — safe to re-run.
 //
-// Canonical source: $AI_CONTEXT/AGENTS.md (defaults: env $AI_CONTEXT → parent
-// of this script's dir → $HOME/.ai-context). The same resolution order the
-// PowerShell version uses, now available on every OS.
+// WHAT'S CANONICAL (in ~/.ai-context/):
+//   AGENTS.md      — global instructions (symlinked as CLAUDE.md/GEMINI.md/AGENTS.md)
+//   hooks/         — all hooks (dir-symlinked into tool dirs)
+//   commands/      — user slash commands (dir-symlinked into Claude/Gemini)
+//   skills/        — portable skills (dir-symlinked per-skill into tool skill dirs)
+//   configs/       — all tool settings (file-symlinked into tool dirs)
+//   memory/        — global memories (dir-symlinked into tool memory dirs)
+//
+// WHAT'S PLUGIN-MANAGED (per-tool, NOT centralized):
+//   GSD skills/agents/commands — managed by GSD plugin
+//   CE skills                  — managed by compound-engineering plugin
+//   Tool-specific plugins      — Claude plugins/, Gemini extensions/
+//
+// WHAT'S TOOL-SPECIFIC (per-tool, by design):
+//   plugins/, file-history/, caches, credentials, active-sessions.jsonl
 //
 // Symlink strategy:
 //   Linux / macOS — always fs.symlinkSync.
 //   Windows       — tries fs.symlinkSync ('file' type). If that fails (no
-//                   Developer Mode + not elevated), falls back to copy mode
-//                   and prints the Dev Mode fix.
-//
-// Hidden drift from the .sh / .ps1 originals (both preserved in .mjs):
-//   - sh defaulted AI_CONTEXT to $HOME/.ai-context only; ps1 also fell back
-//     to the script's parent. This .mjs uses the ps1 resolution everywhere.
-//   - sh had no copy fallback; ps1 did. This .mjs keeps the copy fallback
-//     (never applies on POSIX — symlinks always succeed there).
+//                   Developer Mode + not elevated), falls back to copy mode.
 
 'use strict';
 
@@ -54,6 +59,8 @@ const EXTRA_SYMLINKS = [
   { label: 'claude-settings', src: path.join(AI_CONTEXT, 'configs', 'claude-settings.json'), dest: path.join(HOME, '.claude', 'settings.json') },
   { label: 'gemini-settings', src: path.join(AI_CONTEXT, 'configs', 'gemini-settings.json'), dest: path.join(HOME, '.gemini', 'settings.json') },
   { label: 'codex-config',    src: path.join(AI_CONTEXT, 'configs', 'codex-config.toml'),    dest: path.join(HOME, '.codex', 'config.toml') },
+  { label: 'claude-commands',  src: path.join(AI_CONTEXT, 'commands'),                         dest: path.join(HOME, '.claude', 'commands') },
+  { label: 'gemini-commands', src: path.join(AI_CONTEXT, 'commands'),                         dest: path.join(HOME, '.gemini', 'commands') },
   { label: 'crush-hooks',     src: path.join(AI_CONTEXT, 'hooks'),                           dest: path.join(HOME, '.crush', 'hooks') },
   { label: 'crush-config',    src: path.join(AI_CONTEXT, 'configs', 'crush.json'),            dest: path.join(HOME, '.config/crush', 'crush.json') },
   { label: 'opencode-config', src: path.join(AI_CONTEXT, 'configs', 'opencode.json'),         dest: path.join(HOME, '.config/opencode', 'config.json') },
@@ -175,6 +182,43 @@ for (const { label, src, dest } of EXTRA_SYMLINKS) {
   const type = fs.statSync(src).isDirectory() ? 'dir' : 'file';
   fs.symlinkSync(src, dest, type);
   console.log(`+ ${label}: linked → ${src}`);
+}
+
+// Portable skills: symlink each canonical skill dir into each tool's skills/ dir
+console.log('');
+console.log('== Portable skills (canonical → tool skill dirs) ==');
+const SKILL_TOOLS = [
+  { label: 'claude', dir: path.join(HOME, '.claude', 'skills') },
+  { label: 'gemini', dir: path.join(HOME, '.gemini', 'skills') },
+  { label: 'codex',  dir: path.join(HOME, '.codex', 'skills') },
+];
+const skillsCanonical = path.join(AI_CONTEXT, 'skills');
+if (fs.existsSync(skillsCanonical)) {
+  const skillDirs = fs.readdirSync(skillsCanonical, { withFileTypes: true })
+    .filter(d => d.isDirectory());
+  for (const skill of skillDirs) {
+    const skillSrc = path.join(skillsCanonical, skill.name);
+    for (const { label, dir: toolSkillsDir } of SKILL_TOOLS) {
+      const dest = path.join(toolSkillsDir, skill.name);
+      fs.mkdirSync(toolSkillsDir, { recursive: true });
+      let existing;
+      try { existing = fs.lstatSync(dest); } catch { existing = null; }
+      if (existing && existing.isSymbolicLink() && fs.readlinkSync(dest) === skillSrc) {
+        continue; // already correct
+      }
+      if (existing && existing.isSymbolicLink()) {
+        fs.unlinkSync(dest); // stale symlink
+      }
+      if (existing && !existing.isSymbolicLink()) {
+        continue; // real dir — plugin-managed, don't overwrite
+      }
+      fs.symlinkSync(skillSrc, dest, 'dir');
+      console.log(`+ ${label}/${skill.name}: linked → ${skillSrc}`);
+    }
+  }
+  console.log(`  ${skillDirs.length} portable skills checked across ${SKILL_TOOLS.length} tools`);
+} else {
+  console.log('- no canonical skills dir found');
 }
 
 console.log('');
