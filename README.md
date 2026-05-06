@@ -248,7 +248,11 @@ Inspired-by, not forked: kachow's hooks, commands, skills, and memory schema are
 ## Roadmap
 
 - [x] **v0.2.0** — Documentation rewrite (60+ hooks documented, count corrections, identity refresh), context-pressure threshold fix, scrub leak fixes
-- [ ] **v0.3.0** — Scheduled CI job to detect Claude Code / Gemini CLI version drift and file a release-prep issue
+- [x] **v0.3.0** — Codex as 3rd tool, tri-tool parity checker, 16 new hooks
+- [x] **v0.4.0** — Hook p95 6000ms→141ms, 66 hooks, passive analytics pipeline
+- [x] **v0.5.0** — Hook system restoration (47 items), 17 bugs fixed, context-pressure corrections
+- [x] **v0.6.0** — Safety timeout, confidence decay, session state lib, cost tracker
+- [x] **v0.7.0** — Manifest-driven hooks, 5-tool architecture (Crush + OpenCode), sync safety
 - [ ] **v1.0.0** — API stability promise for hook interface + settings template shape
 
 ## Contributing
