@@ -5,6 +5,8 @@ description: Review pending AI-system self-improvements detected by meta-system-
 
 # /review-improvements
 
+> **Note:** This command is Claude-only by design, not a missing feature. The `meta-system-stop.js` detector and `self-improvements-pending.jsonl` queue are Claude Code-specific. Gemini, Codex, Crush, and OpenCode do not generate self-improvement entries — they use the same hook files but lack the Stop-hook analysis pipeline that feeds this queue.
+
 Read `~/.claude/self-improvements-pending.jsonl` via `~/.claude/hooks/lib/self-improvement/queue.js`. For each entry, present to [user] for decision.
 
 ## Steps

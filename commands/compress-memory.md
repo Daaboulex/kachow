@@ -22,8 +22,8 @@ accumulate knowledge over time — this command prunes without losing informatio
 ### Step 1: Inventory
 
 ```bash
-echo "Memory files: $(ls ~/.claude/projects/*/memory/*.md 2>/dev/null | wc -l)"
-echo "MEMORY.md lines: $(wc -l < ~/.claude/projects/*/memory/MEMORY.md 2>/dev/null)"
+echo "Memory files: $(ls ~/.ai-context/memory/*.md 2>/dev/null | wc -l)"
+echo "MEMORY.md lines: $(wc -l < ~/.ai-context/memory/MEMORY.md 2>/dev/null)"
 ```
 
 ### Step 2: Identify compression candidates
@@ -56,8 +56,8 @@ After: 20-line summary of what was done + what's still open
 
 **ARCHIVE:** Move to a `.archive/` subdirectory (don't delete — just remove from MEMORY.md index):
 ```bash
-mkdir -p ~/.claude/projects/*/memory/.archive/
-mv old-memory.md ~/.claude/projects/*/memory/.archive/
+mkdir -p ~/.ai-context/memory/.archive/
+mv old-memory.md ~/.ai-context/memory/.archive/
 ```
 
 ### Step 4: Update MEMORY.md index
@@ -66,7 +66,7 @@ Remove entries for archived/removed files. Ensure every remaining file has an in
 
 ### Step 5: Sync
 
-Run `/sync-all` to propagate changes to Gemini.
+Run `/sync-all` to propagate changes across all tools.
 
 ## Rules
 

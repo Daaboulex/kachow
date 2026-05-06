@@ -375,7 +375,7 @@ ls home/modules/ | wc -l  # compare with count in CLAUDE.md
 
 Go beyond "file exists." Test actual functionality:
 
-**4d-i. File existence** (both platforms):
+**4d-i. File existence** (all tools share hooks via `~/.ai-context/hooks/`):
 ```bash
 # Claude hooks
 jq -r '.hooks[][] | .hooks[]? | .command' ~/.claude/settings.json | grep -o '[^ ]*\.js' | while read f; do
@@ -385,6 +385,7 @@ done
 jq -r '.hooks[][] | .hooks[]? | .command' ~/.gemini/settings.json | grep -o '[^ ]*\.js' | while read f; do
   [ -f "$HOME/.gemini/hooks/$f" ] || echo "MISSING (Gemini): $f"
 done
+# Codex/Crush hooks use the same ~/.ai-context/hooks/ symlinks — verify their settings.json references if modified
 ```
 
 **4d-ii. Output format validation** — run each hook with empty input, verify valid JSON:
@@ -402,6 +403,7 @@ GSD hooks may output nothing on empty input — that's expected. Flag hooks that
 jq -r '.hooks.PreToolUse[]?.hooks[]?.command' ~/.claude/settings.json 2>/dev/null | grep -i sync && echo "WARNING: sync hook under PreToolUse (should be PostToolUse)"
 # Gemini: sync hooks should be under AfterTool
 jq -r '.hooks.BeforeTool[]?.hooks[]?.command' ~/.gemini/settings.json 2>/dev/null | grep -i sync && echo "WARNING: sync hook under BeforeTool (should be AfterTool)"
+# Codex: sync hooks should be under PostToolUse; Crush: PreToolUse only (no PostToolUse)
 ```
 
 **4d-iv. Agent frontmatter validation** — check for platform-invalid keys:
@@ -415,7 +417,7 @@ done
 
 ### 4e. Platform Parity — Cross-check settings.json
 
-Verify both settings.json files have equivalent hooks with correct platform mappings:
+Verify all tools' settings.json files have equivalent hooks with correct platform mappings (Claude + Gemini are the primary pair; Codex and Crush share the same hook files via symlinks from `~/.ai-context/`):
 
 **Event name mapping** (Claude → Gemini):
 - `SessionStart` → `SessionStart` (same)
@@ -439,8 +441,8 @@ Exceptions: `InstructionsLoaded`, `StopFailure`, `TaskCompleted` are Claude-only
 
 **Translation pattern parity** — count forward vs reverse patterns:
 ```bash
-echo "sync-gemini-md.js patterns: $(grep -c '\.replace(' ~/.claude/hooks/sync-gemini-md.js)"
-echo "sync-claude-md.js patterns: $(grep -c '\.replace(' ~/.gemini/hooks/sync-claude-md.js)"
+echo "sync-gemini-md.js patterns: $(grep -c '\.replace(' ~/.ai-context/hooks/sync-gemini-md.js)"
+echo "sync-claude-md.js patterns: $(grep -c '\.replace(' ~/.ai-context/hooks/sync-claude-md.js)"
 ```
 These should be roughly equal. A large imbalance means a pattern was added to one direction but not the reverse.
 
@@ -497,7 +499,7 @@ Tracked: [N] skills | Stale: [M] | Needs rewrite: [K]
 After successful consolidation, reset the trigger state so the dual-gate timer restarts:
 
 ```bash
-# Reset session counter
+# Reset session counter (Claude state dir)
 echo "0" > ~/.claude/.dream-session-count
 # Reset cooldown timer
 touch ~/.claude/.dream-last

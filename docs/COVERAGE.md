@@ -4,7 +4,7 @@ Documents which hook events exist in which tools, why gaps are structural (not b
 and what coverage the 72 hooks in MANIFEST.yaml actually achieve.
 
 Generated from: `scripts/MANIFEST.yaml` + architecture docs.
-Last updated: 2026-05-05 (Crush added as 4th tool).
+Last updated: 2026-05-06 (5-tool architecture, v0.9.4).
 
 ---
 

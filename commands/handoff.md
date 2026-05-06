@@ -105,8 +105,7 @@ Write a structured handoff file:
 
 Write to: `~/.ai-context/handoffs/sessions/<session-id>.md`
 
-**To get the session ID:** Read `~/.ai-context/handoffs/sessions/.current-session-claude.json` — the
-auto-save hook writes this pointer. Use the `session_id` field from that file.
+**To get the session ID:** Read `~/.ai-context/handoffs/sessions/.current-session-claude.json` (Claude) or `.current-session-gemini.json` / `.current-session-codex.json` as appropriate — the auto-save hook writes this pointer. Use the `session_id` field from that file.
 If the file doesn't exist (auto-save never fired), use a timestamp-based ID: `manual-YYYY-MM-DDTHH-MM`.
 
 **One location. No cascade. No fallback.** Per-session-id filenames prevent collisions.

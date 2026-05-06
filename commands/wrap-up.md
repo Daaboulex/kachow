@@ -4,7 +4,7 @@ description: End-of-session orchestrator — reflect, verify sync, ensure nothin
 
 # Session Wrap-Up
 
-Orchestrate the end-of-session flow. This ensures learnings are captured, sync is verified, and both repos are clean before the auto-push commits everything.
+Orchestrate the end-of-session flow. This ensures learnings are captured, sync is verified, and `~/.ai-context/` is clean before the auto-push commits everything.
 
 **When to run:** Before ending any session where you did meaningful work (code changes, skill edits, hook modifications, memory updates, CLAUDE.md changes). The Stop hook will remind you if you haven't run this.
 
@@ -31,24 +31,24 @@ CTX_REMAINING=$(cat /tmp/claude-ctx-*.json 2>/dev/null | node -e "
 " 2>/dev/null || echo 100)
 
 # Signal 2: commits this session across all known layers
-COMMITS_GLOBAL=$(git -C ~/.claude log --oneline --since="12 hours ago" 2>/dev/null | wc -l)
-COMMITS_GEMINI=$(git -C ~/.gemini log --oneline --since="12 hours ago" 2>/dev/null | wc -l)
+# ~/.ai-context is the ONLY global git repo (tool dirs are derived state, not git repos)
+COMMITS_GLOBAL=$(git -C ~/.ai-context log --oneline --since="12 hours ago" 2>/dev/null | wc -l)
 COMMITS_CWD=$(git log --oneline --since="12 hours ago" 2>/dev/null | wc -l)
-TOTAL_COMMITS=$((COMMITS_GLOBAL + COMMITS_GEMINI + COMMITS_CWD))
+TOTAL_COMMITS=$((COMMITS_GLOBAL + COMMITS_CWD))
 
 # Signal 3: uncommitted changes (dirty vs clean)
-DIRTY_GLOBAL=$(git -C ~/.claude status --porcelain 2>/dev/null | wc -l)
+DIRTY_GLOBAL=$(git -C ~/.ai-context status --porcelain 2>/dev/null | wc -l)
 DIRTY_CWD=$(git status --porcelain 2>/dev/null | wc -l)
 
 # Signal 4: session touched skills/hooks/memories (risky categories)
 RISKY_CHANGES=0
-git -C ~/.claude log --since="12 hours ago" --name-only --pretty=format: 2>/dev/null | grep -qE "hooks/|skills/|commands/" && RISKY_CHANGES=1
+git -C ~/.ai-context log --since="12 hours ago" --name-only --pretty=format: 2>/dev/null | grep -qE "hooks/|skills/|commands/" && RISKY_CHANGES=1
 
 # Signal 5: phase just completed (check for recent VERIFICATION.md or state transition)
 PHASE_COMPLETED=$(find .planning/phases -name "*-VERIFICATION.md" -newer .planning/STATE.md 2>/dev/null | head -1)
 
 # Signal 6: corrections/errors in recent episodic events
-CORRECTION_EVENTS=$(find ~/.claude/projects/*/memory/episodic/*.jsonl 2>/dev/null -mtime -1 -exec grep -h "hook_errors\|correction" {} \; 2>/dev/null | wc -l)
+CORRECTION_EVENTS=$(find ~/.ai-context/memory/episodic/*.jsonl 2>/dev/null -mtime -1 -exec grep -h "hook_errors\|correction" {} \; 2>/dev/null | wc -l)
 ```
 
 ### Route to scenario
@@ -58,7 +58,7 @@ CORRECTION_EVENTS=$(find ~/.claude/projects/*/memory/episodic/*.jsonl 2>/dev/nul
 | **A. Emergency handoff** | `CTX_REMAINING` ≤ 10% | Skip to `/handoff` only. Do NOT run reflect/verify-sync — no tokens to spare. |
 | **B. Read-only session** | `TOTAL_COMMITS == 0` AND `DIRTY_GLOBAL == 0` AND `DIRTY_CWD == 0` | Skip wrap-up entirely. Report "Nothing to persist." |
 | **C. Light session** | `TOTAL_COMMITS` 1-4 AND `RISKY_CHANGES == 0` | Mini wrap-up: Steps 1 + 2 (skip 3/verify-sync unless dirty global) |
-| **D. Full session** | `TOTAL_COMMITS` ≥ 5 OR `RISKY_CHANGES == 1` OR `DIRTY_GLOBAL > 0` | Full wrap-up: Steps 0-4 including verify-sync |
+| **D. Full session** | `TOTAL_COMMITS` ≥ 5 OR `RISKY_CHANGES == 1` OR `DIRTY_GLOBAL > 0` | Full wrap-up: Steps 0-4 including verify-sync (checks all 5 tools) |
 | **E. Phase completion** | `PHASE_COMPLETED` is non-empty | Full wrap-up + milestone audit check: `/gsd:audit-uat` after Step 3 |
 | **F. Correction-heavy** | `CORRECTION_EVENTS` ≥ 3 | Full wrap-up with priority on Step 2 (reflect) — prompt for each correction explicitly |
 
@@ -390,11 +390,10 @@ try {
 "
 ```
 
-**3g. Uncommitted changes (global repos):**
+**3g. Uncommitted changes (global repo):**
 
 ```
-git -C ~/.claude status --porcelain | head -5
-git -C ~/.gemini status --porcelain | head -5
+git -C ~/.ai-context status --porcelain | head -5
 ```
 
 If issues found, fix them before the session ends.
@@ -412,12 +411,12 @@ If everything clean, report: "Sync: OK"
 - [list of memories/rules/skills created or updated, or "None"]
 
 ### Sync Status
-- Claude ↔ Gemini: [OK | issues found and fixed | DRIFT — details]
+- All 5 tools: [OK | issues found and fixed | DRIFT — details]
 
 ### Auto-Push Ready
-- ~/.claude/: [N files changed, ready to commit]
-- ~/.gemini/: [N files changed, ready to commit]
+- ~/.ai-context/: [N files changed, ready to commit]
 - auto-push-global.js will commit+push on session end (30-min cooldown)
+- All tool dirs pick up changes via symlinks — no separate push needed
 ```
 
 ## Important

@@ -59,12 +59,12 @@ ls .gemini/skills/ .gemini/rules/ .gemini/memory/ 2>/dev/null
 
 | Layer | Claude | Gemini | Scope |
 |-------|--------|--------|-------|
-| **Global** | `~/.claude/CLAUDE.md`, `~/.claude/commands/`, `~/.claude/hooks/` | `~/.gemini/extensions/` | All projects |
+| **Global** | `~/.claude/CLAUDE.md` (symlink → `~/.ai-context/AGENTS.md`), `~/.ai-context/commands/`, `~/.ai-context/hooks/` | `~/.gemini/extensions/` | All projects |
 | **Project** | `.claude/skills/`, `.claude/rules/`, `.claude/memory/` | `.gemini/skills/`, `.gemini/rules/`, `.gemini/memory/` | This repo |
 | **NixOS variant** | `.ai-context/.claude/` (symlinked) | `.ai-context/.gemini/` (symlinked) | This repo |
-| **Claude global memory** | `~/.claude/projects/<path-encoded>/memory/` | — | This project, persists across sessions |
+| **Global memory** | `~/.ai-context/memory/` (shared, symlinked into all tool dirs) | — | All projects, persists across sessions |
 
-Note the project memory directory path for Claude global memory — it encodes the project path (e.g., `~/.claude/projects/-home-user-[project-dir]/memory/`).
+Note: global memory lives in `~/.ai-context/memory/` and is symlinked into each tool's memory path.
 
 ## Phase 2: Scan for Signals
 
@@ -131,7 +131,7 @@ Examples:
 | Stop | SessionEnd |
 | PreCompact | PreCompress |
 
-When proposing a hook, specify: event name, matcher (if tool-specific), what it does, and the Gemini equivalent event name. New hooks MUST be registered in BOTH `~/.claude/settings.json` AND `~/.gemini/settings.json`.
+When proposing a hook, specify: event name, matcher (if tool-specific), what it does, and the equivalent event name for each tool. New hooks MUST be registered in all applicable settings.json files (Claude + Gemini + Codex + Crush where events exist). Hook files live in `~/.ai-context/hooks/` and are symlinked into tool dirs.
 
 ### Q3: Should this be a SKILL?
 A skill is appropriate when the learning is a **repeatable multi-step procedure** that would save significant time if codified. Skills are the heaviest artifact — only create one when the procedure has 3+ steps, involves specific files/tools, and will be reused.
@@ -172,7 +172,7 @@ Examples: "bugs tracked in Linear project INGEST", "pipeline docs at wiki.intern
 |-------|---------------|-------------|
 | **All projects, all time** | `~/.claude/CLAUDE.md` (global instructions) | Universal workflow rules, tool philosophy |
 | **All projects, contextual** | `~/.claude/projects/<path>/memory/` (global memory) | Project-specific learnings for Claude |
-| **This project, both AIs** | `.claude/rules/` or `.claude/skills/` + sync to `.gemini/` | Code patterns, domain skills |
+| **This project, all tools** | `.claude/rules/` or `.claude/skills/` + sync to `.gemini/` | Code patterns, domain skills |
 | **This project, memory** | `.claude/memory/` + copy to `.gemini/memory/` | Context that guides behavior |
 | **NixOS project** | `.ai-context/.claude/` (symlinked) | Same as above, NixOS layout |
 | **Sub-repo** | Parent project's memory, NOT the sub-repo | Sub-repos don't own their own context |
@@ -276,11 +276,11 @@ Do NOT proceed silently. Do NOT assume approval. Wait for the user to respond.
 When user approves:
 
 1. **Write/update each file** using Write or Edit tools
-2. **Sync Claude → Gemini** for each change:
-   - Memory: copy to `.gemini/memory/` if it exists
+2. **Sync to all tools** for each change:
+   - Memory: copy to `.gemini/memory/` if it exists (global memory is in `~/.ai-context/memory/` — already shared)
    - Rule: copy to `.gemini/rules/`
    - Skill: copy directory to `.gemini/skills/<name>/`
-   - CLAUDE.md edits: `sync-gemini-md.js` hook handles this automatically
+   - AGENTS.md/CLAUDE.md edits: `sync-gemini-md.js` hook handles Claude→Gemini automatically; Codex/Crush/OpenCode read from `~/.ai-context/` symlinks directly
 3. **Update MEMORY.md** index in the same directory (for memory changes)
 4. **Do NOT commit** — let the user decide when to commit
 
@@ -335,10 +335,10 @@ type: user | feedback | project | reference
 
 ## Global Context Changes
 
-If the session modified `~/.claude/hooks/`, `~/.claude/commands/`, or global skills:
-- `auto-push-global.js` hook auto-commits+pushes `~/.claude/` and `~/.gemini/` on session end
-- Shared hooks are auto-synced Claude→Gemini by the same hook
-- Both dirs are git repos ([claude-repo], [gemini-repo])
+If the session modified hooks, commands, or global skills:
+- `auto-push-global.js` hook auto-commits+pushes `~/.ai-context/` on session end (it is the ONLY git repo)
+- All 5 tools pick up changes via symlinks — no separate per-tool repos
+- `~/.claude/`, `~/.gemini/`, `~/.codex/` are derived state (symlinks), NOT git repos
 
 ## Hard Rules
 
@@ -350,7 +350,7 @@ If the session modified `~/.claude/hooks/`, `~/.claude/commands/`, or global ski
 - If no signals found, report "No learnings detected in this session"
 - If a memory contradicts current code, UPDATE the memory (don't create a duplicate)
 - Always show full target paths, not abbreviated descriptions
-- Skills and rules go in BOTH .claude/ and .gemini/ — never one without the other
+- Skills and rules go in BOTH .claude/ and .gemini/ — never one without the other (Codex/Crush/OpenCode read from the same paths via symlinks)
 
 ## Red Flags
 

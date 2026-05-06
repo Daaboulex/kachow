@@ -1,19 +1,19 @@
 ---
-description: Comprehensive platform health audit — check Claude Code and Gemini CLI releases, audit hooks, verify settings parity, test translation sync, validate agent frontmatter, identify new features to adopt. Run monthly or after platform updates.
+description: Comprehensive platform health audit — check all 5 tool releases (Claude, Gemini, Codex, Crush, OpenCode), audit hooks, verify settings parity, test translation sync, validate agent frontmatter, identify new features to adopt. Run monthly or after platform updates.
 ---
 
 # Platform Audit
 
-Full infrastructure health check for the Claude Code + Gemini CLI dual-agent system.
+Full infrastructure health check for the 5-tool AI system (Claude Code, Gemini CLI, Codex CLI, Crush, OpenCode). All tools share hooks, skills, and settings via `~/.ai-context/` symlinks.
 This is the skill that catches what /consolidate-memory, /verify-sync, and /wrap-up don't — it audits
 the **platform infrastructure itself**, not just the content.
 
 ## When to Run
-- After updating Claude Code or Gemini CLI to a new version
+- After updating any of the 5 tools to a new version
 - Monthly as preventive maintenance
 - When hooks seem broken or sync isn't working
 - After installing new plugins/extensions
-- When you suspect platform drift between Claude and Gemini
+- When you suspect platform drift between tools
 
 ## Arguments
 - `/platform-audit` — full audit (all phases)
@@ -33,7 +33,7 @@ echo "Gemini CLI: $(gemini --version 2>/dev/null || echo 'not found')"
 ```
 
 ### 1a. Claude Code Release Notes
-Check the latest release for new features relevant to our hook system:
+Check the latest release for new features relevant to the hook system:
 ```bash
 gh api repos/anthropics/claude-code/releases/latest --jq '.tag_name + " — " + .name' 2>/dev/null
 ```
@@ -99,7 +99,7 @@ Known good values (as of 2026-03):
 
 ## Phase 2: Hook Health Audit
 
-### 2a. File Existence (both platforms)
+### 2a. File Existence (all tools — hooks live in `~/.ai-context/hooks/`, symlinked into tool dirs)
 ```bash
 echo "=== Claude hooks ==="
 jq -r '.hooks[][] | .hooks[]? | .command' ~/.claude/settings.json | grep -o '[^ "]*\.js' | while read f; do
@@ -109,6 +109,8 @@ echo "=== Gemini hooks ==="
 jq -r '.hooks[][] | .hooks[]? | .command' ~/.gemini/settings.json | grep -o '[^ "]*\.js' | while read f; do
   [ -f "$HOME/.gemini/hooks/$f" ] && echo "  ✓ $f" || echo "  ✗ MISSING: $f"
 done
+echo "=== Codex/Crush hooks (shared via ~/.ai-context/hooks/ symlinks) ==="
+ls ~/.ai-context/hooks/*.js 2>/dev/null | wc -l | xargs -I{} echo "  {} hook files in ~/.ai-context/hooks/"
 ```
 
 ### 2b. Output Format Validation
@@ -144,12 +146,14 @@ done
 ```
 
 ### 2e. Hook File Parity
-Check shared hooks are identical between repos:
+Hooks live in `~/.ai-context/hooks/` — tool dirs symlink there. Check that symlinks are intact and source files exist:
 ```bash
 for f in ~/.claude/hooks/*.js; do
   name=$(basename "$f"); gemini=~/.gemini/hooks/$name
   [ -f "$gemini" ] && ! diff -q "$f" "$gemini" > /dev/null 2>&1 && echo "DIFFERS: $name"
 done
+# Verify symlinks point to ~/.ai-context/hooks/
+ls -la ~/.claude/hooks/ | grep -v "^total" | head -5
 ```
 
 Expected differences (NOT bugs):
@@ -157,14 +161,14 @@ Expected differences (NOT bugs):
 - Claude-only: sync-gemini-md, sync-gemini-skills, reflect-stop, reflect-stop-failure, validate-instructions-sync, plugin-update-checker, enhanced-statusline, sync-hook-versions
 - Gemini-only: sync-claude-md, sync-claude-skills, reflect-stop
 
-Any OTHER shared hook that differs = bug. Fix by copying Claude version to Gemini.
+Any OTHER shared hook that differs = bug. Source of truth is `~/.ai-context/hooks/`.
 
 ---
 
 ## Phase 3: Settings.json Platform Parity
 
 ### 3a. Event Name Mapping
-Verify both settings.json use correct platform-specific event names:
+Verify each tool's settings.json uses correct platform-specific event names (Claude + Gemini are the primary pair; Codex mirrors Claude event names; Crush is PreToolUse-only):
 
 | Purpose | Claude (correct) | Gemini (correct) | Common mistakes |
 |---------|-----------------|-------------------|-----------------|
@@ -216,8 +220,8 @@ echo "Hooks without if field that could benefit:" && jq -r '.hooks.PostToolUse[]
 ### 4a. Pattern Count Parity
 Forward and reverse translation hooks should have roughly equal pattern counts:
 ```bash
-echo "sync-gemini-md.js (Claude→Gemini): $(grep -c '\.replace(' ~/.claude/hooks/sync-gemini-md.js) patterns"
-echo "sync-claude-md.js (Gemini→Claude): $(grep -c '\.replace(' ~/.gemini/hooks/sync-claude-md.js) patterns"
+echo "sync-gemini-md.js (Claude→Gemini): $(grep -c '\.replace(' ~/.ai-context/hooks/sync-gemini-md.js) patterns"
+echo "sync-claude-md.js (Gemini→Claude): $(grep -c '\.replace(' ~/.ai-context/hooks/sync-claude-md.js) patterns"
 ```
 A difference >2 means a pattern was added to one direction but not the reverse.
 
@@ -225,22 +229,22 @@ A difference >2 means a pattern was added to one direction but not the reverse.
 For each pattern in the forward hook, verify the reverse exists:
 ```bash
 echo "Forward-only patterns (missing reverse):"
-grep -oP '\.replace\(/[^/]+/' ~/.claude/hooks/sync-gemini-md.js | sort > /tmp/forward.txt
-grep -oP '\.replace\(/[^/]+/' ~/.gemini/hooks/sync-claude-md.js | sort > /tmp/reverse.txt
+grep -oP '\.replace\(/[^/]+/' ~/.ai-context/hooks/sync-gemini-md.js | sort > /tmp/forward.txt
+grep -oP '\.replace\(/[^/]+/' ~/.ai-context/hooks/sync-claude-md.js | sort > /tmp/reverse.txt
 wc -l /tmp/forward.txt /tmp/reverse.txt
 ```
 
 ### 4c. Bidirectional JSON Sync
-Both `claude-gemini-json-sync.js` files should sync in BOTH directions:
+`claude-gemini-json-sync.js` syncs in BOTH directions (single source in `~/.ai-context/hooks/`):
 ```bash
-echo "Claude hook directions:" && grep 'pattern:' ~/.claude/hooks/claude-gemini-json-sync.js
-echo "Gemini hook directions:" && grep 'pattern:' ~/.gemini/hooks/claude-gemini-json-sync.js
+echo "Hook directions:" && grep 'pattern:' ~/.ai-context/hooks/claude-gemini-json-sync.js
 ```
-Each should have 4 patterns (2 Claude→Gemini + 2 Gemini→Claude).
+Should have 4 patterns (2 Claude→Gemini + 2 Gemini→Claude).
 
 ### 4d. Skills/Commands Sync
-Claude commands should have Gemini skill equivalents and vice versa:
+Commands live in `~/.ai-context/commands/` (symlinked into tool dirs). Verify all 5 tools can see them:
 ```bash
+echo "Commands source:" && ls ~/.ai-context/commands/*.md | sed 's|.*/||;s|\.md||' | sort
 echo "Claude commands:" && ls ~/.claude/commands/*.md | sed 's|.*/||;s|\.md||' | sort
 echo "Gemini root skills:" && ls -d ~/.gemini/skills/*/ 2>/dev/null | sed 's|.*/\(.*\)/|\1|' | grep -v gsd | sort
 ```
@@ -251,7 +255,7 @@ echo "Gemini root skills:" && ls -d ~/.gemini/skills/*/ 2>/dev/null | sed 's|.*/
 
 ### 5a. Skill File Validation
 ```bash
-for d in ~/.claude/skills/*/; do
+for d in ~/.ai-context/skills/*/; do
   name=$(basename "$d")
   [ -f "$d/SKILL.md" ] && echo "  ✓ $name" || echo "  ✗ $name: missing SKILL.md"
 done
@@ -259,7 +263,7 @@ done
 
 ### 5b. Upstream Update Check
 ```bash
-for d in ~/.claude/skills/*/; do
+for d in ~/.ai-context/skills/*/; do
   sources="$d/.upstream-sources.json"
   [ -f "$sources" ] && echo "  $(basename $d): upstream tracked (last checked: $(jq -r '.lastChecked' "$sources"))" || true
 done
@@ -268,6 +272,7 @@ done
 ### 5c. Plugin Health
 ```bash
 jq -r '.enabledPlugins[]' ~/.claude/settings.json 2>/dev/null
+# Codex/Crush/OpenCode: no plugin system — skip
 ```
 
 ---
@@ -304,7 +309,7 @@ When fixing, update the hook tables in the project CLAUDE.md to match current re
 Based on the latest release notes, check if new features should be adopted:
 
 **Checklist (update per release):**
-- [ ] New hook events → register in both settings.json with correct platform names
+- [ ] New hook events → register in all applicable settings.json files (Claude + Gemini + Codex + Crush) with correct platform names
 - [ ] New hook fields (e.g., `if` conditional) → apply to reduce process spawning
 - [ ] New settings → add to settings.json if beneficial
 - [ ] Deprecated features → remove from settings/hooks
@@ -313,7 +318,7 @@ Based on the latest release notes, check if new features should be adopted:
 
 For each new feature found, assess:
 1. Does it affect our hook architecture?
-2. Does it need registration in BOTH settings.json files?
+2. Does it need registration in all applicable settings.json files (Claude, Gemini, Codex, Crush)?
 3. Does it need different syntax per platform?
 4. Is it stable enough to adopt? (check if documented)
 
@@ -379,5 +384,5 @@ Do NOT auto-fix without approval. Present all findings first, then offer to fix.
 - NEVER change settings.json without understanding the impact on both platforms
 - ALWAYS check if a Claude feature exists in Gemini before applying cross-platform
 - Hook changes MUST be tested with `echo '{}' | node hook.js` before committing
-- New hook registrations MUST go in BOTH settings.json with correct platform names
+- New hook registrations MUST go in ALL applicable settings.json files (Claude + Gemini + Codex + Crush where events exist) with correct platform names
 - When in doubt about a new feature's syntax, test in isolation first
