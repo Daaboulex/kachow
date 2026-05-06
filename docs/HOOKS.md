@@ -1,6 +1,6 @@
 # Hooks catalog
 
-70+ shipped hooks + 28 library helpers. Every one is pure Node with no external deps; runs identically on Linux, macOS, and Windows (where the host AI CLI supports hooks).
+60+ shipped hooks + 28 library helpers. Every one is pure Node with no external deps; runs identically on Linux, macOS, and Windows (where the host AI CLI supports hooks). Hooks marked ⁱ are documented for reference but excluded from the public mirror.
 
 Registered under `hooks.<event>[].hooks[]` in the tool's settings JSON. See `settings.template.json` for the wiring.
 
@@ -44,9 +44,9 @@ Fires after each tool call (matcher-scoped — not every hook runs on every tool
 | `skill-drift-guard` | (all) | Re-injects behavioral rules every 60th tool call to prevent model drift in long sessions. |
 | `rule-enforcement-check` | (all, async) | Checks that Agent dispatch includes model:param as required by AGENTS.md. |
 | `handoff-auto-save` | `Bash` (async) | Auto-saves handoff state when meaningful writes are detected mid-session. |
-| `claude-gemini-json-sync` | `Write\|Edit` | After editing `.gemini/` or `.claude/` JSON files (AI-tasks, AI-progress), auto-copies to the other agent's equivalent directory. Gemini-only. |
-| `post-commit-sync-reminder` | `Bash` | After a git commit in a dual-remote project, reminds to sync. Detects dual-remote projects by trait, not name. |
-| `repomap-refresh` | `Write\|Edit` (async) | Refreshes DL2 repo map on C/H file writes in Development-DL2/. |
+| `claude-gemini-json-sync` ⁱ | `Write\|Edit` | After editing `.gemini/` or `.claude/` JSON files (AI-tasks, AI-progress), auto-copies to the other agent's equivalent directory. Gemini-only. |
+| `post-commit-sync-reminder` ⁱ | `Bash` | After a git commit in a dual-remote project, reminds to sync. Detects dual-remote projects by trait, not name. |
+| `repomap-refresh` ⁱ | `Write\|Edit` (async) | Refreshes DL2 repo map on C/H file writes in Development-DL2/. |
 
 ## PreToolUse
 
@@ -84,7 +84,7 @@ Fires once at session end. Data-safety hooks (commit local before network) come 
 | `handoff-session-end` | Saves session handoff state at session end for cross-session continuity. |
 | `skill-auto-updater` | Auto-updates stale skills from upstream repos at session end. |
 | `mirror-kachow` ⁱ | Auto-mirrors non-private artifacts from canonical `~/.ai-context/` to the public kachow mirror repo. Runs scrub pipeline before rsync. |
-| `ai-snapshot-stop` | Snapshots `~/.claude/` and `~/.gemini/` to SSD if present + 7-day cooldown met. Cross-platform mount detection. |
+| `ai-snapshot-stop` ⁱ | Snapshots `~/.claude/` and `~/.gemini/` to SSD if present + 7-day cooldown met. Cross-platform mount detection. |
 
 ## SubagentStart
 
@@ -105,7 +105,7 @@ Fires once at session end. Data-safety hooks (commit local before network) come 
 | Hook | What it does |
 |---|---|
 | `reflect-precompact` | Triggers a structured `/handoff` before the context window gets compressed. Replaces the historical "write a session anchor" nudge. |
-| `caveman-precompact` | Sets a marker so the next UserPromptSubmit re-injects full caveman ruleset after compaction strips SessionStart context. |
+| `caveman-precompact` ⁱ | Sets a marker so the next UserPromptSubmit re-injects full caveman ruleset after compaction strips SessionStart context. |
 
 ## Notification
 

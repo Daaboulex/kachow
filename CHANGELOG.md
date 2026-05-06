@@ -6,6 +6,33 @@ All notable changes to this framework. See [Semantic Versioning](https://semver.
 
 ## [Unreleased]
 
+## [0.7.1] — 2026-05-06
+
+Cross-platform hardening, badge accuracy, documentation fixes.
+
+### Fixed
+- **stop-sleep-consolidator.js** — `isGemini` ReferenceError (undeclared variable, hook silently no-oped since introduction)
+- **context-pressure-enforce.js** — hardcoded `/tmp/` replaced with `os.tmpdir()` (Windows fix)
+- **memory-rotate.js, meta-system-stop.js, observability-logger.js** — forward-slash-only path sanitization replaced with `[/\\]` regex + drive letter handling (Windows fix)
+- **skill-auto-updater.js** — Unix `find` command replaced with `fs.readdirSync` walk; `cp -r` replaced with `fs.cpSync` (Windows fix)
+- **stale-process-detector.js** — hardcoded `/tmp/` replaced with `os.tmpdir()`; `ps --no-headers` replaced with platform-guarded fallback (Windows+macOS fix)
+- **handoff-auto-save.js, session-context-loader.js, session-start-combined.js** — `2>/dev/null` shell redirects replaced with `stdio` option (Windows fix)
+- 7 Codex SKILL.md files — broken YAML frontmatter from auto-conversion (empty folded scalars, unquoted colons)
+- **convert-commands.mjs** — root cause fix: multiline folded scalar parser + quoted description output
+- Reflect hook consolidation — `reflect-session-end.js` archived, `reflect-stop.js` is sole reflect hook
+- HOOKS.md — 5 undocumented hooks added, header count corrected
+- README roadmap — v0.3.0–v0.7.0 marked as shipped
+
+### Changed
+- Badge: "bash + powershell parity" replaced with "scripts: node .mjs (cross-platform)" — 11/12 shipped .sh/.ps1 were 3-line wrappers around .mjs implementations
+- README tagline — updated from 3-tool to 5-tool (added Crush + OpenCode)
+- `d5-anti-skew-test.ps1` added for full script parity
+
+### Removed
+- `reflect-session-end.js` — archived (superseded by `reflect-stop.js`)
+- `deferred-migration.js`, `session-state.js` — archived (zero references, confirmed dead)
+- Nested `~/.gemini/.gemini/` phantom directory — stale Syncthing artifact from March 2026
+
 ## [0.7.0] — 2026-05-05
 
 Manifest-driven hook registration, 5-tool architecture, Syncthing+git safety.

@@ -17,7 +17,7 @@
 
 > AI coding agents forget everything between sessions, run destructive commands without checking, and every tool needs separate configuration.
 >
-> **kachow** is a cross-tool AI agent infrastructure framework. It unifies Claude Code, Gemini CLI, and Codex CLI under one configuration with 60+ behavioral hooks for session continuity, safety guards, and observability.
+> **kachow** is a cross-tool AI agent infrastructure framework. It unifies Claude Code, Gemini CLI, Codex CLI, Crush, and OpenCode under one configuration with 60+ behavioral hooks for session continuity, safety guards, and observability.
 >
 > Three pillars: **Unify** (write rules once, symlinks distribute) · **Protect** (safety hooks block destructive commands) · **Remember** (memory management and handoff automation across sessions).
 
