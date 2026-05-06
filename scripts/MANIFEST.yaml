@@ -65,7 +65,7 @@ hooks:
 
   - file: plugin-update-checker.js
     category: meta
-    tools: [claude, gemini]
+    tools: [claude, gemini, codex]
     order: 6
     async: false
     events:

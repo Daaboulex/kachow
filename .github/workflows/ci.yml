@@ -30,14 +30,15 @@ jobs:
 
       - name: Hook selftest
         shell: bash
-        # Some shipped hooks (research-lint, etc.) rely on POSIX utilities that
-        # Git-Bash on Windows handles differently — surface real issues via the
-        # Linux + macOS matrix, which is where maintainers run these hooks.
-        if: runner.os != 'Windows'
         run: |
           mkdir -p "$HOME/.claude/hooks/lib"
           cp -r hooks/* "$HOME/.claude/hooks/"
           node hooks/lib/hook-selftest.js
+
+      - name: Hook test suite
+        shell: bash
+        if: runner.os != 'Windows'
+        run: node scripts/hook-test-suite.mjs
 
       - name: Bash script syntax (Linux/macOS only)
         if: runner.os != 'Windows'
@@ -61,11 +62,7 @@ jobs:
 
       - name: MCP server smoke test
         shell: bash
-        if: runner.os != 'Windows'
         run: |
-          # Pipe initialize + tools/list, expect >=10 tools. macOS doesn't have
-          # GNU `timeout` by default, so we rely on EOF to terminate the server
-          # (printf closes stdin after the two requests; server exits cleanly).
           RESPONSE=$(
             printf '%s\n%s\n' \
               '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ci","version":"0"}}}' \
