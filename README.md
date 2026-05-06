@@ -11,7 +11,7 @@
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![Platforms](https://img.shields.io/badge/platform-linux%20%7C%20macos%20%7C%20windows-lightgrey.svg)](#install)
-[![Scripts](https://img.shields.io/badge/scripts-bash%20%2B%20powershell%20parity-green.svg)](#cross-platform)
+[![Scripts](https://img.shields.io/badge/scripts-node%20.mjs%20(cross--platform)-green.svg)](#cross-platform)
 [![Node](https://img.shields.io/badge/node-%E2%89%A520-brightgreen.svg)](https://nodejs.org)
 [![CI](https://github.com/Daaboulex/kachow/actions/workflows/ci.yml/badge.svg)](https://github.com/Daaboulex/kachow/actions/workflows/ci.yml)
 
