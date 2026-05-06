@@ -14,14 +14,29 @@
 Every AI tool symlinks into it:
 
 ```
-~/.claude/CLAUDE.md   → ~/.ai-context/AGENTS.md
-~/.gemini/GEMINI.md   → ~/.ai-context/AGENTS.md
-~/.codex/AGENTS.md    → ~/.ai-context/AGENTS.md
-~/.config/opencode/AGENTS.md → ~/.ai-context/AGENTS.md
-~/.config/aider/AGENTS.md    → ~/.ai-context/AGENTS.md
+~/.claude/CLAUDE.md              → ~/.ai-context/AGENTS.md
+~/.gemini/GEMINI.md              → ~/.ai-context/AGENTS.md
+~/.codex/AGENTS.md               → ~/.ai-context/AGENTS.md
+~/.config/crush/crush.json       → ~/.ai-context/configs/crush.json
+~/.config/opencode/AGENTS.md     → ~/.ai-context/AGENTS.md
+~/.config/aider/AGENTS.md        → ~/.ai-context/AGENTS.md
 ```
 
-## Hook lifecycle (Claude + Gemini only)
+## Hook registration (v0.7.0+)
+
+Hooks are registered via `MANIFEST.yaml` — a single source of truth for all hook registrations across 5 tools.
+
+```
+scripts/MANIFEST.yaml     ← declare hooks, events, tools, timeouts, matchers
+scripts/generate-settings.mjs --apply --all
+    → ~/.claude/settings.json   (Claude JSON format)
+    → ~/.gemini/settings.json   (Gemini JSON format, event name translation)
+    → ~/.codex/config.toml      (Codex TOML format)
+```
+
+Crush reads hooks via PreToolUse (Claude-compatible). OpenCode has no hook support — relies on MCP + AGENTS.md.
+
+## Hook lifecycle (Claude, Gemini, Codex, Crush)
 
 - **SessionStart**: auto-pull, load context, validate symlinks, check plugin updates
 - **PreToolUse**: safety guards (block-subagent-writes, autosave-before-destructive, verifiedby-gate, pre-write-combined-guard)

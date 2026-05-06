@@ -26,24 +26,59 @@ if (evt.tool_name !== 'Bash') process.exit(0);
 process.stdout.write(JSON.stringify({ continue: true }));
 ```
 
-## Register in both surfaces
+## Register via MANIFEST (v0.7.0+)
 
-Append to `settings.template.json` under the right event:
+Add an entry to `scripts/MANIFEST.yaml`:
 
-```json
-{
-  "matcher": "Bash",
-  "hooks": [
-    {
-      "type": "command",
-      "command": "node \"$HOME/.claude/hooks/my-hook.js\"",
-      "timeout": 3
-    }
-  ]
-}
+```yaml
+  - file: my-hook.js
+    category: safety            # or: meta, memory, observability, sync
+    tools: [claude, gemini, codex]
+    order: 50                   # execution order within event
+    async: false                # true = non-blocking (no stdout/exit(2))
+    events:
+      claude:
+        - event: PreToolUse
+          matcher: [Bash]
+          timeout: 3            # seconds (Claude)
+      gemini:
+        - event: BeforeTool
+          matcher: [run_shell_command]
+          timeout: 3000         # milliseconds (Gemini)
+      codex:
+        - event: PreToolUse
+          matcher: [shell]
+          timeout: 3            # seconds (Codex)
 ```
 
-And to `settings.gemini.template.json` — note `ms` timeout + different tool name.
+Then regenerate all settings files:
+
+```bash
+node scripts/generate-settings.mjs --apply --all
+```
+
+This writes Claude `settings.json`, Gemini `settings.json`, and Codex `config.toml` from the single MANIFEST source. Run `--check` instead of `--apply` to preview without writing.
+
+**Event name translation** (handled automatically by the generator):
+
+| Claude | Gemini | Codex |
+|--------|--------|-------|
+| SessionStart | SessionStart | SessionStart |
+| PreToolUse | BeforeTool | PreToolUse |
+| PostToolUse | AfterTool | PostToolUse |
+| Stop | SessionEnd | Stop |
+| PreCompact | PreCompress | *(not supported)* |
+| SubagentStart | BeforeAgent | *(not supported)* |
+| SubagentStop | AfterAgent | *(not supported)* |
+
+**Tool name translation** (matchers):
+
+| Claude | Gemini | Codex |
+|--------|--------|-------|
+| Bash | run_shell_command | shell |
+| Write | write_file | apply_patch |
+| Edit | replace | apply_patch |
+| Read | read_file | Read |
 
 ## Add a selftest
 
