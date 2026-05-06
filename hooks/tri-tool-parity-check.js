@@ -109,6 +109,33 @@ try {
     }
   }
 
+  function getJsonHooks(settingsPath) {
+    if (!fs.existsSync(settingsPath)) return new Set();
+    try {
+      const realPath = fs.realpathSync(settingsPath);
+      const settings = JSON.parse(fs.readFileSync(realPath, 'utf8'));
+      const scripts = new Set();
+      for (const groups of Object.values(settings.hooks || {})) {
+        if (!Array.isArray(groups)) continue;
+        for (const group of groups) {
+          for (const h of (group.hooks || [])) {
+            const m = (h.command || '').match(/([a-z][-a-z0-9]+\.js)/);
+            if (m) scripts.add(m[1]);
+          }
+        }
+      }
+      return scripts;
+    } catch { return new Set(); }
+  }
+
+  function getClaudeHooks() {
+    return getJsonHooks(path.join(home, '.claude', 'settings.json'));
+  }
+
+  function getGeminiHooks() {
+    return getJsonHooks(path.join(home, '.gemini', 'settings.json'));
+  }
+
   function getCodexHooks() {
     const p = path.join(home, '.codex', 'config.toml');
     if (!fs.existsSync(p)) return new Set();

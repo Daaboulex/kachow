@@ -22,9 +22,7 @@ try {
     // Codex hooks run from ~/.claude/hooks/ (config.toml points there).
     // Detect by env var that Codex CLI sets (CODEX_HOME or argv[0] hints) since
     // __dirname can't distinguish Codex from Claude. AGENT_TOOL takes precedence.
-    agent: process.env.AGENT_TOOL ||
-           (__dirname.includes('/.gemini/') ? 'gemini' :
-            (process.env.CODEX_HOME || /codex/i.test(process.argv[0] || '') ? 'codex' : 'claude')),
+    agent: require('./lib/tool-detect.js').detectTool(),
     host: require('os').hostname(),
     pid: process.pid,
     tmux: process.env.TMUX_PANE || '',

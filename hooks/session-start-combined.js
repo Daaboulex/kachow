@@ -14,13 +14,13 @@ const TIMER_START = process.hrtime.bigint();
 const _sectionTimings = {};
 function _startSection(name) { _sectionTimings[name] = process.hrtime.bigint(); }
 function _endSection(name) { if (_sectionTimings[name]) _sectionTimings[name] = Number(process.hrtime.bigint() - _sectionTimings[name]) / 1e6; }
+const { detectTool, toolHomeDir } = require('./lib/tool-detect.js');
 const home = os.homedir();
 const claudeDir = path.join(home, '.claude');
 const geminiDir = path.join(home, '.gemini');
-const scriptDir = __dirname;
-const isGemini = scriptDir.includes('.gemini');
-const agentDir = isGemini ? '.gemini' : '.claude';
-const configDir = path.join(home, agentDir);
+const tool = detectTool();
+const isGemini = tool === 'gemini';
+const configDir = toolHomeDir();
 const projectDir = process.cwd();
 
 let raw = '';

@@ -15,10 +15,8 @@ const os = require('os');
 
 const home = os.homedir();
 
-// Detect platform from script location
-const scriptDir = __dirname;
-const isGemini = scriptDir.includes('.gemini');
-const { toolHomeDir } = require('./lib/tool-detect.js');
+const { detectTool, toolHomeDir } = require('./lib/tool-detect.js');
+const isGemini = detectTool() === 'gemini';
 const configDir = toolHomeDir();
 
 const lastFile = path.join(configDir, '.dream-last');
