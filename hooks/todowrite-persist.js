@@ -95,7 +95,7 @@ try {
 
   // Index existing by id
   const byId = new Map(aiTasks.tasks.map(t => [t.id, t]));
-  const agent = process.argv[1].includes('/.gemini/') ? 'gemini' : 'claude';
+  const agent = require('./lib/tool-detect.js').detectTool();
 
   let changed = false;
   const now = new Date().toISOString();

@@ -9,11 +9,9 @@ const path = require('path');
 
 const os = require('os');
 
-// Detect platform from script location
-const scriptDir = __dirname;
-const isGemini = scriptDir.includes('.gemini');
+const { detectTool, toolHomeDir } = require('./lib/tool-detect.js');
+const isGemini = detectTool() === 'gemini';
 const home = process.env.HOME || process.env.USERPROFILE || os.homedir();
-const { toolHomeDir } = require('./lib/tool-detect.js');
 const configDir = toolHomeDir();
 
 const USAGE_FILE = path.join(configDir, 'skill-usage.json');

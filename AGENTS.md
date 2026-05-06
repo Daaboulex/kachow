@@ -21,7 +21,7 @@ Your personal rules go between the USER SECTION markers — they survive updates
 > - `~/.claude/CLAUDE.md`, `~/.gemini/GEMINI.md`, `~/.codex/AGENTS.md`, `~/.config/opencode/AGENTS.md`, `~/.config/aider/AGENTS.md` are symlinks here.
 > - Edit this file. Every tool picks up the change automatically.
 > - Tool-specific sections below are labeled — other tools should ignore them.
-> - **Last updated:** 2026-05-05 (Manifest-driven hooks, Crush/OpenCode onboarding, 5+2 tool system)
+> - **Last updated:** 2026-05-06 (v0.8.0 infrastructure consolidation — one brain, derived tool dirs)
 > - **Override per-project:** drop `AGENTS.md` at repo root — tools walk from cwd to root, deepest wins.
 
 ## Identity
@@ -94,7 +94,7 @@ Plans don't need approval but they must exist.
 - NEVER commit changes that haven't been verified (at minimum: eval passes)
 - Prefer editing existing files over creating new ones
 - Keep changes minimal and focused — no drive-by refactors
-- **GPG sign exception:** `auto-push-global.js` Stop hook commits use `--no-gpg-sign`. Auto-sync commits are mechanical session-end snapshots, not user-authored work; forcing GPG sign would either prompt for passphrase (breaks non-interactive autopush) or silently fail (breaks data preservation). User-authored commits remain signed via standard git config. This exception applies ONLY to `chore: auto-sync from session end` commits in `~/.claude`, `~/.gemini`, `~/.codex`, `~/.ai-context`.
+- **GPG sign exception:** `auto-push-global.js` Stop hook commits use `--no-gpg-sign`. Auto-sync commits are mechanical session-end snapshots, not user-authored work; forcing GPG sign would either prompt for passphrase (breaks non-interactive autopush) or silently fail (breaks data preservation). User-authored commits remain signed via standard git config. This exception applies ONLY to `chore: auto-sync from session end` commits in `~/.ai-context` (the only git repo since v0.8.0).
 
 ## Multi-Tool Enforcement Asymmetry (added 2026-04-29 — adversarial audit finding)
 
@@ -112,17 +112,26 @@ Plans don't need approval but they must exist.
 - Switching from Claude to Gemini/Codex mid-task does NOT preserve permission boundaries. A user blocked by Claude's permissions may successfully run the same operation in Gemini or Codex.
 - Codex `apply_patch` hook fix (PR #18391) is claimed merged but **not empirically verified**. Until verified: use `shell` for sensitive writes in Codex. Config.toml still warns about this.
 - For sensitive writes in Codex, prefer `shell cat > file <<EOF ... EOF` until apply_patch hook firing is confirmed by testing.
-- `tri-tool-parity-check` hook reports HOOK FILE drift, not behavioral equivalence. A clean parity report does NOT mean the 3 tools enforce equivalently.
+- `tool-parity-check` hook reports HOOK FILE drift, not behavioral equivalence. A clean parity report does NOT mean the 3 tools enforce equivalently.
 
 **This is structural, not a bug.** Gemini and Codex don't have Claude's permission vocabulary; perfect parity is impossible until upstream changes.
 
-## 5+2 Repo Live-Together System
+## One Brain Architecture (v0.8.0)
 
-Hooks are canonical at `~/.ai-context/hooks/` — all hook-capable tools (Claude, Gemini, Codex, Crush) see same files via symlink. Editing one file covers all tools.
-Hook registration is manifest-driven. Edit `scripts/MANIFEST.yaml`, run `scripts/generate-settings.mjs --apply --all`. SF-5 shipped as v0.7.0.
-Crush and OpenCode configs are centralized at `~/.ai-context/configs/` (no separate repos).
+`~/.ai-context/` is the ONLY git repo and ONLY Syncthing folder. Tool dirs (`~/.claude/`, `~/.gemini/`, `~/.codex/`) are derived state — settings, hooks, and memories are symlinks pointing into ai-context. No `.git` in tool dirs.
 
-Full repo table, coupling rules, and release procedures: see `AGENTS-architecture.md`.
+| What | Where | Sync |
+|------|-------|------|
+| Settings | `configs/` (claude-settings.json, gemini-settings.json, codex-config.toml, crush.json, opencode.json) | Symlinked into tool dirs |
+| Hooks | `hooks/` (73 .js) | Tool dirs symlink here |
+| Global memory | `memory/` | Tool dirs symlink here |
+| Project memory | `project-state/{nix,<project>,documents}/memory/` | Claude/Gemini project dirs symlink here |
+| Public mirror | `kachow-mirror/` (nested git repo, gitignored) | mirror-kachow.js scrub pipeline |
+
+Hook registration is manifest-driven. Edit `scripts/MANIFEST.yaml`, run `scripts/generate-settings.mjs --apply --all`.
+Old tool-dir GitHub repos (<repo>, <repo>, codex-global) are archived on GitHub (read-only preservation).
+
+Full coupling rules and release procedures: see `AGENTS-architecture.md`.
 
 ## Code Quality
 - Follow existing patterns in the codebase — match style, don't impose it
@@ -172,7 +181,7 @@ Memory format, portable context, tool→read paths: see `~/.ai-context/AGENTS-ar
 ### AI Context Maintenance
 - Editing CLAUDE.md/GEMINI.md/AGENTS.md — all three are the same file via symlink. Just edit `~/.ai-context/AGENTS.md`.
 - Skills/rules are living docs — fix stale content on sight.
-- `~/.claude/` + `~/.gemini/` + `~/.codex/` + `~/.ai-context/` are git repos (<repo>, <repo>, codex-global, ai-context). `auto-push-global.js` auto-commits + pushes all four at Stop. Cooldown-gated. Crush and OpenCode configs live inside `~/.ai-context/configs/` (no separate repos).
+- `~/.ai-context/` is the ONLY git repo (ai-context-global). `auto-push-global.js` auto-commits + pushes at Stop. Cooldown-gated. Tool dirs (`~/.claude/`, `~/.gemini/`, `~/.codex/`) have NO `.git` — they are derived state with symlinks to ai-context. All 5 tool configs (Claude, Gemini, Codex, Crush, OpenCode) live in `~/.ai-context/configs/`. Old tool-dir GitHub repos (<repo>, <repo>, codex-global) are archived.
 - **Self-improvement loop:** `meta-system-stop.js` detectors append findings to `~/.claude/self-improvements-pending-<host>.jsonl`. Run `/review-improvements` to triage. Rejections teach 90-day class suppression via `memory/reference/self-improvement-feedback.md`.
 
 ### Cross-Platform Hook Rules
@@ -181,7 +190,7 @@ Memory format, portable context, tool→read paths: see `~/.ai-context/AGENTS-ar
 - Claude timeouts are in **seconds**; Gemini timeouts are in **milliseconds**; Codex timeouts are in **seconds** — never confuse them
 - Claude tool names: `Write`, `Edit`, `Bash`, `Read`, `Skill`, `Agent`; Gemini tool names: `write_file`, `replace`, `run_shell_command`, `read_file`, `activate_skill`; Codex tool names: `apply_patch`, `shell`, `Read` (NOT same as Claude)
 - Claude session-end event: `Stop`; Gemini session-end event: `SessionEnd`; Codex session-end event: `Stop`
-- When adding a hook: add to ALL THREE — `~/.claude/settings.json` (JSON), `~/.gemini/settings.json` (JSON), `~/.codex/config.toml` (TOML `[[hooks.Event]]`)
+- When adding a hook: add to MANIFEST.yaml, run `generate-settings.mjs --apply --all`. Settings live at `~/.ai-context/configs/` (symlinked into tool dirs)
 - Codex: 6 hook events (PostToolUse, PreToolUse, PermissionRequest, SessionStart, Stop, UserPromptSubmit); `apply_patch` now fires hooks (fixed v0.128.0+, was openai/codex#16732)
 
 New hook events (v2.1.83+) and CLI changelog notes: see `AGENTS-architecture.md`.
@@ -216,5 +225,5 @@ Crush has PreToolUse hooks (Claude Code compatible). Config at `~/.config/crush/
 ## ═════ UNIVERSAL TOOLING CAVEATS ═════
 
 - File reads over 2000 lines: use explicit `offset` + `limit`; some tools silently truncate.
-- `~/.claude/` + `~/.gemini/` + `~/.codex/` + `~/.ai-context/` are themselves git repos (private, per-machine or Syncthing/GitHub). Changes auto-commit at session end.
+- `~/.ai-context/` is the only git repo (private, Syncthing + GitHub). Changes auto-commit at session end. Tool dirs (`~/.claude/`, `~/.gemini/`, `~/.codex/`) are derived state — no `.git`, no Syncthing.
 - Safety-critical code paths (customize for your domain): respond in normal prose, not caveman. Fragment misread risk too high.

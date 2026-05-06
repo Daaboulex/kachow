@@ -20,7 +20,7 @@ Fires once at the beginning of every session.
 | `session-context-loader` | Loads rules summary, memories, tasks, git status, handoffs, and self-improvement queue at session start. Primary context injector (~1100 tokens). |
 | `injection-size-monitor` | Monitors total injection bytes at session start. Warns on stderr if total exceeds budget. |
 | `handoff-triage-gate` | Checks for stale deferred items at session start. Surfaces unresolved handoffs from previous sessions. |
-| `tri-tool-parity-check` | Detects hook registration drift between Claude, Gemini, and Codex on a 24h cooldown. Reports only actionable gaps (excludes structural event differences). |
+| `tool-parity-check` | Detects hook registration drift between Claude, Gemini, Codex, Crush, and OpenCode on a 24h cooldown. Reports only actionable gaps (excludes structural event differences). |
 | `detect-sync-conflicts` ⁱ | Scans for Syncthing conflict files in AI context directories. Silent when clean. |
 | `gsd-check-update` ⁱ | Checks GSD plugin version on a cooldown. Silent when current. |
 

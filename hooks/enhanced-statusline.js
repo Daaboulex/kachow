@@ -10,7 +10,8 @@ const os = require('os');
 
 const { COLORS, formatGit, formatContext, formatModel } = require('./lib/statusline-renderer');
 
-const claudeDir = process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude');
+const { toolHomeDir } = require('./lib/tool-detect.js');
+const claudeDir = process.env.CLAUDE_CONFIG_DIR || toolHomeDir();
 
 // Timeout guard — exit cleanly if stdin never arrives
 const stdinTimeout = setTimeout(() => process.exit(0), 3000);

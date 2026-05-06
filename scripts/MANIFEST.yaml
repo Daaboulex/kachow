@@ -209,7 +209,7 @@ hooks:
       gemini:
         name: autosave-before-destructive
 
-  - file: tri-tool-parity-check.js
+  - file: tool-parity-check.js
     category: meta
     tools: [claude, codex, gemini]
     order: 17
@@ -221,7 +221,7 @@ hooks:
         timeout: 5
     overrides:
       gemini:
-        name: tri-tool-parity-check
+        name: tool-parity-check
 
   - file: peer-conflict-check.js
     category: meta

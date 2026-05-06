@@ -30,8 +30,8 @@ try {
   const filePath = (input.tool_input || {}).file_path || '';
   const normalized = filePath.replace(/\\/g, '/');
 
-  // Only trigger for .js files inside ~/.claude/hooks/ or ~/.gemini/hooks/
-  if ((!normalized.includes('/.claude/hooks/') && !normalized.includes('/.gemini/hooks/')) || !normalized.endsWith('.js')) {
+  // Trigger for .js files inside any hook directory (canonical or symlinked)
+  if ((!normalized.includes('/.claude/hooks/') && !normalized.includes('/.gemini/hooks/') && !normalized.includes('/.ai-context/hooks/')) || !normalized.endsWith('.js')) {
     process.stdout.write('{"continue":true}');
     process.exit(0);
   }

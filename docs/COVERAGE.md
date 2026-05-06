@@ -208,7 +208,7 @@ already written and would need only a config.toml registration entry to activate
 
 ### Claude `ConfigChange` / `PostToolBatch` (v2.1.105+, not yet adopted)
 
-`ConfigChange` — fires when `settings.json` changes; could trigger `tri-tool-parity-check.js`
+`ConfigChange` — fires when `settings.json` changes; could trigger `tool-parity-check.js`
 inline instead of waiting for next SessionStart.
 
 `PostToolBatch` — fires after parallel tool batch resolves; exit 2 can halt agentic loop.

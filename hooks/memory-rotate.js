@@ -19,9 +19,8 @@ const path = require('path');
 const os = require('os');
 
 const HOME = os.homedir();
-const SCRIPT_DIR = __dirname;
-const IS_GEMINI = SCRIPT_DIR.includes('.gemini');
-const { toolHomeDir } = require('./lib/tool-detect.js');
+const { detectTool, toolHomeDir } = require('./lib/tool-detect.js');
+const IS_GEMINI = detectTool() === 'gemini';
 const CONFIG_DIR = toolHomeDir();
 const MARKER = path.join(CONFIG_DIR, '.last-memory-rotation');
 const COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;

@@ -200,6 +200,7 @@ try {
         const cmdDir = path.dirname(filePath);
         const projectRoot = cmdDir.replace(/[/\\]\.ai-context[/\\]\.claude[/\\]commands$/, '')
                                   .replace(/[/\\]\.claude[/\\]commands$/, '');
+        const synced = [];
         for (const skillDir of [
           path.join(projectRoot, '.gemini', 'skills', cmdName),
           path.join(projectRoot, '.ai-context', '.gemini', 'skills', cmdName),
@@ -208,9 +209,19 @@ try {
             fs.mkdirSync(skillDir, { recursive: true });
             const content = fs.readFileSync(filePath, 'utf8');
             fs.writeFileSync(path.join(skillDir, 'SKILL.md'), translateFrontmatter(content, toolMap, claudeOnlyFields, modelMap), 'utf8');
-            process.stdout.write(JSON.stringify({ continue: true, systemMessage: `Auto-synced command → skill: ${cmdName}` }));
-            process.exit(0);
+            synced.push('gemini');
           }
+        }
+        const codexSkillDir = path.join(projectRoot, '.codex', 'skills', 'cmd-' + cmdName);
+        if (fs.existsSync(path.join(projectRoot, '.codex', 'skills'))) {
+          fs.mkdirSync(codexSkillDir, { recursive: true });
+          const content = fs.readFileSync(filePath, 'utf8');
+          fs.writeFileSync(path.join(codexSkillDir, 'SKILL.md'), translateFrontmatter(content, toolMap, claudeOnlyFields, modelMap), 'utf8');
+          synced.push('codex');
+        }
+        if (synced.length > 0) {
+          process.stdout.write(JSON.stringify({ continue: true, systemMessage: `Auto-synced command → ${synced.join('+')} skill: ${cmdName}` }));
+          process.exit(0);
         }
       }
 

@@ -93,12 +93,6 @@
           },
           {
             "type": "command",
-            "command": "node \"$HOME/.gemini/hooks/tri-tool-parity-check.js\"",
-            "timeout": 5000,
-            "name": "tri-tool-parity-check"
-          },
-          {
-            "type": "command",
             "command": "node \"$HOME/.gemini/hooks/handoff-triage-gate.js\"",
             "timeout": 5000
           }

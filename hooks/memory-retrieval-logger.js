@@ -62,8 +62,7 @@ try {
   const host = os.hostname();
   const logFile = path.join(cacheDir, `retrieval-log-${host}.jsonl`);
 
-  const scriptDir = __dirname;
-  const platform = scriptDir.includes('.gemini') ? 'gemini' : 'claude';
+  const platform = require('./lib/tool-detect.js').detectTool();
 
   // Store relative-to-cwd path for portability across hosts
   const cwd = input.cwd || process.cwd();

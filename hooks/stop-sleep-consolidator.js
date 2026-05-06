@@ -80,8 +80,7 @@ try {
     fs.writeFileSync(lockFile, String(process.pid) + '\n' + new Date().toISOString(), { flag: 'wx' });
   } catch { passthrough(); }
 
-  // Locate binary. Prefer `claude` for .claude platform, `gemini` for .gemini.
-  const binary = isGemini ? 'gemini' : 'claude';
+  const binary = tool === 'gemini' ? 'gemini' : tool === 'codex' ? 'codex' : 'claude';
   const prompt = '/consolidate-memory deep';
   const logFile = path.join(cacheDir, `sleep-consolidator-${host}.log`);
 

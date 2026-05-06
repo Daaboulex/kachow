@@ -12,10 +12,10 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
+const { detectTool, toolHomeDir } = require('./lib/tool-detect.js');
 const home = os.homedir();
-const scriptDir = __dirname;
-const isGemini = scriptDir.includes('.gemini');
-const configDir = path.join(home, isGemini ? '.gemini' : '.claude');
+const isGemini = detectTool() === 'gemini';
+const configDir = toolHomeDir();
 const enabledFile = path.join(configDir, '.reflect-enabled');
 const lastFile = path.join(configDir, '.reflect-last');
 
