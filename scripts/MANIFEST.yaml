@@ -671,18 +671,6 @@ hooks:
       gemini:
         name: skill-auto-updater
 
-  - file: sync-memory-dirs.js
-    category: sync
-    tools: [gemini]
-    order: 54
-    async: false
-    events:
-      - event: Stop
-        timeout: 5
-    overrides:
-      gemini:
-        name: sync-memory
-
   - file: memory-rotate.js
     category: memory
     tools: [claude, codex, gemini]
@@ -818,19 +806,6 @@ hooks:
     overrides:
       gemini:
         name: sync-claude-agents
-
-  - file: claude-gemini-json-sync.js
-    category: meta
-    tools: [gemini]
-    order: 67
-    async: false
-    events:
-      - event: PostToolUse
-        matcher: [Edit, Write]
-        timeout: 5
-    overrides:
-      gemini:
-        name: claude-gemini-json-sync
 
   - file: reflect-precompact.js
     category: memory

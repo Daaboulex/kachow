@@ -450,6 +450,11 @@
           },
           {
             "type": "command",
+            "command": "node \"$HOME/.claude/hooks/tool-parity-check.js\"",
+            "timeout": 5
+          },
+          {
+            "type": "command",
             "command": "node \"$HOME/.claude/hooks/handoff-triage-gate.js\"",
             "timeout": 5
           }
@@ -665,6 +670,17 @@
           }
         ],
         "matcher": "Edit|MultiEdit|NotebookEdit|Write|mcp__.*"
+      }
+    ],
+    "ConfigChange": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/tool-parity-check.js\"",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "Stop": [

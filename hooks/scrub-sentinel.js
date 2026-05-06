@@ -152,7 +152,7 @@ try {
     process.stdout.write(JSON.stringify({
       continue: false,
       decision: 'block',
-      reason: `scrub-sentinel: write would leak ${hits.length} personal token(s) into ${filePath}.\n\n${sample}\n\nFix before writing. Override: SKIP_SCRUB_SENTINEL=1 (not recommended for public-shareable paths).`
+      reason: `scrub-sentinel: write would leak ${hits.length} personal token(s) into ${filePath}.\n\n${sample}\n\nFix the content before writing.`
     }));
     process.exit(0);
   }

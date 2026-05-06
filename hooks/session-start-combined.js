@@ -255,18 +255,34 @@ try {
 // ── 5. Ensure portable memory ──
 _startSection('portable-memory');
 try {
+  const agentRelDir = path.relative(home, configDir);
   const sanitized = projectDir.replace(/^\//, '').replace(/[/\\]/g, '-').replace(/^([A-Z]):/i, '$1');
-  const memoryDir = path.join(home, agentDir, 'projects', sanitized, 'memory');
+  const memoryDir = path.join(home, agentRelDir, 'projects', sanitized, 'memory');
+  // Also check dash-prefixed variant (Claude's internal sanitization keeps leading dash)
+  const dashSanitized = projectDir.replace(/[/\\]/g, '-').replace(/^([A-Z]):/i, '$1');
+  const dashMemoryDir = path.join(home, agentRelDir, 'projects', dashSanitized, 'memory');
 
-  let needsLink = true;
-  try {
-    const stat = fs.lstatSync(memoryDir);
-    if ((stat.isSymbolicLink() || stat.isDirectory()) && fs.existsSync(path.join(memoryDir, 'MEMORY.md'))) {
-      needsLink = false;
+  // Check both no-dash and dash-prefixed variants (Claude uses dash-prefix internally)
+  function isAlreadyLinked(dir) {
+    try {
+      const stat = fs.lstatSync(dir);
+      return (stat.isSymbolicLink() || stat.isDirectory()) && fs.existsSync(path.join(dir, 'MEMORY.md'));
+    } catch { return false; }
+  }
+
+  function createSymlink(targetDir, portable) {
+    fs.mkdirSync(path.dirname(targetDir), { recursive: true });
+    try {
+      const stat = fs.lstatSync(targetDir);
+      if (stat.isSymbolicLink()) fs.unlinkSync(targetDir);
+      else if (stat.isDirectory() && fs.readdirSync(targetDir).length === 0) fs.rmdirSync(targetDir);
+    } catch {}
+    if (!fs.existsSync(targetDir)) {
+      fs.symlinkSync(portable, targetDir, os.platform() === 'win32' ? 'junction' : undefined);
     }
-  } catch {}
+  }
 
-  if (needsLink) {
+  if (!isAlreadyLinked(memoryDir) || !isAlreadyLinked(dashMemoryDir)) {
     const candidates = ['.ai-context/memory', '.claude/memory'];
     let portable = null;
     for (const candidate of candidates) {
@@ -277,17 +293,8 @@ try {
       }
     }
     if (portable) {
-      fs.mkdirSync(path.dirname(memoryDir), { recursive: true });
-      try {
-        const stat = fs.lstatSync(memoryDir);
-        if (stat.isSymbolicLink()) fs.unlinkSync(memoryDir);
-        else if (stat.isDirectory() && fs.readdirSync(memoryDir).length === 0) fs.rmdirSync(memoryDir);
-      } catch {}
-      if (os.platform() === 'win32') {
-        fs.symlinkSync(portable, memoryDir, 'junction');
-      } else {
-        fs.symlinkSync(portable, memoryDir);
-      }
+      if (!isAlreadyLinked(memoryDir)) createSymlink(memoryDir, portable);
+      if (!isAlreadyLinked(dashMemoryDir)) createSymlink(dashMemoryDir, portable);
     }
   }
   _endSection('portable-memory');

@@ -93,6 +93,12 @@
           },
           {
             "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/tool-parity-check.js\"",
+            "timeout": 5000,
+            "name": "tool-parity-check"
+          },
+          {
+            "type": "command",
             "command": "node \"$HOME/.gemini/hooks/handoff-triage-gate.js\"",
             "timeout": 5000
           }
@@ -378,12 +384,6 @@
             "command": "node \"$HOME/.gemini/hooks/skill-auto-updater.js\"",
             "timeout": 30000,
             "name": "skill-auto-updater"
-          },
-          {
-            "type": "command",
-            "command": "node \"$HOME/.gemini/hooks/sync-memory-dirs.js\"",
-            "timeout": 5000,
-            "name": "sync-memory"
           },
           {
             "type": "command",

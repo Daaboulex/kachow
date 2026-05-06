@@ -38,7 +38,7 @@ try {
 
   // Subagent context check
   const markerDir = path.join(os.homedir(), '.claude', 'cache', 'subagent-active');
-  const markerPath = path.join(markerDir, `${sessionId}.json`);
+  const markerPath = path.join(markerDir, `${sessionId}-${process.pid}.json`);
   if (!fs.existsSync(markerPath)) passthrough();
 
   // ── F4.B: MCP filesystem mutation block ──
