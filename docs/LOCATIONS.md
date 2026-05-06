@@ -51,6 +51,19 @@ git clone https://github.com/Daaboulex/kachow "$AI_CONTEXT"
 
 Tool directories contain symlinks created by `install-adapters.mjs`. Each tool's CLI reads from its own directory, but the actual files live in `~/.ai-context/`. Edit once, all tools see the change.
 
+### Per-project state
+
+Each project can have a `.ai-context` symlink pointing to a `project-state/<name>` entry inside the canonical directory:
+
+```
+~/my-project/.ai-context → ~/.ai-context/project-state/my-project
+                            ├── memory/     (project-specific memories)
+                            ├── rules/      (project-specific rules)
+                            └── project-rules.md
+```
+
+New projects are **auto-provisioned** on first session start — the `session-start-combined.js` hook creates the project-state entry and symlinks automatically. Tool-specific project dirs (`.claude/memory`, `.gemini/memory`) also symlink to the same target, so all tools share one set of project memories.
+
 ## Per-OS install destinations
 
 | OS | Typical default | How to target elsewhere |

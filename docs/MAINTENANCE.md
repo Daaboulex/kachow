@@ -22,7 +22,8 @@ Key consequences:
 
 - **Edit once, all tools see the change.** Hooks, settings, commands, memories, and instructions are all canonical in `~/.ai-context/`. Symlinks deliver them to each tool.
 - **`auto-push-global.js` pushes only `~/.ai-context/`.** Enable with `AI_CONTEXT_AUTOCOMMIT=1` + `AI_CONTEXT_AUTOPUSH=1` in your env config.
-- **`install-adapters.mjs` creates all symlinks.** Run it after cloning on a new machine, or after adding a new tool.
+- **`install-adapters.mjs` creates all symlinks** (settings, hooks, commands, skills). Run it after cloning on a new machine, or after adding a new tool. Also converts commands to Codex skill format.
+- **Per-project state is auto-provisioned.** On first session start in any project, `session-start-combined.js` creates a `project-state/<name>/memory/` entry and symlinks the tool's project memory dir to it. Add `.ai-context` to your project's `.gitignore`.
 
 ## Trigger matrix — what runs when
 
