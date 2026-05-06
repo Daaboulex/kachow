@@ -364,6 +364,68 @@ try {
       createSymlinkSafe(target, toolMemDir);
     }
   }
+  // Step 5: Auto-create .ai-context symlink in project dir (if git repo + not already present)
+  if (projectKey && projectStateMemory) {
+    const aiCtxLink = path.join(projectDir, '.ai-context');
+    const projectStateDir = path.dirname(projectStateMemory); // project-state/<key>
+    if (!fs.existsSync(aiCtxLink)) {
+      // Only for git repos or dirs with >5 files (skip random tmp dirs)
+      const isGit = fs.existsSync(path.join(projectDir, '.git'));
+      const hasContent = !isGit && (() => { try { return fs.readdirSync(projectDir).length > 5; } catch { return false; } })();
+      if (isGit || hasContent) {
+        try { fs.symlinkSync(projectStateDir, aiCtxLink); } catch {}
+      }
+    }
+    // Step 6: Ensure instruction file symlinks in project-state (CLAUDE.md, GEMINI.md → project-rules.md)
+    const rulesFile = path.join(projectStateDir, 'project-rules.md');
+    if (fs.existsSync(rulesFile)) {
+      for (const name of ['CLAUDE.md', 'GEMINI.md']) {
+        const psLink = path.join(projectStateDir, name);
+        if (!fs.existsSync(psLink)) {
+          try { fs.symlinkSync('project-rules.md', psLink); } catch {}
+        }
+      }
+    }
+    // Step 7: If cwd has a real CLAUDE.md (not symlink), migrate to project-rules.md
+    const cwdClaude = path.join(projectDir, 'CLAUDE.md');
+    try {
+      if (fs.existsSync(cwdClaude) && !fs.lstatSync(cwdClaude).isSymbolicLink() && !fs.existsSync(rulesFile)) {
+        fs.copyFileSync(cwdClaude, rulesFile);
+        for (const name of ['CLAUDE.md', 'GEMINI.md']) {
+          const psLink = path.join(projectStateDir, name);
+          if (!fs.existsSync(psLink)) fs.symlinkSync('project-rules.md', psLink);
+        }
+      }
+    } catch {}
+    // Step 8: Ensure AGENTS.md → CLAUDE.md in cwd (so all tools find it)
+    const cwdAgents = path.join(projectDir, 'AGENTS.md');
+    if (!fs.existsSync(cwdAgents) && fs.existsSync(cwdClaude)) {
+      try { fs.symlinkSync('CLAUDE.md', cwdAgents); } catch {}
+    }
+  }
+
+  // Step 9: Skill auto-discovery (daily cooldown)
+  const SKILL_SYNC_COOLDOWN = 24 * 60 * 60 * 1000;
+  const skillMarker = path.join(configDir, '.skill-sync-last');
+  try {
+    const skillAge = Date.now() - (fs.existsSync(skillMarker) ? fs.statSync(skillMarker).mtimeMs : 0);
+    if (skillAge > SKILL_SYNC_COOLDOWN) {
+      const canonSkills = path.join(home, '.ai-context', 'skills');
+      if (fs.existsSync(canonSkills)) {
+        for (const s of fs.readdirSync(canonSkills, { withFileTypes: true })) {
+          if (!s.isDirectory()) continue;
+          const src = path.join(canonSkills, s.name);
+          const dest = path.join(configDir, 'skills', s.name);
+          if (!fs.existsSync(dest)) {
+            fs.mkdirSync(path.dirname(dest), { recursive: true });
+            try { fs.symlinkSync(src, dest); } catch {}
+          }
+        }
+      }
+      try { fs.writeFileSync(skillMarker, ''); } catch {}
+    }
+  } catch {}
+
   _endSection('portable-memory');
 } catch (e) {
   errors.push({ section: 'ensure-portable-memory', error: e.message, stack: e.stack?.split('\n')[1]?.trim(), critical: true });

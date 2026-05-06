@@ -28,15 +28,6 @@ hooks:
       gemini:
         name: session-context-loader
 
-  - file: gsd-check-update.js
-    category: meta
-    tools: [claude, codex, gemini]
-    order: 3
-    async: false
-    events:
-      - event: SessionStart
-        timeout: 5
-
   - file: session-start-combined.js
     category: meta
     tools: [claude, codex, gemini]

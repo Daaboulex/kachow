@@ -323,12 +323,6 @@
     ],
     "defaultMode": "acceptEdits"
   },
-  "statusLine": {
-    "type": "command",
-    "command": "node \"$HOME/.claude/hooks/enhanced-statusline.js\""
-  },
-  "effortLevel": "xhigh",
-  "editorMode": "vim",
   "skillOverrides": {
     "gsd-add-backlog": "name-only",
     "gsd-add-phase": "name-only",
@@ -404,6 +398,12 @@
     "compound-engineering:ce-worktree": "name-only",
     "compound-engineering:ce-proof": "name-only"
   },
+  "statusLine": {
+    "type": "command",
+    "command": "node \"$HOME/.claude/hooks/enhanced-statusline.js\""
+  },
+  "effortLevel": "xhigh",
+  "editorMode": "vim",
   "hooks": {
     "SessionStart": [
       {
