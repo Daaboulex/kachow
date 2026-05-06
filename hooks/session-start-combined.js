@@ -270,7 +270,8 @@ try {
   if (!isInternalDir && !isTmpDir) {
     try {
       const pk = require('./lib/project-key.js');
-      projectKey = typeof pk.deriveKey === 'function' ? pk.deriveKey(projectDir) : null;
+      const result = typeof pk.deriveProjectKey === 'function' ? pk.deriveProjectKey(projectDir) : null;
+      projectKey = result?.key || null;
     } catch {}
     if (!projectKey) {
       const parts = projectDir.split(path.sep).filter(Boolean);
@@ -300,21 +301,39 @@ try {
     } catch { return false; }
   }
   function atomicMigrate(srcDir, targetDir) {
+    const copyErrors = [];
     for (const f of fs.readdirSync(srcDir)) {
       const s = path.join(srcDir, f);
       const d = path.join(targetDir, f);
-      if (!fs.existsSync(d)) {
-        try {
+      try {
+        if (fs.existsSync(d)) {
+          // Conflict: same filename exists in target. Keep both — write conflict copy.
+          const srcSize = fs.statSync(s).size;
+          const dstSize = fs.statSync(d).size;
+          if (srcSize !== dstSize) {
+            const conflict = d.replace(/\.md$/, '.migrate-conflict.md');
+            fs.copyFileSync(s, conflict);
+          }
+        } else {
           if (fs.statSync(s).isDirectory()) fs.cpSync(s, d, { recursive: true });
           else fs.copyFileSync(s, d);
-        } catch {}
-      }
+        }
+      } catch (e) { copyErrors.push({ file: f, error: e.message }); }
     }
+    // Abort if any copy failed — don't delete source
+    if (copyErrors.length > 0) return;
     const backup = srcDir + '.migrating-' + Date.now();
     fs.renameSync(srcDir, backup);
+    // Verify symlink will be created by caller before deleting backup
     try { fs.rmSync(backup, { recursive: true }); } catch {}
   }
   function createSymlinkSafe(target, linkPath) {
+    // Guard: linkPath parent must resolve inside configDir/projects (prevent symlink traversal)
+    try {
+      const parentReal = fs.realpathSync(path.dirname(path.dirname(linkPath)));
+      const projectsRoot = fs.realpathSync(path.join(configDir, 'projects'));
+      if (!parentReal.startsWith(projectsRoot)) return;
+    } catch {} // parent doesn't exist yet — mkdirSync below creates it safely
     try {
       const existing = fs.lstatSync(linkPath);
       if (existing.isSymbolicLink()) {

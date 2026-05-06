@@ -48,8 +48,14 @@ try {
   // so parent's markers don't match (fixing the false-positive block bug).
   const tp = require('./lib/tool-paths.js');
   const markerDir = tp.subagentMarkerDir;
-  const markerPath = path.join(markerDir, `${sessionId}-${process.pid}.json`);
-  if (!fs.existsSync(markerPath)) passthrough();
+  // Glob for sessionId-*.json (PID differs between inject hook and this hook process)
+  let isSubagent = false;
+  try {
+    for (const f of fs.readdirSync(markerDir)) {
+      if (f.startsWith(sessionId + '-') && f.endsWith('.json')) { isSubagent = true; break; }
+    }
+  } catch {}
+  if (!isSubagent) passthrough();
 
   // Subagent context confirmed. Check command against blocked patterns.
   // R-AUDIT-5 hardening (2026-04-25):

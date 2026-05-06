@@ -39,8 +39,14 @@ try {
   // Subagent context check
   const tp = require('./lib/tool-paths.js');
   const markerDir = tp.subagentMarkerDir;
-  const markerPath = path.join(markerDir, `${sessionId}-${process.pid}.json`);
-  if (!fs.existsSync(markerPath)) passthrough();
+  // Glob for sessionId-*.json (PID differs between inject hook and this hook process)
+  let isSubagent = false;
+  try {
+    for (const f of fs.readdirSync(markerDir)) {
+      if (f.startsWith(sessionId + '-') && f.endsWith('.json')) { isSubagent = true; break; }
+    }
+  } catch {}
+  if (!isSubagent) passthrough();
 
   // ── F4.B: MCP filesystem mutation block ──
   // Pattern: mcp__<server>__<verb>. Match all known mutation verbs.

@@ -25,10 +25,15 @@ try {
   if (sessionId) {
     try {
       const markerDir = require('./lib/tool-paths.js').subagentMarkerDir;
-      // New format: session_id-pid.json
-      const markerPath = path.join(markerDir, `${sessionId}-${process.pid}.json`);
-      if (fs.existsSync(markerPath)) fs.unlinkSync(markerPath);
-      // Legacy format: session_id.json (clean up old markers too)
+      // Clean ALL markers for this session (PID varies between hooks)
+      try {
+        for (const f of fs.readdirSync(markerDir)) {
+          if (f.startsWith(sessionId + '-') && f.endsWith('.json')) {
+            fs.unlinkSync(path.join(markerDir, f));
+          }
+        }
+      } catch {}
+      // Legacy format: session_id.json
       const legacyPath = path.join(markerDir, `${sessionId}.json`);
       if (fs.existsSync(legacyPath)) fs.unlinkSync(legacyPath);
     } catch (e) {

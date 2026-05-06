@@ -31,7 +31,7 @@ try {
   try { raw = fs.readFileSync(0, 'utf8'); } catch { passthrough(); }
   const input = JSON.parse(raw);
 
-  const TOOL_NORM = { write: 'Write', edit: 'Edit', multiedit: 'MultiEdit', write_file: 'Write', replace: 'Edit' };
+  const TOOL_NORM = { write: 'Write', edit: 'Edit', multiedit: 'MultiEdit', notebookedit: 'NotebookEdit', write_file: 'Write', replace: 'Edit' };
   const tool = TOOL_NORM[(input.tool_name || '').toLowerCase()] || input.tool_name || '';
   if (tool !== 'Write' && tool !== 'Edit' && tool !== 'MultiEdit') passthrough();
 

@@ -24,7 +24,7 @@ try {
 
   // Normalize tool names (Gemini: write_file/replace)
   const TOOL_NORM = { write_file: 'Write', replace: 'Edit', run_shell_command: 'Bash', read_file: 'Read', activate_skill: 'Skill',
-    write: 'Write', edit: 'Edit', multiedit: 'MultiEdit', bash: 'Bash', read: 'Read' };
+    write: 'Write', edit: 'Edit', multiedit: 'MultiEdit', notebookedit: 'NotebookEdit', bash: 'Bash', read: 'Read' };
   const toolName = TOOL_NORM[(data.tool_name || '').toLowerCase()] || data.tool_name || '';
   const cwd = data.cwd || process.cwd();
 
