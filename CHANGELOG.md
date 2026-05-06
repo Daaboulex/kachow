@@ -6,6 +6,28 @@ All notable changes to this framework. See [Semantic Versioning](https://semver.
 
 ## [Unreleased]
 
+## [0.8.0] — 2026-05-06
+
+Infrastructure consolidation — one brain architecture.
+
+### Added
+- **project-state/** — centralized project memories for per-repo context
+- **configs/** — centralized tool settings (Claude, Gemini, Codex)
+- CI settings.json stub for hook-test-suite
+
+### Changed
+- **install-adapters.mjs** — settings symlinks for all 5 tools
+- **auto-push-global.js** — explicit pathspec replaces `git add -A`
+- **mirror-kachow.js** — simplified trigger model (single source)
+- **reflect-stop.js** — file mtime heuristic replaces git status
+- **tri-tool-parity-check.js** — removed dead .git checks
+- **validate-settings-on-write.js** — recognizes centralized config paths
+- **git-global.js REPOS** — single repo model
+
+### Removed
+- `.git` from tool dirs — tool dirs are now derived state via symlinks
+- Syncthing folders for individual tool dirs
+
 ## [0.7.1] — 2026-05-06
 
 Cross-platform hardening, badge accuracy, documentation fixes.
