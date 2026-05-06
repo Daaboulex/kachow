@@ -5,21 +5,24 @@ This doc answers two questions every new maintainer asks after the first `bootst
 1. **Where does each piece live, and why?**
 2. **When I work on machine X, what happens where?**
 
-## The four canonical dirs
+## The one canonical dir
 
-Configuration is deliberately split across three per-user directories. They have different git-remote and sync characteristics on purpose.
+All configuration lives in one place: `~/.ai-context/`. Tool directories (`~/.claude/`, `~/.gemini/`, `~/.codex/`) are **derived state** — they contain symlinks pointing back into `~/.ai-context/` plus tool-managed runtime files (caches, plugins, session data).
 
-| Dir | Owns | Git remote | Cross-machine sync |
+| Dir | Role | Git | Cross-machine sync |
 |---|---|---|---|
-| `~/.ai-context/` | `AGENTS.md`, `memory/`, `skills/`, `mcp/`, `scripts/`, `VERSION` | **Your choice.** Syncthing, private git, or nothing. | User decides — `scripts/setup-private-remote.sh` lists the common options. |
-| `~/.claude/` | Claude Code: `hooks/`, `commands/`, `settings.json`, `.notifications.jsonl` | Typically a private GitHub repo (`<you>/claude-global`). | Automatic via the `auto-push-global.js` Stop hook. |
-| `~/.gemini/` | Gemini CLI: `hooks/`, `commands/`, `settings.json` | Typically a private GitHub repo (`<you>/gemini-global`). | Same — `auto-push-global.js` covers all three. |
-| `~/.codex/` | Codex CLI: `hooks/`, `commands/`, `config.toml` | Typically a private GitHub repo (`<you>/codex-global`). | Same — `auto-push-global.js` covers all three. |
+| `~/.ai-context/` | **Canonical source.** `AGENTS.md`, `hooks/`, `commands/`, `configs/`, `memory/`, `skills/`, `mcp/`, `scripts/`, `project-state/` | Private git repo (your choice). `auto-push-global.js` commits + pushes at session end. | Syncthing, private git, or both. |
+| `~/.claude/` | Derived. Symlinks to canonical for `settings.json`, `hooks/`, `commands/`, `memory/`, `CLAUDE.md`. Plus Claude-managed runtime: `plugins/`, `cache/`, `file-history/`. | No git repo. | Not synced directly — changes flow through `~/.ai-context/`. |
+| `~/.gemini/` | Derived. Same symlink pattern. Plus Gemini-managed runtime: `extensions/`, `cache/`. | No git repo. | Same. |
+| `~/.codex/` | Derived. Same pattern. `config.toml` symlinked from `configs/`. | No git repo. | Same. |
+| `~/.config/crush/` | Derived. `crush.json` + `hooks/` symlinked. | No git repo. | Same. |
+| `~/.config/opencode/` | Derived. `AGENTS.md` + `config.json` symlinked. | No git repo. | Same. |
 
-Two practical consequences:
+Key consequences:
 
-- **Hooks canonical source is `~/.ai-context/hooks/`**. Consumer symlinks point there: `~/.claude/hooks/ → ~/.ai-context/hooks/`, `~/.gemini/hooks/ → ~/.ai-context/hooks/`, `~/.codex/hooks/ → ~/.ai-context/hooks/`. Editing any hook file in `~/.ai-context/hooks/` affects all three tools automatically via those symlinks.
-- **`~/.ai-context/` has no auto-push by default.** It's intentionally quiet because many users sync it via Syncthing or leave it local-only. Enable auto-commit by setting `AI_CONTEXT_AUTOCOMMIT=1`; enable auto-push (requires a remote) with `AI_CONTEXT_AUTOPUSH=1`.
+- **Edit once, all tools see the change.** Hooks, settings, commands, memories, and instructions are all canonical in `~/.ai-context/`. Symlinks deliver them to each tool.
+- **`auto-push-global.js` pushes only `~/.ai-context/`.** Enable with `AI_CONTEXT_AUTOCOMMIT=1` + `AI_CONTEXT_AUTOPUSH=1` in your env config.
+- **`install-adapters.mjs` creates all symlinks.** Run it after cloning on a new machine, or after adding a new tool.
 
 ## Trigger matrix — what runs when
 
@@ -27,16 +30,12 @@ Every Stop hook runs in a known order (see `settings.template.json → hooks.Sto
 
 | Hook | Scope | What it does | Cooldown |
 |---|---|---|---|
-| `auto-push-global` | `~/.claude/` + `~/.gemini/` + `~/.codex/` (+ `~/.ai-context/` opt-in) | Commits locally always; pushes every 5 min or when commits pile up. | 5 min (push only) |
-| `mirror-kachow` (maintainer-only) | `~/.ai-context/` + `~/.claude/` + `~/.gemini/` | Scrubs all three into the public framework mirror, deep-verifies, commits locally. Pushes only if `KACHOW_AUTO_PUSH=1`. | 15 min |
+| `auto-push-global` | `~/.ai-context/` | Commits locally always; pushes every 5 min or when commits pile up. | 5 min (push only) |
+| `mirror-kachow` (maintainer-only) | `~/.ai-context/` | Scrubs canonical source into the public framework mirror, deep-verifies, commits locally. Pushes only if `KACHOW_AUTO_PUSH=1`. | 15 min |
 
-`mirror-kachow` fires on **any** of:
+`mirror-kachow` fires on **either** of:
 - `~/.ai-context/` HEAD changed (e.g. you committed a rule change)
-- `~/.claude/` HEAD changed (e.g. `auto-push-global` just committed a hook edit)
-- `~/.gemini/` HEAD changed (e.g. Gemini-side hook edit)
 - `~/.ai-context/` working-tree content-hash changed (e.g. you edited `AGENTS.md` but haven't committed yet)
-
-This catches the common "I edited a hook but nothing in `~/.ai-context/` changed" case where the older trigger model would silently no-op.
 
 ## Machine scenarios
 
@@ -46,16 +45,15 @@ Day-to-day edits of `AGENTS.md`, hooks, or skills. Everything is automatic:
 
 1. You edit a file.
 2. Session ends (Stop hook chain fires).
-3. `auto-push-global` commits `~/.claude/` + `~/.gemini/` + `~/.codex/` and pushes them to your private repos.
-4. `mirror-kachow` sees the change, re-scrubs, updates `~/.kachow-mirror/` locally.
+3. `auto-push-global` commits `~/.ai-context/` and pushes to your private repo.
+4. `mirror-kachow` sees the change, re-scrubs, updates the local mirror.
 5. If you've opted in (`KACHOW_AUTO_PUSH=1`), that mirror is pushed to the public repo.
 
 ### Secondary machine (another personal install)
 
-Your second machine pulls two things on startup:
+Your second machine pulls one thing on startup:
 
-- **Claude/Gemini/Codex state**: `auto-pull-global.js` (SessionStart hook) fetches `~/.claude/`, `~/.gemini/`, and `~/.codex/` from your private repos. Identical hook set everywhere.
-- **`~/.ai-context/`**: either Syncthing keeps it current, or you `git pull` your private remote manually. No hook does this by default.
+- **`~/.ai-context/`**: `auto-pull-global.js` (SessionStart hook) fetches from your private remote. Or Syncthing keeps it current between sessions. Tool dirs are derived — `install-adapters.mjs` creates the symlinks.
 
 ### Windows work machine (consumer-only)
 
@@ -87,7 +85,7 @@ A Node-native publish pipeline is on the roadmap for a future release.
 Everything is in git. If a release introduces a bad hook:
 
 ```bash
-cd ~/.kachow-mirror     # or wherever your mirror lives
+cd ~/.ai-context/kachow-mirror   # or wherever your mirror lives
 git log --oneline       # find the bad commit
 git revert <sha>        # make a clean revert commit
 git push origin main

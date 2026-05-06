@@ -167,9 +167,9 @@ try {
 
   // ── 3. .claude/commands|skills|rules → .gemini/ (non-critical) ──
   try {
-    const isCommand = normalized.includes('.claude/commands/') && normalized.endsWith('.md');
-    const isSkill = normalized.includes('.claude/skills/') && normalized.endsWith('.md');
-    const isRule = normalized.includes('.claude/rules/') && normalized.endsWith('.md');
+    const isCommand = (normalized.includes('.claude/commands/') || normalized.includes('.gemini/commands/') || normalized.includes('.ai-context/commands/')) && normalized.endsWith('.md');
+    const isSkill = (normalized.includes('.claude/skills/') || normalized.includes('.gemini/skills/') || normalized.includes('.ai-context/skills/')) && normalized.endsWith('.md');
+    const isRule = (normalized.includes('.claude/rules/') || normalized.includes('.gemini/rules/')) && normalized.endsWith('.md');
 
     if (isCommand || isSkill || isRule) {
       const { toolMap, modelMap, claudeOnlyFields, translateFrontmatter } = require('./lib/platform-map');

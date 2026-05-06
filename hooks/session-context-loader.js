@@ -307,8 +307,17 @@ try {
     }
     // Also check global project memory (fallback for projects without local memory dir)
     const sanitized = cwd.replace(/^\//, '').replace(/[/\\]/g, '-').replace(/^([A-Z]):/i, '$1');
-    const globalMemPath = path.join(require('os').homedir(), '.claude', 'projects', sanitized, 'memory', 'MEMORY.md');
-    memoryPaths.push(globalMemPath);
+    const dashSanitized = cwd.replace(/[/\\]/g, '-').replace(/^([A-Z]):/i, '$1');
+    const tp = require('./lib/tool-paths.js');
+    const toolProjects = path.join(tp.configDir, 'projects');
+    // Check both dash-prefix (Claude internal) and no-dash-prefix variants
+    memoryPaths.push(path.join(toolProjects, dashSanitized, 'memory', 'MEMORY.md'));
+    memoryPaths.push(path.join(toolProjects, sanitized, 'memory', 'MEMORY.md'));
+    // Also check Claude projects if running under different tool
+    if (tp.configDir !== path.join(require('os').homedir(), '.claude')) {
+      memoryPaths.push(path.join(require('os').homedir(), '.claude', 'projects', dashSanitized, 'memory', 'MEMORY.md'));
+      memoryPaths.push(path.join(require('os').homedir(), '.claude', 'projects', sanitized, 'memory', 'MEMORY.md'));
+    }
 
     for (const memPath of memoryPaths) {
       if (fs.existsSync(memPath)) {
@@ -418,7 +427,7 @@ try {
 
           // R-CTX: configurable counts (default 3 full + 10 titles, was 5+15).
           // Restore old behavior with: MEMORY_INJECTION_FULL_COUNT=5 MEMORY_INJECTION_TITLE_COUNT=15
-          const FULL_N = parseInt(process.env.MEMORY_INJECTION_FULL_COUNT, 10) || 3;
+          const FULL_N = parseInt(process.env.MEMORY_INJECTION_FULL_COUNT, 10) || 8;
           const TITLE_N = parseInt(process.env.MEMORY_INJECTION_TITLE_COUNT, 10) || 10;
           // 40/60 budget ratio: 40% of FULL_N slots go to synthesized memories (feedback/user),
           // 60% to recent/explicit memories (project/reference). Override: MEMORY_SUMMARY_RATIO=0.5

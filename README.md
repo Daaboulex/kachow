@@ -132,13 +132,13 @@ Edit `~/.ai-context/AGENTS.md`. Every tool picks up the change on next session s
 
 ## Where things live
 
-Three canonical directories per user. They have different sync characteristics on purpose. Full table + trigger matrix in [MAINTENANCE.md](./docs/MAINTENANCE.md).
+One canonical directory per user. Tool directories are derived state (symlinks). Full table + trigger matrix in [MAINTENANCE.md](./docs/MAINTENANCE.md).
 
-- `~/.ai-context/` — shared canonical (rules, memory, skills, MCP, scripts)
-- `~/.claude/` — Claude-specific (hooks master, commands, settings)
-- `~/.gemini/` — Gemini-specific (settings, hooks mirrored from Claude)
+- `~/.ai-context/` — **source of truth** (hooks, commands, configs, memory, skills, MCP, scripts)
+- `~/.claude/`, `~/.gemini/`, `~/.codex/` — derived (symlinks to canonical + tool runtime)
+- `~/.config/crush/`, `~/.config/opencode/` — derived (config + hooks symlinked)
 
-The other tools (Codex, OpenCode, Aider, Cursor) all read `AGENTS.md` through a symlink — no per-tool duplication of rules.
+All 5+ tools read from the same canonical source via `install-adapters.mjs` symlinks.
 
 ## Staying up to date
 

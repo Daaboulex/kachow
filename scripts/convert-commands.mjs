@@ -2,7 +2,7 @@
 // convert-commands.mjs
 // Auto-converts Claude user commands to Codex skills and Gemini commands.
 //
-// Source:  ~/.claude/commands/*.md
+// Source:  ~/.ai-context/commands/*.md (canonical, symlinked to tool dirs)
 // Codex:   ~/.codex/skills/cmd-{name}/SKILL.md  (cmd- prefix avoids collision with plugin skills)
 // Gemini:  ~/.gemini/commands/{name}.md          (verbatim copy)
 //
@@ -18,12 +18,12 @@ import { join, basename } from 'node:path';
 
 const HOME = homedir();
 
-const CLAUDE_COMMANDS_DIR = join(HOME, '.claude', 'commands');
+const CLAUDE_COMMANDS_DIR = join(HOME, '.ai-context', 'commands');
 const CODEX_SKILLS_DIR    = join(HOME, '.codex', 'skills');
 const GEMINI_COMMANDS_DIR = join(HOME, '.gemini', 'commands');
 
 // Protected: skip entirely (never overwrite)
-const PROTECTED = new Set(['handoff']);
+const PROTECTED = new Set([]);
 
 // Convert but prepend warning comment
 const NEEDS_MANUAL_ADAPTATION = new Set([
