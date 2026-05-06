@@ -184,42 +184,53 @@ for (const { label, src, dest } of EXTRA_SYMLINKS) {
   console.log(`+ ${label}: linked → ${src}`);
 }
 
-// Portable skills: symlink each canonical skill dir into each tool's skills/ dir
+// Portable skills: ~/.agents/skills/ is the cross-tool standard.
+// Gemini, Codex, OpenCode auto-discover from ~/.agents/skills/.
+// Claude needs per-skill symlinks (doesn't read ~/.agents/).
+// Crush uses options.skills_paths in crush.json.
 console.log('');
-console.log('== Portable skills (canonical → tool skill dirs) ==');
-const SKILL_TOOLS = [
-  { label: 'claude', dir: path.join(HOME, '.claude', 'skills') },
-  { label: 'gemini', dir: path.join(HOME, '.gemini', 'skills') },
-  { label: 'codex',  dir: path.join(HOME, '.codex', 'skills') },
-];
-const skillsCanonical = path.join(AI_CONTEXT, 'skills');
-if (fs.existsSync(skillsCanonical)) {
-  const skillDirs = fs.readdirSync(skillsCanonical, { withFileTypes: true })
-    .filter(d => d.isDirectory());
-  for (const skill of skillDirs) {
-    const skillSrc = path.join(skillsCanonical, skill.name);
-    for (const { label, dir: toolSkillsDir } of SKILL_TOOLS) {
-      const dest = path.join(toolSkillsDir, skill.name);
-      fs.mkdirSync(toolSkillsDir, { recursive: true });
-      let existing;
-      try { existing = fs.lstatSync(dest); } catch { existing = null; }
-      if (existing && existing.isSymbolicLink() && fs.readlinkSync(dest) === skillSrc) {
-        continue; // already correct
-      }
-      if (existing && existing.isSymbolicLink()) {
-        fs.unlinkSync(dest); // stale symlink
-      }
-      if (existing && !existing.isSymbolicLink()) {
-        continue; // real dir — plugin-managed, don't overwrite
-      }
-      fs.symlinkSync(skillSrc, dest, 'dir');
-      console.log(`+ ${label}/${skill.name}: linked → ${skillSrc}`);
+console.log('== Portable skills (cross-tool via ~/.agents/skills/) ==');
+const agentsSkills = path.join(HOME, '.agents', 'skills');
+const aiContextSkills = path.join(AI_CONTEXT, 'skills');
+
+// Ensure ~/.agents/skills/ exists
+fs.mkdirSync(agentsSkills, { recursive: true });
+
+// If ai-context/skills/ has real dirs (not symlinks), migrate them to ~/.agents/skills/
+if (fs.existsSync(aiContextSkills)) {
+  for (const entry of fs.readdirSync(aiContextSkills, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const src = path.join(aiContextSkills, entry.name);
+    const agentsDest = path.join(agentsSkills, entry.name);
+    // Skip if ai-context entry is already a symlink to agents
+    try { if (fs.lstatSync(src).isSymbolicLink()) continue; } catch { continue; }
+    // Move to ~/.agents/skills/ if not there yet
+    if (!fs.existsSync(agentsDest)) {
+      fs.renameSync(src, agentsDest);
+      fs.symlinkSync(agentsDest, src); // backward compat symlink
+      console.log(`↻ ${entry.name}: migrated to ~/.agents/skills/`);
     }
   }
-  console.log(`  ${skillDirs.length} portable skills checked across ${SKILL_TOOLS.length} tools`);
-} else {
-  console.log('- no canonical skills dir found');
 }
+
+// Claude: create per-skill symlinks (only tool that doesn't read ~/.agents/)
+const claudeSkills = path.join(HOME, '.claude', 'skills');
+fs.mkdirSync(claudeSkills, { recursive: true });
+let skillCount = 0;
+for (const entry of fs.readdirSync(agentsSkills, { withFileTypes: true })) {
+  if (!entry.isDirectory()) continue;
+  skillCount++;
+  const src = path.join(agentsSkills, entry.name);
+  const dest = path.join(claudeSkills, entry.name);
+  let existing;
+  try { existing = fs.lstatSync(dest); } catch { existing = null; }
+  if (existing && existing.isSymbolicLink() && fs.readlinkSync(dest) === src) continue;
+  if (existing && existing.isSymbolicLink()) fs.unlinkSync(dest);
+  if (existing && !existing.isSymbolicLink()) continue; // plugin-managed
+  fs.symlinkSync(src, dest, 'dir');
+  console.log(`+ claude/${entry.name}: linked → ${src}`);
+}
+console.log(`  ${skillCount} skills in ~/.agents/skills/ (auto-discovered by Gemini+Codex+OpenCode, symlinked for Claude)`);
 
 // Convert canonical commands to Codex skill format
 console.log('');

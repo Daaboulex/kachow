@@ -307,10 +307,10 @@ try {
       const d = path.join(targetDir, f);
       try {
         if (fs.existsSync(d)) {
-          // Conflict: same filename exists in target. Keep both — write conflict copy.
-          const srcSize = fs.statSync(s).size;
-          const dstSize = fs.statSync(d).size;
-          if (srcSize !== dstSize) {
+          // Conflict: same filename in target. Compare content hash, not just size.
+          const srcBuf = fs.readFileSync(s);
+          const dstBuf = fs.readFileSync(d);
+          if (!srcBuf.equals(dstBuf)) {
             const conflict = d.replace(/\.md$/, '.migrate-conflict.md');
             fs.copyFileSync(s, conflict);
           }

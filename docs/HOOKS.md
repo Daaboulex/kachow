@@ -1,6 +1,6 @@
 # Hooks catalog
 
-60+ shipped hooks + 28 library helpers. Every one is pure Node with no external deps; runs identically on Linux, macOS, and Windows (where the host AI CLI supports hooks). Hooks marked ⁱ are documented for reference but excluded from the public mirror.
+70+ shipped hooks + 28 library helpers. Every one is pure Node with no external deps; runs identically on Linux, macOS, and Windows (where the host AI CLI supports hooks). Hooks marked ⁱ are documented for reference but excluded from the public mirror.
 
 Registered under `hooks.<event>[].hooks[]` in the tool's settings JSON. See `settings.template.json` for the wiring.
 
@@ -22,7 +22,6 @@ Fires once at the beginning of every session.
 | `handoff-triage-gate` | Checks for stale deferred items at session start. Surfaces unresolved handoffs from previous sessions. |
 | `tool-parity-check` | Detects hook registration drift between Claude, Gemini, Codex, Crush, and OpenCode on a 24h cooldown. Reports only actionable gaps (excludes structural event differences). |
 | `detect-sync-conflicts` ⁱ | Scans for Syncthing conflict files in AI context directories. Silent when clean. |
-| `gsd-check-update` ⁱ | Checks GSD plugin version on a cooldown. Silent when current. |
 
 ## PostToolUse
 
@@ -44,7 +43,6 @@ Fires after each tool call (matcher-scoped — not every hook runs on every tool
 | `skill-drift-guard` | (all) | Re-injects behavioral rules every 60th tool call to prevent model drift in long sessions. |
 | `rule-enforcement-check` | (all, async) | Checks that Agent dispatch includes model:param as required by AGENTS.md. |
 | `handoff-auto-save` | `Bash` (async) | Auto-saves handoff state when meaningful writes are detected mid-session. |
-| `claude-gemini-json-sync` ⁱ | `Write\|Edit` | After editing `.gemini/` or `.claude/` JSON files (AI-tasks, AI-progress), auto-copies to the other agent's equivalent directory. Gemini-only. |
 | `post-commit-sync-reminder` ⁱ | `Bash` | After a git commit in a dual-remote project, reminds to sync. Detects dual-remote projects by trait, not name. |
 | `repomap-refresh` ⁱ | `Write\|Edit` (async) | Refreshes DL2 repo map on C/H file writes in Development-DL2/. |
 
@@ -144,7 +142,6 @@ These fire under AfterTool in Gemini CLI and handle Gemini→Claude direction sy
 | `sync-claude-md` | Syncs CLAUDE.md changes from Gemini's write to Claude's copy. |
 | `sync-claude-skills` | Syncs skill changes from Gemini to Claude. |
 | `sync-claude-agents` | Syncs agent file changes from Gemini to Claude. |
-| `sync-memory-dirs` | Bidirectional sync of memory directories between Claude and Gemini at session end. |
 
 ## Library helpers (`hooks/lib/`)
 
@@ -156,7 +153,6 @@ Not registered as hooks. Required by the hooks above.
 | `constants.js` | multiple | Shared timeout + path constants. |
 | `git-global.js` | `auto-*-global.js` | Thin wrapper around git CLI with quiet-by-default behavior. |
 | `hook-selftest.js` | CI + manual | Runs every hook through a recorded input/output spec. Fails CI on regression. |
-| `hook-topology.js` | CI + `/platform-audit` | Detects event collisions and timeout imbalances between Claude and Gemini settings. |
 | `memory-migrate.js` | `/consolidate-memory` + one-time script | Migrates memory files from v1 to v2 frontmatter. |
 | `observability-logger.js` | all major hooks | Emits per-event JSONL for later analysis. Off by default; opt in by setting a log path. |
 | `platform-map.js` | sync hooks | Maps Claude tool names ↔ Gemini tool names (Write ↔ write_file, etc.) and event names (Stop ↔ SessionEnd). |
@@ -170,8 +166,6 @@ Not registered as hooks. Required by the hooks above.
 | `emit-simple-timing.js` | all major hooks | Lightweight timing helper — records hook execution duration. |
 | `handoff-progress.js` | handoff hooks | Tracks handoff progress state across sessions. |
 | `handoff-state.js` | handoff hooks | Manages handoff file state (create, read, archive). |
-| `hook-interaction-map.js` | `/platform-audit` | Maps hook-to-hook interactions and dependencies. |
-| `hook-timer.js` | all hooks | Timer utility for hook timeout enforcement. |
 | `hostname-presence.js` | presence system | Hostname-aware presence tracking for multi-machine setups. |
 | `leader-election.js` | concurrent sessions | Elects a leader session when multiple AI sessions are active simultaneously. |
 | `project-identity.js` | `session-context-loader` | Detects project identity constraints (forbidden remotes, allowed commands). |

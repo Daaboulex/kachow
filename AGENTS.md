@@ -112,7 +112,7 @@ Plans don't need approval but they must exist.
 - Switching from Claude to Gemini/Codex mid-task does NOT preserve permission boundaries. A user blocked by Claude's permissions may successfully run the same operation in Gemini or Codex.
 - Codex `apply_patch` hook fix (PR #18391) is claimed merged but **not empirically verified**. Until verified: use `shell` for sensitive writes in Codex. Config.toml still warns about this.
 - For sensitive writes in Codex, prefer `shell cat > file <<EOF ... EOF` until apply_patch hook firing is confirmed by testing.
-- `tool-parity-check` hook reports HOOK FILE drift, not behavioral equivalence. A clean parity report does NOT mean the 3 tools enforce equivalently.
+- `tool-parity-check` hook reports HOOK FILE drift, not behavioral equivalence. A clean parity report does NOT mean the 5 tools enforce equivalently.
 
 **This is structural, not a bug.** Gemini and Codex don't have Claude's permission vocabulary; perfect parity is impossible until upstream changes.
 
@@ -183,7 +183,7 @@ Memory format, portable context, tool→read paths: see `~/.ai-context/AGENTS-ar
 ### (Other tools: skip this section)
 
 ### AI Context Maintenance
-- Editing CLAUDE.md/GEMINI.md/AGENTS.md — all three are the same file via symlink. Just edit `~/.ai-context/AGENTS.md`.
+- Editing CLAUDE.md/GEMINI.md/AGENTS.md — all are the same file via symlink. Just edit `~/.ai-context/AGENTS.md`.
 - Skills/rules are living docs — fix stale content on sight.
 - `~/.ai-context/` is the ONLY git repo (ai-context-global). `auto-push-global.js` auto-commits + pushes at Stop. Cooldown-gated. Tool dirs (`~/.claude/`, `~/.gemini/`, `~/.codex/`) have NO `.git` — they are derived state with symlinks to ai-context. All 5 tool configs (Claude, Gemini, Codex, Crush, OpenCode) live in `~/.ai-context/configs/`. Old tool-dir GitHub repos (<repo>, <repo>, [codex-repo]) are archived.
 - **Self-improvement loop:** `meta-system-stop.js` detectors append findings to `~/.claude/self-improvements-pending-<host>.jsonl`. Run `/review-improvements` to triage. Rejections teach 90-day class suppression via `memory/reference/self-improvement-feedback.md`.
@@ -199,7 +199,7 @@ Memory format, portable context, tool→read paths: see `~/.ai-context/AGENTS-ar
 
 New hook events (v2.1.83+) and CLI changelog notes: see `AGENTS-architecture.md`.
 
-### Enforcement hooks (all 3 tools where events exist)
+### Enforcement hooks (all 5 tools where events exist)
 - `autosave-before-destructive.js` — auto-stashes before `rm -rf`, `git reset --hard`, etc.
 - `verifiedby-gate.js` — nudges when TodoWrite marks task done with empty `verifiedBy`
 - `prefer-editing-nudge.js` — warns when creating `foo-v2.ts` next to `foo.ts`

@@ -17,7 +17,7 @@
 
 > AI coding agents forget everything between sessions, run destructive commands without checking, and every tool needs separate configuration.
 >
-> **kachow** is a cross-tool AI agent infrastructure framework. It unifies Claude Code, Gemini CLI, Codex CLI, Crush, and OpenCode under one configuration with 60+ behavioral hooks for session continuity, safety guards, and observability.
+> **kachow** is a cross-tool AI agent infrastructure framework. It unifies Claude Code, Gemini CLI, Codex CLI, Crush, and OpenCode under one configuration with 70+ behavioral hooks for session continuity, safety guards, and observability.
 >
 > Three pillars: **Unify** (write rules once, symlinks distribute) · **Protect** (safety hooks block destructive commands) · **Remember** (memory management and handoff automation across sessions).
 
@@ -96,7 +96,7 @@ Every script reads `AI_CONTEXT` with a fallback to `$HOME/.ai-context`. Useful i
 | Surface | Lives at | Installed by | Cross-platform |
 |---|---|---|---|
 | Canonical rules (`AGENTS.md`) | `~/.ai-context/AGENTS.md` | `install-adapters.sh` / `.ps1` | yes — symlinks (or copy fallback on Windows without Dev Mode) |
-| 60+ hooks | `~/.claude/hooks/` | symlinked on first bootstrap | yes — all pure Node, no shell deps |
+| 70+ hooks | `~/.claude/hooks/` | symlinked on first bootstrap | yes — all pure Node, no shell deps |
 | 28 library helpers | `~/.claude/hooks/lib/` | same | yes |
 | MCP server (`personal-context`) | `~/.ai-context/mcp/personal-context/server.js` | `install-mcp.sh` / `.ps1` | yes — zero-dep Node |
 | Slash commands (13) | `~/.claude/commands/` | bootstrap | yes — Markdown with frontmatter |
@@ -247,7 +247,7 @@ Inspired-by, not forked: kachow's hooks, commands, skills, and memory schema are
 
 ## Roadmap
 
-- [x] **v0.2.0** — Documentation rewrite (60+ hooks documented, count corrections, identity refresh), context-pressure threshold fix, scrub leak fixes
+- [x] **v0.2.0** — Documentation rewrite (70+ hooks documented, count corrections, identity refresh), context-pressure threshold fix, scrub leak fixes
 - [x] **v0.3.0** — Codex as 3rd tool, tri-tool parity checker, 16 new hooks
 - [x] **v0.4.0** — Hook p95 6000ms→141ms, 66 hooks, passive analytics pipeline
 - [x] **v0.5.0** — Hook system restoration (47 items), 17 bugs fixed, context-pressure corrections
