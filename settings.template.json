@@ -398,6 +398,10 @@
     "compound-engineering:ce-worktree": "name-only",
     "compound-engineering:ce-proof": "name-only"
   },
+  "statusLine": {
+    "type": "command",
+    "command": "node \"$HOME/.claude/hooks/enhanced-statusline.js\""
+  },
   "effortLevel": "xhigh",
   "editorMode": "vim",
   "hooks": {
