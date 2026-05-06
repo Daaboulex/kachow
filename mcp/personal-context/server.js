@@ -16,7 +16,16 @@ const os = require('os');
 const AI_CONTEXT = process.env.AI_CONTEXT || path.join(os.homedir(), '.ai-context');
 const MEMORY_DIRS = [
   path.join(AI_CONTEXT, 'memory'),
-  path.join(os.homedir(), '.claude', 'projects'), // per-cwd auto memories
+  ...(() => {
+    const ps = path.join(AI_CONTEXT, 'project-state');
+    try {
+      return fs.readdirSync(ps, { withFileTypes: true })
+        .filter(d => d.isDirectory())
+        .map(d => path.join(ps, d.name, 'memory'))
+        .filter(p => fs.existsSync(p));
+    } catch { return []; }
+  })(),
+  path.join(os.homedir(), '.claude', 'projects'),
 ];
 const SKILLS_DIR = path.join(AI_CONTEXT, 'skills');
 const SUPPORTED_PROTOCOL_VERSIONS = ['2025-06-18', '2025-03-26', '2024-11-05'];

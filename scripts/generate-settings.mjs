@@ -25,10 +25,12 @@ const PATHS = {
   claude:   resolve(HOME, '.claude/settings.json'),
   gemini:   resolve(HOME, '.gemini/settings.json'),
   codex:    resolve(HOME, '.codex/config.toml'),
+  crush:    resolve(HOME, '.config/crush/crush.json'),
   hookBase: {
     claude: resolve(HOME, '.claude/hooks'),
     gemini: resolve(HOME, '.gemini/hooks'),
     codex:  resolve(HOME, '.codex/hooks'),
+    crush:  resolve(HOME, '.crush/hooks'),
   },
 };
 
@@ -484,6 +486,9 @@ function buildExpectedRegistrations(allHooks, tool) {
         if (!geminiEventSupported(event)) continue;
         const gm = ev.matcher ? translateMatcherForGemini(ev.matcher) : null;
         if (ev.matcher && ev.matcher.length > 0 && gm === null) continue;
+      } else if (tool === 'crush') {
+        event = ev.event;
+        if (!TOOL_EVENTS.crush || !TOOL_EVENTS.crush.includes(event)) continue;
       } else {
         event = ev.event; // claude — all events valid
       }
@@ -510,6 +515,11 @@ function runCheck(allHooks) {
       } else if (tool === 'gemini') {
         const s = JSON.parse(readFileSync(PATHS.gemini, 'utf8'));
         actual = extractHooksFromGeminiJson(s);
+      } else if (tool === 'crush') {
+        if (existsSync(PATHS.crush)) {
+          const s = JSON.parse(readFileSync(PATHS.crush, 'utf8'));
+          actual = extractHooksFromCrushJson(s);
+        }
       } else {
         const t = readFileSync(PATHS.codex, 'utf8');
         actual = extractHooksFromCodexToml(t);
@@ -655,6 +665,55 @@ function applyCodexHooks(allHooks, ts) {
   console.log(`Applied to codex. Backup at ~/.ai-context/backups/${ts}/`);
 }
 
+// ── Generator: Crush JSON ────────────────────────────────────────────────────
+// Returns an object: { PreToolUse: [{matcher, command, timeout}, ...] }
+// Crush uses Claude-compatible tool names but a flat array per event (no grouped hooks wrapper).
+
+function generateCrushHooks(allHooks) {
+  const out = {};
+  for (const hook of allHooks) {
+    if (!hook.tools.includes('crush')) continue;
+    for (const ev of hook.events) {
+      if (ev.event !== 'PreToolUse') continue; // Crush only supports PreToolUse
+      if (!out[ev.event]) out[ev.event] = [];
+      const matcher = ev.matcher ? ev.matcher.map(m => m.toLowerCase()).join('|') : '';
+      const entry = {
+        matcher,
+        command: `node "${PATHS.hookBase.crush}/${hook.file}"`,
+        timeout: ev.timeout,
+      };
+      out[ev.event].push(entry);
+    }
+  }
+  return out;
+}
+
+function applyCrushHooks(allHooks, ts) {
+  if (!existsSync(PATHS.crush)) {
+    console.log('Skipped crush (config not found).');
+    return;
+  }
+  const generated = generateCrushHooks(allHooks);
+  const config = JSON.parse(readFileSync(PATHS.crush, 'utf8'));
+  config.hooks = generated;
+  writeFileSync(PATHS.crush, JSON.stringify(config, null, 2), 'utf8');
+  console.log(`Applied to crush. Backup at ~/.ai-context/backups/${ts}/`);
+}
+
+function extractHooksFromCrushJson(config) {
+  const reg = {};
+  for (const [event, hooks] of Object.entries(config.hooks || {})) {
+    for (const h of hooks) {
+      const m = (h.command || '').match(/([a-z][-a-z0-9]+\.js)/);
+      if (m) {
+        const key = `${event}:${m[1]}`;
+        reg[key] = { timeout: h.timeout };
+      }
+    }
+  }
+  return reg;
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 const manifestText = readFileSync(PATHS.manifest, 'utf8');
@@ -692,12 +751,13 @@ if (MODE === 'apply') {
   const validTools = new Set(['claude', 'gemini', 'codex', 'crush']);
   for (const tool of targetTools) {
     if (!validTools.has(tool)) {
-      console.error(`ERROR: unknown tool '${tool}'. Valid: claude, gemini, codex`);
+      console.error(`ERROR: unknown tool '${tool}'. Valid: claude, gemini, codex, crush`);
       process.exit(1);
     }
     if (tool === 'claude') applyClaudeHooks(allHooks, ts);
     else if (tool === 'gemini') applyGeminiHooks(allHooks, ts);
     else if (tool === 'codex') applyCodexHooks(allHooks, ts);
+    else if (tool === 'crush') applyCrushHooks(allHooks, ts);
   }
   process.exit(0);
 }
@@ -720,5 +780,8 @@ for (const tool of targetTools) {
     const missing = checkCriticalHooks(allHooks, 'codex', generated);
     if (missing.length) console.warn(`  WARN critical missing codex: ${missing.join(', ')}`);
     writePreview('codex', generated);
+  } else if (tool === 'crush') {
+    const generated = generateCrushHooks(allHooks);
+    writePreview('crush', JSON.stringify({ hooks: generated }, null, 2));
   }
 }

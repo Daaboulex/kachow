@@ -226,6 +226,24 @@ try {
   } catch {}
   // === END NEW — falls through to old scan if handoffFound is still false ===
 
+  // Fallback: scan synced handoffs/sessions/*.md for recent prose handoffs (cross-machine)
+  if (!handoffFound) try {
+    const sessionsDir = path.join(os.homedir(), '.ai-context', 'handoffs', 'sessions');
+    if (fs.existsSync(sessionsDir)) {
+      const mdFiles = fs.readdirSync(sessionsDir)
+        .filter(f => f.endsWith('.md'))
+        .map(f => ({ name: f, path: path.join(sessionsDir, f), mtime: fs.statSync(path.join(sessionsDir, f)).mtimeMs }))
+        .sort((a, b) => b.mtime - a.mtime);
+      const dayAgo = Date.now() - 24 * 60 * 60 * 1000;
+      const recent = mdFiles.filter(f => f.mtime > dayAgo).slice(0, 1);
+      if (recent.length > 0) {
+        const age = Math.floor((Date.now() - recent[0].mtime) / 3600000);
+        parts.push(`⚡ HANDOFF from synced sessions (${age}h ago): ${recent[0].name} — Read ${recent[0].path}`);
+        handoffFound = true;
+      }
+    }
+  } catch {}
+
   // Check for session handoff file (from /handoff or context-pressure save) — legacy read path
   if (!handoffFound) for (const handoffPath of [
     path.join(cwd, '.session-handoff.md'),
@@ -545,36 +563,48 @@ try {
     }
   } catch {}
 
-  // Deferred work queue (added 2026-04-17): items user explicitly postponed.
-  // Surfaces when trigger_after date passed or when cwd matches project.
-  // File format: JSONL with {id, summary, trigger_after, trigger_cond, project, done}.
+  // Deferred work queue: items user explicitly postponed.
+  // Reads from canonical store at ~/.ai-context/handoffs/deferred/items.json (synced).
+  // Falls back to legacy ~/.claude/deferred-work.jsonl if canonical missing.
   try {
-    const deferredFile = path.join(os.homedir(), '.claude', 'deferred-work.jsonl');
-    if (fs.existsSync(deferredFile)) {
-      const lines = fs.readFileSync(deferredFile, 'utf8').split('\n').filter(Boolean);
-      const now = new Date();
-      const cwdLower = cwd.toLowerCase();
-      const relevant = [];
+    const canonicalDeferred = path.join(os.homedir(), '.ai-context', 'handoffs', 'deferred', 'items.json');
+    const legacyDeferred = path.join(os.homedir(), '.claude', 'deferred-work.jsonl');
+    const now = new Date();
+    const cwdLower = cwd.toLowerCase();
+    const relevant = [];
+
+    if (fs.existsSync(canonicalDeferred)) {
+      const data = JSON.parse(fs.readFileSync(canonicalDeferred, 'utf8'));
+      const items = data.items || [];
+      for (const item of items) {
+        if (item.status === 'done' || item.status === 'resolved') continue;
+        let show = false;
+        if (item.trigger_after && new Date(item.trigger_after) <= now) show = true;
+        else if (item.project_key && cwdLower.includes(item.project_key.toLowerCase())) show = true;
+        if (show) {
+          const trig = item.trigger_after ? `(triggered ${item.trigger_after})` : `[${item.project_key}]`;
+          relevant.push(`${item.id} ${trig}: ${(item.title || item.summary || '').slice(0, 120)}`);
+        }
+      }
+    } else if (fs.existsSync(legacyDeferred)) {
+      const lines = fs.readFileSync(legacyDeferred, 'utf8').split('\n').filter(Boolean);
       for (const line of lines) {
         try {
           const item = JSON.parse(line);
           if (item.done) continue;
-          // Surface if: (a) trigger date passed, OR (b) cwd matches project name
           let show = false;
-          if (item.trigger_after) {
-            if (new Date(item.trigger_after) <= now) show = true;
-          } else if (item.project && cwdLower.includes(item.project.toLowerCase())) {
-            show = true;
-          }
+          if (item.trigger_after && new Date(item.trigger_after) <= now) show = true;
+          else if (item.project && cwdLower.includes(item.project.toLowerCase())) show = true;
           if (show) {
             const trig = item.trigger_after ? `(triggered ${item.trigger_after})` : `[${item.project}]`;
-            relevant.push(`${item.id} ${trig}: ${item.summary.slice(0, 120)}`);
+            relevant.push(`${item.id} ${trig}: ${(item.summary || '').slice(0, 120)}`);
           }
         } catch {}
       }
-      if (relevant.length > 0) {
-        parts.push(`Deferred work (${relevant.length}): ${relevant.slice(0, 3).join(' || ')}${relevant.length > 3 ? ` (+${relevant.length - 3} more in ~/.claude/deferred-work.jsonl)` : ''}`);
-      }
+    }
+
+    if (relevant.length > 0) {
+      parts.push(`Deferred work (${relevant.length}): ${relevant.slice(0, 3).join(' || ')}${relevant.length > 3 ? ` (+${relevant.length - 3} more)` : ''}`);
     }
   } catch {}
 
@@ -672,37 +702,38 @@ try {
     }
   } catch {}
 
-  // Cross-agent concurrent edit warning (added 2026-04-17): warn if peer agent active.
-  // Checks active-sessions.jsonl for other agent heartbeat within last 5 min.
+  // Cross-agent concurrent edit warning: warn if peer agent active on any host.
+  // Reads per-host presence files (hostname-sharded since 2026-04).
   try {
-    const peerFile = path.join(os.homedir(), '.claude', 'cache', 'active-sessions-global.jsonl');
-    if (fs.existsSync(peerFile)) {
-      const lines = fs.readFileSync(peerFile, 'utf8').split('\n').filter(Boolean).slice(-50);
-      const fiveMinAgo = Date.now() - 5 * 60 * 1000;
-      const ourAgent = process.env.CLAUDE_AGENT || 'claude';
-      const peers = new Set();
-      for (const line of lines) {
-        try {
-          const evt = JSON.parse(line);
-          const ts = new Date(evt.ts || evt.timestamp || 0).getTime();
-          if (ts < fiveMinAgo) continue;
-          if (evt.agent && evt.agent !== ourAgent) peers.add(evt.agent);
-        } catch {}
-      }
-      if (peers.size > 0) {
-        // Anti-skew rule 1: write to SIDE-CHANNEL, never to systemMessage.
-        // PreToolUse hook (peer-conflict-check.js) reads this + surfaces via permission prompt.
-        try {
-          const peerDir = path.join(os.homedir(), '.ai-context', 'instances');
-          fs.mkdirSync(peerDir, { recursive: true });
-          fs.writeFileSync(path.join(peerDir, 'active-peers.json'), JSON.stringify({
-            peers: [...peers],
-            timestamp: new Date().toISOString(),
-            session_id: input.session_id || 'unknown',
-            cwd: cwd,
-          }));
-        } catch {}
-      }
+    const { allHostPresencePaths } = require('./lib/hostname-presence.js');
+    const peerFiles = allHostPresencePaths();
+    const fiveMinAgo = Date.now() - 5 * 60 * 1000;
+    const ourAgent = process.env.CLAUDE_AGENT || require('./lib/tool-detect.js').detectTool();
+    const peers = new Set();
+    for (const pf of peerFiles) {
+      try {
+        const lines = fs.readFileSync(pf, 'utf8').split('\n').filter(Boolean).slice(-50);
+        for (const line of lines) {
+          try {
+            const evt = JSON.parse(line);
+            const ts = new Date(evt.ts || evt.timestamp || 0).getTime();
+            if (ts < fiveMinAgo) continue;
+            if (evt.agent && evt.agent !== ourAgent) peers.add(evt.agent);
+          } catch {}
+        }
+      } catch {}
+    }
+    if (peers.size > 0) {
+      try {
+        const peerDir = path.join(os.homedir(), '.ai-context', 'instances');
+        fs.mkdirSync(peerDir, { recursive: true });
+        fs.writeFileSync(path.join(peerDir, 'active-peers.json'), JSON.stringify({
+          peers: [...peers],
+          timestamp: new Date().toISOString(),
+          session_id: input.session_id || 'unknown',
+          cwd: cwd,
+        }));
+      } catch {}
     }
   } catch {}
 

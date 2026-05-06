@@ -16,7 +16,7 @@ function _startSection(name) { _sectionTimings[name] = process.hrtime.bigint(); 
 function _endSection(name) { if (_sectionTimings[name]) _sectionTimings[name] = Number(process.hrtime.bigint() - _sectionTimings[name]) / 1e6; }
 const { detectTool, toolHomeDir } = require('./lib/tool-detect.js');
 const home = os.homedir();
-const claudeDir = path.join(home, '.claude');
+const claudeDir = path.join(home, '.claude'); // Legacy — only for Claude-specific paths (plugins, file-history)
 const geminiDir = path.join(home, '.gemini');
 const tool = detectTool();
 const isGemini = tool === 'gemini';
@@ -41,7 +41,7 @@ try {
 // older than 24h. Prevents SEC-3 MCP write gate from false-blocking on
 // abandoned subagents. Shared marker dir between Claude + Gemini.
 try {
-  const markerDir = path.join(home, '.claude', 'cache', 'subagent-active');
+  const markerDir = path.join(configDir, 'cache', 'subagent-active');
   const cutoff = Date.now() - (24 * 60 * 60 * 1000);
   for (const name of fs.readdirSync(markerDir)) {
     if (!name.endsWith('.json')) continue;
@@ -64,7 +64,7 @@ try {
 _startSection('stale-lock');
 try {
   const { DREAM_LOCK_STALE_MS, TEMP_FILE_STALE_MS } = require('./lib/constants.js');
-  const dreamLockFile = path.join(claudeDir, '.dream-lock');
+  const dreamLockFile = path.join(configDir, '.dream-lock');
   try {
     const lockAge = Date.now() - fs.statSync(dreamLockFile).mtimeMs;
     if (lockAge >= DREAM_LOCK_STALE_MS) fs.unlinkSync(dreamLockFile);
@@ -102,9 +102,9 @@ _startSection('consolidate-counter');
 try {
   const { incrementCounter } = require('./lib/atomic-counter.js');
   const { DREAM_COOLDOWN_MS, DREAM_MIN_SESSIONS } = require('./lib/constants.js');
-  const countFile = path.join(claudeDir, '.dream-session-count');
-  const lastFile = path.join(claudeDir, '.dream-last');
-  const lockFile = path.join(claudeDir, '.dream-lock');
+  const countFile = path.join(configDir, '.dream-session-count');
+  const lastFile = path.join(configDir, '.dream-last');
+  const lockFile = path.join(configDir, '.dream-lock');
   const COOLDOWN_MS = DREAM_COOLDOWN_MS;
   const MIN_SESSIONS = DREAM_MIN_SESSIONS;
 
@@ -230,13 +230,13 @@ try {
 // ── 4. Sync hook versions (GSD version tag patching) ──
 _startSection('sync-versions');
 try {
-  const versionFile = path.join(claudeDir, 'get-shit-done', 'VERSION');
+  const versionFile = path.join(configDir, 'get-shit-done', 'VERSION');
   if (fs.existsSync(versionFile)) {
     const gsdVersion = fs.readFileSync(versionFile, 'utf8').trim();
     if (gsdVersion) {
       const CUSTOM_HOOKS = ['enhanced-statusline.js', 'plugin-update-checker.js', 'sync-hook-versions.js'];
       for (const hookFile of CUSTOM_HOOKS) {
-        const filePath = path.join(claudeDir, 'hooks', hookFile);
+        const filePath = path.join(configDir, 'hooks', hookFile);
         if (!fs.existsSync(filePath)) continue;
         let content = fs.readFileSync(filePath, 'utf8');
         const match = content.match(/^\/\/ gsd-hook-version: (.+)$/m);
@@ -383,7 +383,7 @@ try {
 // ── 8. Version-change detector (REQ-08-01) ──
 _startSection('version-change');
 try {
-  const versionFile = path.join(claudeDir, '.last-known-version');
+  const versionFile = path.join(configDir, '.last-known-version');
 
   // Extract version from CLAUDE_CODE_EXECPATH (CLAUDE_CODE_VERSION does NOT exist)
   // e.g. /nix/store/...-claude-code-2.1.104/bin/.claude-unwrapped
@@ -453,11 +453,11 @@ try {
 _startSection('research-counter');
 try {
   const { incrementCounter } = require('./lib/atomic-counter.js');
-  const researchCountFile = path.join(claudeDir, '.research-session-count');
+  const researchCountFile = path.join(configDir, '.research-session-count');
   incrementCounter(researchCountFile);
 
   // Auto-init .research-last baseline if missing (prevents gate 1 from always firing on fresh install)
-  const researchLastFile = path.join(claudeDir, '.research-last');
+  const researchLastFile = path.join(configDir, '.research-last');
   try {
     fs.statSync(researchLastFile);
   } catch {
@@ -466,7 +466,7 @@ try {
   }
 
   // Also auto-init .dream-last if missing (same reason — cooldown starts from first session)
-  const dreamLastFile = path.join(claudeDir, '.dream-last');
+  const dreamLastFile = path.join(configDir, '.dream-last');
   try {
     fs.statSync(dreamLastFile);
   } catch {
@@ -480,7 +480,7 @@ try {
 // ── 11. Settings schema drift detection ──
 _startSection('settings-drift');
 try {
-  const settingsPath = path.join(claudeDir, 'settings.json');
+  const settingsPath = path.join(configDir, 'settings.json');
   if (fs.existsSync(settingsPath)) {
     const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
     const { findDrift } = require('./lib/settings-schema.js');

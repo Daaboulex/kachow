@@ -7,9 +7,10 @@ import { resolve } from 'path';
 const HOME = process.env.HOME || '$HOME';
 
 const CONFIG_FILES = [
-  { tool: 'claude', src: resolve(HOME, '.claude/settings.json'),  name: 'claude-settings.json' },
-  { tool: 'gemini', src: resolve(HOME, '.gemini/settings.json'),  name: 'gemini-settings.json' },
-  { tool: 'codex',  src: resolve(HOME, '.codex/config.toml'),     name: 'codex-config.toml'    },
+  { tool: 'claude', src: resolve(HOME, '.claude/settings.json'),       name: 'claude-settings.json' },
+  { tool: 'gemini', src: resolve(HOME, '.gemini/settings.json'),       name: 'gemini-settings.json' },
+  { tool: 'codex',  src: resolve(HOME, '.codex/config.toml'),          name: 'codex-config.toml'    },
+  { tool: 'crush',  src: resolve(HOME, '.config/crush/crush.json'),    name: 'crush.json'           },
 ];
 
 const BACKUPS_DIR = resolve(HOME, '.ai-context/backups');

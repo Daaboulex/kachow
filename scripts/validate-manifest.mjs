@@ -12,7 +12,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const { ALL_EVENTS, TOOL_EVENTS } = require(resolve(__dirname, '../hooks/lib/platform-map.js'));
 const HOOKS_DIR = resolve(__dirname, '../hooks');
 
-const VALID_TOOLS = ['claude', 'gemini', 'codex', 'crush'];
+const VALID_TOOLS = ['claude', 'gemini', 'codex', 'crush', 'opencode'];
 const VALID_CATEGORIES = ['safety', 'lifecycle', 'observability', 'memory', 'sync', 'meta'];
 const REQUIRED_CRITICAL = [
   'block-subagent-writes.js',
@@ -38,6 +38,7 @@ const TOOL_CANONICAL_EVENTS = {
   claude: new Set(TOOL_EVENTS.claude),
   gemini: new Set(TOOL_EVENTS.gemini.map(e => eventMap[e] || e)),
   codex:  new Set(TOOL_EVENTS.codex),
+  crush:  new Set(['PreToolUse']),
 };
 
 // ── Minimal line-by-line YAML parser for MANIFEST format ─────────────────────

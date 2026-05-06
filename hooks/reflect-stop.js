@@ -87,7 +87,7 @@ try {
       try {
         const prog = JSON.parse(fs.readFileSync(progPath, 'utf8'));
         prog.lastSessionEnd = new Date().toISOString();
-        prog.lastAgent = 'claude';
+        prog.lastAgent = detectTool();
         if (!prog.inFlight) prog.inFlight = {};
         // Don't overwrite existing inFlight details — just mark that a session touched it
         fs.writeFileSync(progPath, JSON.stringify(prog, null, 2));

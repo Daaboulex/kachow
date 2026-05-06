@@ -64,7 +64,8 @@ try {
 
   // Scope: only run in tracked projects
   const cwd = process.cwd();
-  const memDir = path.join(cwd, '.claude', 'memory');
+  const toolRelDir = path.relative(os.homedir(), configDir);
+  const memDir = path.join(cwd, toolRelDir, 'memory');
   if (!fs.existsSync(memDir)) passthrough();
 
   // Per-host lock (separate from dream-lock)
@@ -123,7 +124,7 @@ try {
       require('./lib/observability-logger.js').logEvent(cwd, {
         type: 'sleep_consolidator_spawned',
         source: 'stop-sleep-consolidator',
-        meta: { binary, pid: child.pid, host, platform: isGemini ? 'gemini' : 'claude' },
+        meta: { binary, pid: child.pid, host, platform: tool },
       });
     } catch {}
   } catch (e) {
