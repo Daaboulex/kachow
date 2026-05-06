@@ -193,24 +193,26 @@ console.log('== Portable skills (cross-tool via ~/.agents/skills/) ==');
 const agentsSkills = path.join(HOME, '.agents', 'skills');
 const aiContextSkills = path.join(AI_CONTEXT, 'skills');
 
-// Ensure ~/.agents/skills/ exists
-fs.mkdirSync(agentsSkills, { recursive: true });
-
-// If ai-context/skills/ has real dirs (not symlinks), migrate them to ~/.agents/skills/
-if (fs.existsSync(aiContextSkills)) {
-  for (const entry of fs.readdirSync(aiContextSkills, { withFileTypes: true })) {
-    if (!entry.isDirectory()) continue;
-    const src = path.join(aiContextSkills, entry.name);
-    const agentsDest = path.join(agentsSkills, entry.name);
-    // Skip if ai-context entry is already a symlink to agents
-    try { if (fs.lstatSync(src).isSymbolicLink()) continue; } catch { continue; }
-    // Move to ~/.agents/skills/ if not there yet
-    if (!fs.existsSync(agentsDest)) {
-      fs.renameSync(src, agentsDest);
-      fs.symlinkSync(agentsDest, src); // backward compat symlink
-      console.log(`↻ ${entry.name}: migrated to ~/.agents/skills/`);
+// ~/.ai-context/skills/ is canonical. ~/.agents/skills is a symlink to it.
+// Gemini, Codex, Crush, OpenCode auto-discover from ~/.agents/skills/.
+// DO NOT migrate files between these dirs — that creates circular symlinks.
+if (fs.existsSync(agentsSkills)) {
+  try {
+    const st = fs.lstatSync(agentsSkills);
+    if (st.isSymbolicLink() && fs.readlinkSync(agentsSkills) === aiContextSkills) {
+      // Already correct symlink
+    } else if (st.isSymbolicLink()) {
+      // Wrong target — fix
+      fs.unlinkSync(agentsSkills);
+      fs.symlinkSync(aiContextSkills, agentsSkills);
+      console.log(`↻ ~/.agents/skills: re-linked → ${aiContextSkills}`);
     }
-  }
+    // If real dir: leave it (may have been intentionally populated)
+  } catch {}
+} else {
+  fs.mkdirSync(path.dirname(agentsSkills), { recursive: true });
+  fs.symlinkSync(aiContextSkills, agentsSkills);
+  console.log(`+ ~/.agents/skills: linked → ${aiContextSkills}`);
 }
 
 // Claude: create per-skill symlinks (only tool that doesn't read ~/.agents/)
