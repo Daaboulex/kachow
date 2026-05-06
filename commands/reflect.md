@@ -308,7 +308,7 @@ After applying, verify:
 - MEMORY.md matches disk (no orphan entries, no missing entries)
 - New rules have correct `paths:` frontmatter that matches actual file globs
 - New skills have correct `name:` and `description:` frontmatter
-- Claude/Gemini parity: same files exist in both `.claude/` and `.gemini/` dirs
+- Tool parity: same files exist in `.claude/` and `.gemini/` dirs (Codex/Crush/OpenCode read via symlinks)
 - Report: "Context sync: OK" or "Context sync: DRIFT — [details]"
 
 ## What NOT to Save

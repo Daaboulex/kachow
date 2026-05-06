@@ -104,6 +104,7 @@ For 3+ tool calls or 2+ file edits, output a **numbered plan** BEFORE first edit
 - **Domain rules:** `~/.ai-context/AGENTS-domain-specific.md` (cwd-gated).
 - **Architecture, memory format, portable context, tool read paths:** `~/.ai-context/AGENTS-architecture.md`.
 - **Other tools (Aider/Cursor/Windsurf/Copilot/Cline):** see `AGENTS-architecture.md` "Other-tools specifics" section.
+- **Upstream blockers + structural limits:** `~/.ai-context/KNOWN-LIMITS.md` — check BEFORE investigating "bugs" in 5-tool parity. If it's there, it's known.
 
 ---
 
@@ -119,8 +120,8 @@ For 3+ tool calls or 2+ file edits, output a **numbered plan** BEFORE first edit
 - Guard hooks: **PreToolUse** (Claude/Codex/Crush) / **BeforeTool** (Gemini) — intercept before write
 - Sync hooks: **PostToolUse** (Claude/Codex) / **AfterTool** (Gemini) — read after write completes
 - Timeouts: Claude/Codex in **seconds**; Gemini in **milliseconds**
-- Tool names — Claude: `Write`, `Edit`, `Bash`, `Read`, `Skill`, `Agent`; Gemini: `write_file`, `replace`, `run_shell_command`, `read_file`, `activate_skill`; Codex: `apply_patch`, `shell`, `Read`
-- Session-end — Claude/Codex: `Stop`; Gemini: `SessionEnd`
+- Tool names — Claude: `Write`, `Edit`, `Bash`, `Read`, `Skill`, `Agent`; Gemini: `write_file`, `replace`, `run_shell_command`, `read_file`, `activate_skill`; Codex: `apply_patch`, `shell`, `Read`; Crush: Claude-compatible (lowercase normalized by hooks); OpenCode: JS plugin API (no shell hooks)
+- Session-end — Claude/Codex: `Stop`; Gemini: `SessionEnd`; Crush: none (PreToolUse only); OpenCode: JS plugin lifecycle
 - Claude: 10+ hook events (incl. CwdChanged, FileChanged, PostCompact, etc. — see `AGENTS-architecture.md`)
 - Gemini: 11 hook events (incl. BeforeToolSelection — no Claude equivalent)
 - Codex: 6 hook events; `apply_patch` fires hooks (fixed v0.128.0+)

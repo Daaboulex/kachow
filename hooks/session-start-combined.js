@@ -261,7 +261,7 @@ try {
   const dashSanitized = projectDir.replace(/[/\\]/g, '-').replace(/^([A-Z]):/i, '$1');
 
   // Step 1: Derive project key (skip internal/tmp dirs)
-  const SKIP_DIRS = ['.ai-context', '.claude', '.gemini', '.codex', '.crush', '.config', 'tmp'];
+  const SKIP_DIRS = ['.ai-context', '.claude', '.gemini', '.codex', '.crush', '.opencode', '.config', 'tmp'];
   const isInternalDir = SKIP_DIRS.some(d => projectDir.includes(path.sep + d + path.sep) || projectDir.endsWith(path.sep + d));
   const isTmpDir = projectDir.startsWith(os.tmpdir()) || projectDir.startsWith('/tmp');
 
