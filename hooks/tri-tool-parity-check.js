@@ -168,19 +168,14 @@ try {
   const codexMissing = [...CODEX_PORTABLE].filter(h => !codex.has(h));
   if (codexMissing.length > 0) warnings.push(`Codex missing ${codexMissing.length} portable hooks: ${codexMissing.slice(0, 3).join(', ')}${codexMissing.length > 3 ? '...' : ''}`);
 
-  // Check remotes
-  for (const [name, dir] of [['claude', '.claude'], ['gemini', '.gemini'], ['codex', '.codex']]) {
-    const gitDir = path.join(home, dir, '.git');
-    if (fs.existsSync(gitDir)) {
-      try {
-        const { execSync } = require('child_process');
-        const remote = execSync('git remote get-url origin', { cwd: path.join(home, dir), encoding: 'utf8', timeout: 2000 }).trim();
-        if (!remote) warnings.push(`${name}-global: no remote`);
-      } catch {
-        warnings.push(`${name}-global: no remote configured`);
-      }
+  // Check ai-context git remote (tool dirs no longer have .git — consolidated v0.8.0)
+  try {
+    const aiDir = path.join(home, '.ai-context');
+    if (fs.existsSync(path.join(aiDir, '.git'))) {
+      const remote = execSync('git remote get-url origin', { cwd: aiDir, encoding: 'utf8', timeout: 2000 }).trim();
+      if (!remote) warnings.push('ai-context: no remote');
     }
-  }
+  } catch {}
 
   // Cache results
   try {

@@ -95,7 +95,11 @@ function autoCommit(dir, label) {
   // either prompt for passphrase (breaks autopush in non-interactive context)
   // or silently fail (breaks data preservation). User-authored commits remain
   // signed via standard git config. AGENTS.md documents this exception.
-  run('git add -A', dir);
+  const TRACKED = ['AGENTS.md', 'AGENTS-*.md', 'CHANGELOG.md', 'VERSION', 'README.md',
+    'hooks/', 'memory/', 'skills/', 'scripts/', 'configs/', 'mcp/',
+    '.superpowers/', 'project-state/', 'instances/', 'handoffs/', 'docs/',
+    '.gitignore', '.pre-commit-scrub.sh', 'AI-progress.json'];
+  run(`git add ${TRACKED.join(' ')}`, dir);
   const committed = run(`git commit -m "chore: auto-sync from session end" --no-gpg-sign`, dir);
   return committed !== null;
 }

@@ -5,7 +5,7 @@ require(__dirname + "/lib/emit-simple-timing.js").start(__filename);
 // + pre-push still run as defense-in-depth.
 //
 // Active when the target file is under a "public" root:
-//   ~/.kachow-release/  (kachow release mirror)
+//   ~/.ai-context/kachow-mirror/
 //   any dir containing .public-ship marker
 //
 // Matches the same token-set-from-parts as scripts/scrub-check.sh so rules
@@ -40,8 +40,7 @@ try {
   // Only gate public-shareable roots
   const home = os.homedir();
   const PUBLIC_ROOTS = [
-    path.join(home, '.kachow-release'),
-    path.join(home, '.kachow-mirror'),
+    path.join(home, '.ai-context', 'kachow-mirror'),
   ];
   let activeRoot = PUBLIC_ROOTS.find(r => filePath.startsWith(r + path.sep) || filePath === r) || null;
   // Also check for a .public-ship marker in the path's parent chain

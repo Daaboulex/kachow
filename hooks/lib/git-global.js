@@ -9,9 +9,6 @@ const home = os.homedir();
 
 const REPOS = [
   { dir: path.join(home, '.ai-context'), label: '~/.ai-context' },
-  { dir: path.join(home, '.claude'), label: '~/.claude' },
-  { dir: path.join(home, '.gemini'), label: '~/.gemini' },
-  { dir: path.join(home, '.codex'), label: '~/.codex' },
 ];
 
 function run(cmd, cwd) {

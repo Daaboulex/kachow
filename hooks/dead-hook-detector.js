@@ -67,7 +67,9 @@ try {
   const registeredFiles = new Set();
   const unknownEvents = [];
   try {
-    const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+    // Resolve symlink before reading (settings may be symlinked to ai-context/configs/)
+    const realSettingsPath = fs.existsSync(settingsPath) ? fs.realpathSync(settingsPath) : settingsPath;
+    const settings = JSON.parse(fs.readFileSync(realSettingsPath, 'utf8'));
     const hookEvents = settings.hooks || {};
     for (const eventName of Object.keys(hookEvents)) {
       const entries = hookEvents[eventName];

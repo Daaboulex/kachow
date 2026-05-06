@@ -51,9 +51,12 @@ const CORE_TARGETS = [
 
 // Extra symlinks for tools whose configs/hooks are centralized in ai-context
 const EXTRA_SYMLINKS = [
-  { label: 'crush-hooks',    src: path.join(AI_CONTEXT, 'hooks'),                dest: path.join(HOME, '.crush', 'hooks') },
-  { label: 'crush-config',   src: path.join(AI_CONTEXT, 'configs', 'crush.json'),    dest: path.join(HOME, '.config/crush', 'crush.json') },
-  { label: 'opencode-config',src: path.join(AI_CONTEXT, 'configs', 'opencode.json'), dest: path.join(HOME, '.config/opencode', 'config.json') },
+  { label: 'claude-settings', src: path.join(AI_CONTEXT, 'configs', 'claude-settings.json'), dest: path.join(HOME, '.claude', 'settings.json') },
+  { label: 'gemini-settings', src: path.join(AI_CONTEXT, 'configs', 'gemini-settings.json'), dest: path.join(HOME, '.gemini', 'settings.json') },
+  { label: 'codex-config',    src: path.join(AI_CONTEXT, 'configs', 'codex-config.toml'),    dest: path.join(HOME, '.codex', 'config.toml') },
+  { label: 'crush-hooks',     src: path.join(AI_CONTEXT, 'hooks'),                           dest: path.join(HOME, '.crush', 'hooks') },
+  { label: 'crush-config',    src: path.join(AI_CONTEXT, 'configs', 'crush.json'),            dest: path.join(HOME, '.config/crush', 'crush.json') },
+  { label: 'opencode-config', src: path.join(AI_CONTEXT, 'configs', 'opencode.json'),         dest: path.join(HOME, '.config/opencode', 'config.json') },
 ];
 
 const OPTIONAL_TARGETS = [

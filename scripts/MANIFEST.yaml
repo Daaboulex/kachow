@@ -156,7 +156,7 @@ hooks:
 
   - file: validate-instructions-sync.js
     category: meta
-    tools: [claude, gemini]
+    tools: [claude, gemini, codex]
     order: 13
     async: false
     events:
@@ -295,7 +295,7 @@ hooks:
 
   - file: todowrite-mirror.js
     category: meta
-    tools: [claude, gemini]
+    tools: [claude, gemini, codex]
     order: 24
     async: true
     events:
@@ -355,7 +355,7 @@ hooks:
 
   - file: post-write-sync.js
     category: sync
-    tools: [claude, gemini]
+    tools: [claude, gemini, codex]
     order: 29
     async: false
     events:
@@ -383,7 +383,7 @@ hooks:
 
   - file: post-commit-sync-reminder.js
     category: meta
-    tools: [claude, gemini]
+    tools: [claude, gemini, codex]
     order: 31
     async: false
     events:
@@ -398,7 +398,7 @@ hooks:
 
   - file: hook-doc-drift-detector.js
     category: meta
-    tools: [claude, gemini]
+    tools: [claude, gemini, codex]
     order: 32
     async: false
     events:
@@ -413,7 +413,7 @@ hooks:
 
   - file: prefer-editing-nudge.js
     category: meta
-    tools: [claude, gemini]
+    tools: [claude, gemini, codex]
     order: 33
     async: false
     events:
@@ -423,7 +423,7 @@ hooks:
 
   - file: dead-hook-detector.js
     category: meta
-    tools: [claude, gemini]
+    tools: [claude, gemini, codex]
     order: 34
     async: false
     events:
@@ -437,7 +437,7 @@ hooks:
   - file: block-subagent-non-bash-writes.js
     category: safety
     critical: true
-    tools: [claude, gemini, crush]
+    tools: [claude, gemini, codex, crush]
     order: 35
     async: false
     events:
@@ -491,7 +491,7 @@ hooks:
 
   - file: repomap-refresh.js
     category: meta
-    tools: [claude, gemini]
+    tools: [claude, gemini, codex]
     order: 39
     async: true
     events:
@@ -697,7 +697,7 @@ hooks:
 
   - file: session-end-logger.js
     category: observability
-    tools: [claude, gemini]
+    tools: [claude, gemini, codex]
     order: 56
     async: false
     events:

@@ -33,7 +33,7 @@ try {
   const input = JSON.parse(raw);
 
   const filePath = (input.tool_input || {}).file_path || '';
-  if (!filePath || !/settings(\.local)?\.json$/.test(filePath)) passthrough();
+  if (!filePath || (!/settings(\.local)?\.json$/.test(filePath) && !filePath.includes('ai-context/configs/'))) passthrough();
 
   // For Write tool, the new content is in tool_input.content
   // For Edit tool, the new content is the original + new_string substitution
@@ -60,7 +60,7 @@ try {
 
   const issues = [];
 
-  const isClaude = filePath.includes('/.claude/');
+  const isClaude = filePath.includes('/.claude/') || filePath.includes('ai-context/configs/claude-settings');
   const isGemini = filePath.includes('/.gemini/');
   const isProjectLevel = !filePath.startsWith(os.homedir() + '/.claude/') && !filePath.startsWith(os.homedir() + '/.gemini/');
 

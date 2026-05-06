@@ -60,19 +60,19 @@ try {
     process.exit(0);
   }
 
-  // Check if meaningful work was done (heuristic: any files changed in global repos)
-  let claudeChanged = false;
-  let geminiChanged = false;
+  // Check if meaningful work was done (heuristic: ai-context has recent modifications)
+  let aiContextChanged = false;
   try {
-    const { execSync } = require('child_process');
-    const cStatus = execSync('git status --porcelain', { cwd: claudeDir, timeout: 3000, stdio: 'pipe' }).toString();
-    claudeChanged = cStatus.trim().length > 0;
-  } catch {}
-  try {
-    const { execSync } = require('child_process');
-    const gDir = path.join(home, '.gemini');
-    const gStatus = execSync('git status --porcelain', { cwd: gDir, timeout: 3000, stdio: 'pipe' }).toString();
-    geminiChanged = gStatus.trim().length > 0;
+    const aiDir = path.join(home, '.ai-context');
+    const thirtyMin = 30 * 60 * 1000;
+    const now = Date.now();
+    for (const sub of ['memory', 'hooks', 'configs', 'AGENTS.md']) {
+      const p = path.join(aiDir, sub);
+      try {
+        const stat = fs.statSync(p);
+        if ((now - stat.mtimeMs) < thirtyMin) { aiContextChanged = true; break; }
+      } catch {}
+    }
   } catch {}
 
   // Touch AI-progress.json timestamp so it's never completely stale
@@ -97,9 +97,9 @@ try {
   }
 
   // Observability: emit session-end event
-  try { require('./lib/observability-logger.js').logEvent(cwd, { type: 'session_end', source: 'reflect-stop', meta: { claudeChanged, geminiChanged, wrapUpRecent } }); } catch {}
+  try { require('./lib/observability-logger.js').logEvent(cwd, { type: 'session_end', source: 'reflect-stop', meta: { aiContextChanged, wrapUpRecent } }); } catch {}
 
-  if (claudeChanged || geminiChanged) {
+  if (aiContextChanged) {
     __emitTiming(0); process.stdout.write(JSON.stringify({
       continue: true,
       systemMessage: isGemini
