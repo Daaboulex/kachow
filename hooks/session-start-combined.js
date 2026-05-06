@@ -261,20 +261,28 @@ try {
   const sanitized = projectDir.replace(/^\//, '').replace(/[/\\]/g, '-').replace(/^([A-Z]):/i, '$1');
   const dashSanitized = projectDir.replace(/[/\\]/g, '-').replace(/^([A-Z]):/i, '$1');
 
-  // Step 1: Derive project key
+  // Step 1: Derive project key (skip internal/tmp dirs)
+  const SKIP_DIRS = ['.ai-context', '.claude', '.gemini', '.codex', '.crush', '.config', 'tmp'];
+  const isInternalDir = SKIP_DIRS.some(d => projectDir.includes(path.sep + d + path.sep) || projectDir.endsWith(path.sep + d));
+  const isTmpDir = projectDir.startsWith(os.tmpdir()) || projectDir.startsWith('/tmp');
+
   let projectKey;
-  try {
-    const pk = require('./lib/project-key.js');
-    projectKey = typeof pk.deriveKey === 'function' ? pk.deriveKey(projectDir) : null;
-  } catch {}
-  if (!projectKey) {
-    const parts = projectDir.split(path.sep).filter(Boolean);
-    projectKey = parts[parts.length - 1] || 'default';
+  if (!isInternalDir && !isTmpDir) {
+    try {
+      const pk = require('./lib/project-key.js');
+      projectKey = typeof pk.deriveKey === 'function' ? pk.deriveKey(projectDir) : null;
+    } catch {}
+    if (!projectKey) {
+      const parts = projectDir.split(path.sep).filter(Boolean);
+      projectKey = parts[parts.length - 1] || null;
+    }
   }
 
-  // Step 2: Ensure project-state/<key>/memory/ exists (proactive)
-  const projectStateMemory = path.join(home, '.ai-context', 'project-state', projectKey, 'memory');
-  if (!fs.existsSync(projectStateMemory)) {
+  // Step 2: Ensure project-state/<key>/memory/ exists (proactive — only for real projects)
+  const projectStateMemory = projectKey
+    ? path.join(home, '.ai-context', 'project-state', projectKey, 'memory')
+    : null;
+  if (projectStateMemory && !fs.existsSync(projectStateMemory)) {
     fs.mkdirSync(projectStateMemory, { recursive: true });
     fs.writeFileSync(path.join(projectStateMemory, 'MEMORY.md'),
       `# Memory Index — ${projectDir}\n\n_Auto-provisioned ${new Date().toISOString().split('T')[0]}_\n`);
@@ -329,11 +337,13 @@ try {
   );
   const target = projectLocalMemory || projectStateMemory;
 
-  for (const san of [sanitized, dashSanitized]) {
-    const toolMemDir = path.join(home, agentRelDir, 'projects', san, 'memory');
-    if (isSymlinked(toolMemDir)) continue;
-    if (isRealDirWithContent(toolMemDir)) atomicMigrate(toolMemDir, target);
-    createSymlinkSafe(target, toolMemDir);
+  if (target) {
+    for (const san of [sanitized, dashSanitized]) {
+      const toolMemDir = path.join(home, agentRelDir, 'projects', san, 'memory');
+      if (isSymlinked(toolMemDir)) continue;
+      if (isRealDirWithContent(toolMemDir)) atomicMigrate(toolMemDir, target);
+      createSymlinkSafe(target, toolMemDir);
+    }
   }
   _endSection('portable-memory');
 } catch (e) {
@@ -373,7 +383,7 @@ try {
   }
   _endSection('sync-memory');
 } catch (e) {
-  errors.push({ section: 'sync-memory-dirs', error: e.message, stack: e.stack?.split('\n')[1]?.trim() });
+  errors.push({ section: 'portable-memory', error: e.message, stack: e.stack?.split('\n')[1]?.trim() });
 }
 
 // ── 7. Session catchup (missed reflect detection) ──

@@ -123,10 +123,14 @@ Plans don't need approval but they must exist.
 | What | Where | Sync |
 |------|-------|------|
 | Settings | `configs/` (claude-settings.json, gemini-settings.json, codex-config.toml, crush.json, opencode.json) | Symlinked into tool dirs |
-| Hooks | `hooks/` (73 .js) | Tool dirs symlink here |
+| Hooks | `hooks/` (70 .js) | Tool dirs symlink here |
 | Global memory | `memory/` | Tool dirs symlink here |
-| Project memory | `project-state/{nix,<project>,documents}/memory/` | Claude/Gemini project dirs symlink here |
+| Commands | `commands/` (14 .md) | Symlinked into Claude + Gemini; converted to Codex skills |
+| Skills | `skills/` (4 portable) | Symlinked into Claude + Gemini + Codex |
+| Project state | `project-state/<name>/` | Per-project: memory, rules, project-rules, artifacts |
 | Public mirror | `kachow-mirror/` (nested git repo, gitignored) | mirror-kachow.js scrub pipeline |
+
+**Sub-project pattern:** Every project gets a `project/.ai-context` symlink → `~/.ai-context/project-state/<name>`. Contains memory/, rules/, project-rules.md. New projects are **auto-provisioned** on first session start (session-start-combined.js creates project-state entry + symlinks). Tool dirs (.claude/memory, .gemini/memory) also symlink to the same target.
 
 Hook registration is manifest-driven. Edit `scripts/MANIFEST.yaml`, run `scripts/generate-settings.mjs --apply --all`.
 Old tool-dir GitHub repos (<repo>, <repo>, codex-global) are archived on GitHub (read-only preservation).
