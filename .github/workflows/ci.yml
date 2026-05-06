@@ -38,7 +38,10 @@ jobs:
       - name: Hook test suite
         shell: bash
         if: runner.os != 'Windows'
-        run: node scripts/hook-test-suite.mjs
+        run: |
+          mkdir -p "$HOME/.claude"
+          echo '{"hooks":{}}' > "$HOME/.claude/settings.json"
+          node scripts/hook-test-suite.mjs
 
       - name: Bash script syntax (Linux/macOS only)
         if: runner.os != 'Windows'
