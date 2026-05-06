@@ -770,7 +770,7 @@ try {
 
   // Stale memory warning (added 2026-04-17): if MEMORY.md hasn't been updated in 14+ days.
   try {
-    for (const memDir of [path.join(cwd, '.claude', 'memory'), path.join(cwd, '.ai-context', 'memory')]) {
+    for (const memDir of [path.join(cwd, '.ai-context', 'memory'), path.join(cwd, '.claude', 'memory')]) {
       const memIndex = path.join(memDir, 'MEMORY.md');
       if (!fs.existsSync(memIndex)) continue;
       const ageDays = Math.round((Date.now() - fs.statSync(memIndex).mtimeMs) / (86400 * 1000));

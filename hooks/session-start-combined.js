@@ -139,7 +139,7 @@ try {
   const POINTER_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
   const KEEP_NEWEST = 3;
 
-  for (const handoffDir of [projectDir, path.join(projectDir, '.claude'), path.join(projectDir, '.ai-context')]) {
+  for (const handoffDir of [projectDir, path.join(projectDir, '.ai-context'), path.join(projectDir, '.claude')]) {
     if (!fs.existsSync(handoffDir)) continue;
 
     const archiveDir = path.join(handoffDir, 'handoff-archive');

@@ -61,9 +61,14 @@ try {
 
   // Canonical hook events per platform — registrations under other names are dead code.
   const CANONICAL_EVENTS_CLAUDE = new Set([
-    'PreToolUse', 'PostToolUse', 'UserPromptSubmit', 'Notification',
-    'Stop', 'SubagentStart', 'SubagentStop', 'PreCompact',
-    'SessionStart', 'SessionEnd',
+    'PreToolUse', 'PostToolUse', 'PostToolUseFailure', 'PostToolBatch',
+    'UserPromptSubmit', 'UserPromptExpansion', 'Notification',
+    'Stop', 'StopFailure', 'SessionStart', 'SessionEnd', 'SessionResume',
+    'SubagentStart', 'SubagentStop', 'PreCompact', 'PostCompact',
+    'ConfigChange', 'CwdChanged', 'FileChanged',
+    'PermissionDenied', 'PermissionRequest', 'InstructionsLoaded',
+    'TaskCreated', 'TaskCompleted', 'TeammateIdle',
+    'WorktreeCreate', 'WorktreeRemove', 'Elicitation', 'ElicitationResult', 'Setup',
   ]);
   const CANONICAL_EVENTS_GEMINI = new Set([
     'SessionStart', 'SessionEnd', 'BeforeTool', 'AfterTool',

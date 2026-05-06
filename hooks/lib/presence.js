@@ -11,7 +11,7 @@ const ROTATE_THRESHOLD = 5000;
 const HEARTBEAT_INTERVAL = 10;
 
 function findCanonicalDir(cwd) {
-  for (const candidate of ['.claude', '.ai-context']) {
+  for (const candidate of ['.ai-context', '.claude']) {
     const p = path.join(cwd, candidate);
     try {
       if (fs.existsSync(p) && fs.statSync(p).isDirectory()) return p;

@@ -57,7 +57,7 @@ function deriveProjectKey(cwd) {
   let current = resolved;
   while (true) {
     // Priority 1: project-identity.json
-    for (const sub of ['.claude', '.ai-context']) {
+    for (const sub of ['.ai-context', '.claude']) {
       const idFile = path.join(current, sub, 'project-identity.json');
       try {
         const data = JSON.parse(fs.readFileSync(idFile, 'utf8'));

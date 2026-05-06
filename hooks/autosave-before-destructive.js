@@ -76,7 +76,7 @@ function findRepoRoot(cwd) {
   let dir = cwd;
   const root = path.parse(dir).root;
   while (dir && dir !== root) {
-    for (const candidate of ['.claude', '.gemini', '.codex', '.ai-context']) {
+    for (const candidate of ['.ai-context', '.claude', '.gemini', '.codex', '.crush']) {
       const p = path.join(dir, candidate);
       try {
         if (fs.existsSync(p) && fs.statSync(p).isDirectory()) return dir;
