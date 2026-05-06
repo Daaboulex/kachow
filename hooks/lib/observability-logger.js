@@ -51,7 +51,7 @@ function getEpisodicPath(cwd) {
 
   // Fallback: use the global project memory path.
   // Match native Claude Code's sanitization (keeps leading dash from leading slash).
-  const sanitized = cwd.replace(/\//g, '-');
+  const sanitized = cwd.replace(/[/\\]/g, '-').replace(/^([A-Z]):-/i, '$1-');
   const globalMemory = path.join(claudeDir, 'projects', sanitized, 'memory', 'episodic');
   return path.join(globalMemory, `${today}-${HOSTNAME}.jsonl`);
 }
@@ -126,7 +126,7 @@ function readEvents(cwd, days = 7, options = {}) {
   const primaryDir = path.dirname(filePath);
 
   // Also check the old-style slug (without leading dash) for backward compat
-  const altSanitized = cwd.replace(/\//g, '-').replace(/^-/, '');
+  const altSanitized = cwd.replace(/[/\\]/g, '-').replace(/^-/, '').replace(/^([A-Z]):-/i, '$1-');
   const altDir = path.join(claudeDir, 'projects', altSanitized, 'memory', 'episodic');
 
   // Collect all dirs to scan (deduplicated)

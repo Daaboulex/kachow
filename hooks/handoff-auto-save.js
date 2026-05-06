@@ -93,9 +93,9 @@ try {
         try {
           const { execSync } = require('child_process');
           const opts = { cwd, timeout: 2000, stdio: ['pipe', 'pipe', 'pipe'] };
-          const branch = execSync('git rev-parse --abbrev-ref HEAD 2>/dev/null', opts).toString().trim();
-          const status = execSync('git status --porcelain 2>/dev/null', opts).toString().trim();
-          const logLine = execSync('git log --oneline -1 2>/dev/null', opts).toString().trim();
+          const branch = execSync('git rev-parse --abbrev-ref HEAD', opts).toString().trim();
+          const status = execSync('git status --porcelain', opts).toString().trim();
+          const logLine = execSync('git log --oneline -1', opts).toString().trim();
           state.git_state = {
             branch,
             dirty_files: status ? status.split('\n').map(l => l.trim().split(/\s+/).slice(1).join(' ')) : [],

@@ -636,8 +636,8 @@ try {
   // AI is blind to commits user made between sessions without this.
   try {
     const humanLog = execSync(
-      'git log --no-merges --since="7 days ago" --pretty=format:"%h %an %s" -n 10 2>/dev/null',
-      { cwd, timeout: 2000, encoding: 'utf8' }
+      'git log --no-merges --since="7 days ago" --pretty=format:"%h %an %s" -n 10',
+      { cwd, timeout: 2000, encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] }
     ).trim();
     if (humanLog) {
       const humanCommits = humanLog.split('\n')
@@ -661,7 +661,7 @@ try {
     } catch {}
     if (!ghBlocked) {
       const prJson = execSync(
-        'gh pr view --json number,title,state,isDraft,reviewDecision,mergeable 2>/dev/null',
+        'gh pr view --json number,title,state,isDraft,reviewDecision,mergeable',
         { cwd, timeout: 3000, encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] }
       ).trim();
       if (prJson) {
@@ -762,7 +762,7 @@ try {
     const branch = execSync('git rev-parse --abbrev-ref HEAD', { cwd, timeout: 2000, encoding: 'utf8' }).trim();
     let ahead = '', behind = '';
     try {
-      const counts = execSync('git rev-list --left-right --count HEAD...@{upstream} 2>/dev/null', { cwd, timeout: 2000, encoding: 'utf8' }).trim();
+      const counts = execSync('git rev-list --left-right --count HEAD...@{upstream}', { cwd, timeout: 2000, encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] }).trim();
       const [a, b] = counts.split(/\s+/);
       if (a && a !== '0') ahead = ` +${a}`;
       if (b && b !== '0') behind = ` -${b}`;

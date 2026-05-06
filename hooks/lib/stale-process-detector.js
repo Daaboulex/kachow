@@ -27,8 +27,8 @@ function safeStat(p) {
 }
 
 function findTaskDirs() {
-  const uid = process.getuid?.() ?? '';
-  const base = `/tmp/claude-${uid}`;
+  const uid = process.getuid?.() ?? process.env.USERNAME ?? '';
+  const base = path.join(os.tmpdir(), `claude-${uid}`);
   const out = [];
   if (!fs.existsSync(base)) return out;
   for (const cwdDir of fs.readdirSync(base)) {
@@ -103,9 +103,10 @@ function scanOrphanedShells(activeSidList) {
   const orphans = [];
   try {
     // Look for zsh processes that look like Claude-spawned shells
+    if (process.platform === 'win32') return orphans;
     const out = execSync(
-      `ps -eo pid,ppid,etime,user,comm,args --no-headers 2>/dev/null || ps -eo pid,ppid,etime,user,comm,args`,
-      { encoding: 'utf8', timeout: 3000 }
+      'ps -eo pid,ppid,etime,user,comm,args || ps -Ao pid,ppid,etime,user,comm,args',
+      { encoding: 'utf8', timeout: 3000, stdio: ['pipe', 'pipe', 'ignore'] }
     );
     for (const line of out.split('\n')) {
       if (!line.trim()) continue;

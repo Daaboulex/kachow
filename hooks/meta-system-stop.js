@@ -94,7 +94,7 @@ try {
         }
       }
       if (!semanticDir) {
-        const sanitized = cwd.replace(/\//g, '-');
+        const sanitized = cwd.replace(/[/\\]/g, '-').replace(/^([A-Z]):-/i, '$1-');
         semanticDir = path.join(configDir, 'projects', sanitized, 'memory', 'semantic');
       }
 

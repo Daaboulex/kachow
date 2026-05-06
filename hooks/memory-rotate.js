@@ -41,7 +41,7 @@ function targetDirs() {
   const dirs = [];
   // per-cwd auto-memory
   const cwd = process.cwd();
-  const sanitized = cwd.replace(/\//g, '-');
+  const sanitized = cwd.replace(/[/\\]/g, '-').replace(/^([A-Z]):-/i, '$1-');
   const autoMem = path.join(HOME, '.claude', 'projects', sanitized, 'memory');
   if (fs.existsSync(autoMem)) dirs.push(autoMem);
   // ~/.ai-context/memory/

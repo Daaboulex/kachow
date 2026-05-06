@@ -46,6 +46,7 @@ try {
   const scriptDir = __dirname;
   const { detectTool, toolHomeDir } = require('./lib/tool-detect.js');
   const tool = detectTool();
+  const isGemini = tool === 'gemini';
   const configDir = toolHomeDir(tool);
   const cacheDir = path.join(configDir, 'cache');
   try { fs.mkdirSync(cacheDir, { recursive: true }); } catch {}

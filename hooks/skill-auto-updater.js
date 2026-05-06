@@ -32,6 +32,23 @@ function log(entry) {
   } catch {}
 }
 
+function findSkillMd(dir, skillName, depth) {
+  if (depth > 5) return '';
+  try {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (entry.isDirectory()) {
+        if (entry.name === skillName) {
+          const candidate = path.join(dir, entry.name, 'SKILL.md');
+          if (fs.existsSync(candidate)) return candidate;
+        }
+        const deeper = findSkillMd(path.join(dir, entry.name), skillName, depth + 1);
+        if (deeper) return deeper;
+      }
+    }
+  } catch {}
+  return '';
+}
+
 try {
   // Cooldown check
   try {
@@ -118,13 +135,8 @@ try {
       let srcSkillMd = path.join(claudeSkills, skillName, 'SKILL.md');
       if (!fs.existsSync(srcSkillMd)) {
         // Search plugin cache
-        try {
-          const found = execSync(
-            `find "${pluginCache}" -maxdepth 5 -path "*/${skillName}/SKILL.md" -print -quit 2>/dev/null`,
-            { encoding: 'utf8', timeout: 3000 }
-          ).trim();
-          if (found) srcSkillMd = found;
-        } catch {}
+        const found = findSkillMd(pluginCache, skillName, 0);
+        if (found) srcSkillMd = found;
       }
 
       if (!fs.existsSync(srcSkillMd)) continue;
@@ -136,7 +148,7 @@ try {
         if (srcContent !== dstContent) {
           const srcDir = path.dirname(srcSkillMd);
           // Copy entire skill directory
-          run(`cp -r "${srcDir}" "${codexDest}"`, home);
+          fs.cpSync(srcDir, codexDest, { recursive: true });
           synced++;
         }
       } catch {}

@@ -387,7 +387,7 @@ try {
     // Fallback: parse claude --version
     try {
       const { execSync } = require('child_process');
-      const out = execSync('claude --version 2>/dev/null', { encoding: 'utf8', timeout: 3000 });
+      const out = execSync('claude --version', { encoding: 'utf8', timeout: 3000, stdio: ['pipe', 'pipe', 'ignore'] });
       const m = out.match(/(\d+\.\d+\.\d+)/);
       return m ? m[1] : null;
     } catch { return null; }

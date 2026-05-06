@@ -41,7 +41,7 @@ try {
   if (!sessionId) passthrough();
 
   // Read context metrics from statusline bridge
-  const ctxFile = `/tmp/claude-ctx-${sessionId}.json`;
+  const ctxFile = path.join(os.tmpdir(), `claude-ctx-${sessionId}.json`);
   let metrics;
   try {
     metrics = JSON.parse(fs.readFileSync(ctxFile, 'utf8'));
