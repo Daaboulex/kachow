@@ -21,7 +21,7 @@ Your personal rules go between the USER SECTION markers — they survive updates
 > - `~/.claude/CLAUDE.md`, `~/.gemini/GEMINI.md`, `~/.codex/AGENTS.md`, `~/.config/opencode/AGENTS.md`, `~/.config/aider/AGENTS.md` are symlinks here.
 > - Edit this file. Every tool picks up the change automatically.
 > - Tool-specific sections below are labeled — other tools should ignore them.
-> - **Last updated:** 2026-05-06 (v0.8.0 infrastructure consolidation — one brain, derived tool dirs)
+> - **Last updated:** 2026-05-06 (v0.9.1 — one brain + proactive provisioning + 5-tool scalability)
 > - **Override per-project:** drop `AGENTS.md` at repo root — tools walk from cwd to root, deepest wins.
 
 ## Identity
@@ -116,7 +116,7 @@ Plans don't need approval but they must exist.
 
 **This is structural, not a bug.** Gemini and Codex don't have Claude's permission vocabulary; perfect parity is impossible until upstream changes.
 
-## One Brain Architecture (v0.8.0)
+## One Brain Architecture (v0.9.1)
 
 `~/.ai-context/` is the ONLY git repo and ONLY Syncthing folder. Tool dirs (`~/.claude/`, `~/.gemini/`, `~/.codex/`) are derived state — settings, hooks, and memories are symlinks pointing into ai-context. No `.git` in tool dirs.
 

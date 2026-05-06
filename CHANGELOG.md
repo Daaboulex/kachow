@@ -6,6 +6,38 @@ All notable changes to this framework. See [Semantic Versioning](https://semver.
 
 ## [Unreleased]
 
+## [0.9.1] — 2026-05-06
+
+One-brain hardening — proactive provisioning, 5-tool scalability, security fixes.
+
+### Added
+- **lib/tool-paths.js** — single import for all tool-aware paths
+- **system-integrity-check.mjs** — automated contract verifier
+- **commands/** — centralized user commands as canonical source
+- **Proactive project-state provisioning** — new projects auto-provisioned from first session
+- **Crush support** in generate-settings.mjs
+- **MCP lazy MEMORY_DIRS** — dynamic project discovery
+
+### Changed
+- 14 hooks migrated from hardcoded .claude paths to tool-paths.js
+- Session context loader: dash-prefix discovery, peer detection, FULL_N default 8
+- install-adapters.mjs: commands + portable skills + Codex auto-conversion
+- Crush tool_name normalization in critical safety hooks
+- Unified .ai-context symlink pattern across all projects
+
+### Fixed
+- Subagent marker PID mismatch — guards were non-functional since creation
+- Memory provisioning — 47 of 52 project dirs were real, not symlinked
+- Ghost hooks in MANIFEST — archived files still registered
+- atomicMigrate data loss — conflict preservation + copy error abort
+- Pre-commit hook not executable
+
+### Security
+- Subagent write guards functional (PID glob fix)
+- Crush tool_name normalization in scrub-sentinel + pre-write-combined-guard
+- Symlink traversal guard in provisioning
+- Memory-rotate skips status:active memories
+
 ## [0.8.0] — 2026-05-06
 
 Infrastructure consolidation — one brain architecture.
@@ -216,7 +248,8 @@ Initial public release. *Ka-chow.*
 - Obfuscated personal-token patterns in CI (printf-concatenated, no literals)
 - `deep-verify-scrub` maintainer tool cross-references a master personal-token list beyond scrub-config
 
-[Unreleased]: https://github.com/Daaboulex/kachow/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/Daaboulex/kachow/compare/v0.9.1...HEAD
+[0.9.1]: https://github.com/Daaboulex/kachow/compare/v0.8.0...v0.9.1
 [0.8.0]: https://github.com/Daaboulex/kachow/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/Daaboulex/kachow/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/Daaboulex/kachow/compare/v0.6.0...v0.7.0

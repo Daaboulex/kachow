@@ -253,6 +253,8 @@ Inspired-by, not forked: kachow's hooks, commands, skills, and memory schema are
 - [x] **v0.5.0** — Hook system restoration (47 items), 17 bugs fixed, context-pressure corrections
 - [x] **v0.6.0** — Safety timeout, confidence decay, session state lib, cost tracker
 - [x] **v0.7.0** — Manifest-driven hooks, 5-tool architecture (Crush + OpenCode), sync safety
+- [x] **v0.8.0** — Infrastructure consolidation, one-brain architecture
+- [x] **v0.9.1** — Proactive provisioning, 5-tool scalability, security hardening
 - [ ] **v1.0.0** — API stability promise for hook interface + settings template shape
 
 ## Contributing
