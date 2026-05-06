@@ -72,12 +72,30 @@ function parseFrontmatter(raw) {
 
   let description = '';
   let fmName = '';
-  for (const line of fmLines) {
+  let inFoldedDesc = false;
+  for (let i = 0; i < fmLines.length; i++) {
+    const line = fmLines[i];
+    if (inFoldedDesc) {
+      if (/^\s+\S/.test(line)) {
+        description += ' ' + line.trim();
+        continue;
+      }
+      inFoldedDesc = false;
+    }
     const m = line.match(/^(\w+):\s*(.*)$/);
     if (!m) continue;
-    if (m[1] === 'description') description = m[2].trim();
-    if (m[1] === 'name')        fmName      = m[2].trim();
+    if (m[1] === 'description') {
+      const val = m[2].trim();
+      if (val === '>' || val === '|') {
+        inFoldedDesc = true;
+        description = '';
+      } else {
+        description = val;
+      }
+    }
+    if (m[1] === 'name') fmName = m[2].trim();
   }
+  description = description.trim();
   return { description, name: fmName, body };
 }
 
@@ -90,7 +108,8 @@ function applyPathSubs(content) {
 }
 
 function buildCodexSkillContent(cmdName, description, body, needsWarning) {
-  const fm = `---\nname: ${cmdName}\ndescription: ${description}\n---\n\n`;
+  const safeDesc = description.replace(/"/g, '\\"');
+  const fm = `---\nname: ${cmdName}\ndescription: "${safeDesc}"\n---\n\n`;
   const convertedBody = applyPathSubs(body);
   const prefix = needsWarning ? WARNING_COMMENT : '';
   return fm + prefix + convertedBody.trimStart();
