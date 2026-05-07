@@ -64,6 +64,10 @@ const SPECS = [
       // Passthrough MUST emit `{"continue":true}` — a silent exit=0 (e.g. crash before write)
       // would otherwise look identical to success.
       { name: 'passthrough on ls emits continue signal', stdin: JSON.stringify({ tool_name: 'Bash', tool_input: { command: 'ls' } }), expect: { exit: 0, stdoutMatch: 'continue' } },
+      // Critical selftest: if `if` conditional is added (Claude-only perf filter),
+      // verify the hook still fires on destructive patterns.
+      { name: 'detects rm -rf as destructive', stdin: JSON.stringify({ tool_name: 'Bash', tool_input: { command: 'rm -rf /tmp/testdir' } }), expect: { exit: 0, stdoutMatch: 'continue' } },
+      { name: 'detects git reset --hard as destructive', stdin: JSON.stringify({ tool_name: 'Bash', tool_input: { command: 'git reset --hard HEAD~1' } }), expect: { exit: 0, stdoutMatch: 'continue' } },
     ],
   },
   {

@@ -34,6 +34,30 @@ const PUSH_COOLDOWN_MS = 5 * 60 * 1000;
 const AI_CONTEXT_AUTOCOMMIT = process.env.AI_CONTEXT_AUTOCOMMIT !== '0';
 const AI_CONTEXT_AUTOPUSH = process.env.AI_CONTEXT_AUTOPUSH !== '0';
 
+// Git mutex — prevents concurrent git operations on ~/.ai-context/
+const GIT_LOCK_PATH = path.join(aiContextDir, '.git', 'ai-context.lock');
+const GIT_LOCK_STALE_MS = 120000;
+const GIT_LOCK_TIMEOUT_MS = 30000;
+function acquireGitLock() {
+  const deadline = Date.now() + GIT_LOCK_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    try {
+      fs.writeFileSync(GIT_LOCK_PATH, JSON.stringify({ pid: process.pid, hostname: os.hostname(), created: Date.now() }), { flag: 'wx' });
+      return true;
+    } catch (e) {
+      if (e.code === 'EEXIST') {
+        try {
+          const lock = JSON.parse(fs.readFileSync(GIT_LOCK_PATH, 'utf8'));
+          if (Date.now() - lock.created > GIT_LOCK_STALE_MS) { fs.unlinkSync(GIT_LOCK_PATH); continue; }
+        } catch { try { fs.unlinkSync(GIT_LOCK_PATH); } catch {} continue; }
+        try { require('child_process').execSync('sleep 0.2'); } catch {}
+      } else return false;
+    }
+  }
+  return false;
+}
+function releaseGitLock() { try { fs.unlinkSync(GIT_LOCK_PATH); } catch {} }
+
 const warnings = [];
 
 function autoCommit(dir, label) {
@@ -109,25 +133,33 @@ try {
   let raw = '';
   try { raw = fs.readFileSync(0, 'utf8'); } catch { raw = '{}'; }
 
-  const aiContextCommitted = AI_CONTEXT_AUTOCOMMIT
-    ? autoCommit(aiContextDir, '~/.ai-context')
-    : false;
+  if (!acquireGitLock()) {
+    warnings.push('git lock acquisition timed out — skipping commit/push (another session may be pushing)');
+  } else {
+    try {
+      const aiContextCommitted = AI_CONTEXT_AUTOCOMMIT
+        ? autoCommit(aiContextDir, '~/.ai-context')
+        : false;
 
-  let lastTime = 0;
-  try { lastTime = fs.statSync(lastPush).mtimeMs; } catch {}
-  const cooldownElapsed = (Date.now() - lastTime) >= PUSH_COOLDOWN_MS;
+      let lastTime = 0;
+      try { lastTime = fs.statSync(lastPush).mtimeMs; } catch {}
+      const cooldownElapsed = (Date.now() - lastTime) >= PUSH_COOLDOWN_MS;
 
-  const aiContextUnpushed = AI_CONTEXT_AUTOPUSH && isGitRepo(aiContextDir) && hasUnpushedCommits(aiContextDir);
-  const shouldPush = cooldownElapsed || aiContextUnpushed;
+      const aiContextUnpushed = AI_CONTEXT_AUTOPUSH && isGitRepo(aiContextDir) && hasUnpushedCommits(aiContextDir);
+      const shouldPush = cooldownElapsed || aiContextUnpushed;
 
-  if (shouldPush) {
-    if (AI_CONTEXT_AUTOPUSH && isGitRepo(aiContextDir)) {
-      const remotes = run('git remote', aiContextDir);
-      if (remotes && remotes.trim()) autoPush(aiContextDir, '~/.ai-context');
+      if (shouldPush) {
+        if (AI_CONTEXT_AUTOPUSH && isGitRepo(aiContextDir)) {
+          const remotes = run('git remote', aiContextDir);
+          if (remotes && remotes.trim()) autoPush(aiContextDir, '~/.ai-context');
+        }
+        try { fs.writeFileSync(lastPush, ''); } catch {}
+      } else if (aiContextCommitted) {
+        warnings.push('committed locally (push cooldown active — will push on next session end)');
+      }
+    } finally {
+      releaseGitLock();
     }
-    try { fs.writeFileSync(lastPush, ''); } catch {}
-  } else if (aiContextCommitted) {
-    warnings.push('committed locally (push cooldown active — will push on next session end)');
   }
 
   try { require('./lib/observability-logger.js').logEvent(process.cwd(), { type: 'auto_push', source: 'auto-push-global', success: warnings.length === 0, meta: { aiContextCommitted, pushed: shouldPush, warnings } }); } catch {}

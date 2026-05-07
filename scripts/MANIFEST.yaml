@@ -132,31 +132,6 @@ hooks:
       gemini:
         name: block-subagent-writes
 
-  - file: validate-settings-on-write.js
-    category: meta
-    tools: [claude, codex, gemini, crush]
-    order: 12
-    async: false
-    events:
-      - event: PreToolUse
-        matcher: [Bash, Edit, MultiEdit, Write]
-        timeout: 3
-    overrides:
-      codex:
-        matcher_raw: '^(apply_patch|shell)$'
-
-  - file: validate-instructions-sync.js
-    category: meta
-    tools: [claude, gemini, codex]
-    order: 13
-    async: false
-    events:
-      - event: SessionStart
-        timeout: 5
-    overrides:
-      gemini:
-        name: validate-instructions-sync
-
   - file: verifiedby-gate.js
     category: meta
     tools: [claude, codex, gemini, crush]
@@ -181,6 +156,8 @@ hooks:
         matcher: [Bash]
         timeout: 8
     overrides:
+      claude:
+        if: 'Bash(rm *) OR Bash(git reset*) OR Bash(git clean*) OR Bash(git checkout -- *)'
       codex:
         matcher_raw: ^shell$
       gemini:
@@ -265,9 +242,9 @@ hooks:
     category: meta
     tools: [claude, codex]
     order: 23
-    async: false
+    async: true
     events:
-      - event: UserPromptSubmit
+      - event: SessionStart
         timeout: 5
 
   - file: todowrite-mirror.js
@@ -316,7 +293,7 @@ hooks:
     category: observability
     tools: [claude, codex]
     order: 28
-    async: false
+    async: true
     events:
       - event: UserPromptSubmit
         timeout: 5
@@ -364,7 +341,7 @@ hooks:
       gemini:
         name: post-commit-sync-reminder
 
-  - file: hook-doc-drift-detector.js
+  - file: hook-edit-monitor.js
     category: meta
     tools: [claude, gemini, codex]
     order: 32
@@ -375,9 +352,9 @@ hooks:
         timeout: 5
     overrides:
       claude:
-        if: 'Write(*.claude/hooks/*.js)|Edit(*.claude/hooks/*.js)'
+        if: 'Write(*.claude/hooks/*.js)|Edit(*.claude/hooks/*.js)|Write(*.ai-context/hooks/*.js)|Edit(*.ai-context/hooks/*.js)'
       gemini:
-        name: hook-doc-drift-detector
+        name: hook-edit-monitor
 
   - file: prefer-editing-nudge.js
     category: meta
@@ -388,19 +365,6 @@ hooks:
       - event: PreToolUse
         matcher: [Write]
         timeout: 3
-
-  - file: dead-hook-detector.js
-    category: meta
-    tools: [claude, gemini, codex]
-    order: 34
-    async: false
-    events:
-      - event: PostToolUse
-        matcher: [Edit, Write]
-        timeout: 5
-    overrides:
-      gemini:
-        name: dead-hook-detector
 
   - file: block-subagent-non-bash-writes.js
     category: safety
@@ -550,7 +514,7 @@ hooks:
     category: meta
     tools: [claude, codex]
     order: 46
-    async: false
+    async: true
     events:
       - event: UserPromptSubmit
         timeout: 3
@@ -640,6 +604,15 @@ hooks:
       gemini:
         name: skill-auto-updater
 
+  - file: jsonl-rotation.js
+    category: lifecycle
+    tools: [claude, codex, gemini]
+    order: 54
+    async: true
+    events:
+      - event: Stop
+        timeout: 5
+
   - file: memory-rotate.js
     category: memory
     tools: [claude, codex, gemini]
@@ -651,6 +624,25 @@ hooks:
     overrides:
       gemini:
         name: memory-rotate
+
+  - file: memory-index-verify.js
+    category: memory
+    tools: [claude, codex, gemini]
+    order: 551
+    async: true
+    events:
+      - event: Stop
+        timeout: 5
+
+  - file: memory-index-updater.js
+    category: memory
+    tools: [claude, gemini]
+    order: 552
+    async: true
+    events:
+      - event: PostToolUse
+        matcher: [Edit, Write]
+        timeout: 3
 
   - file: session-end-logger.js
     category: observability
@@ -686,7 +678,7 @@ hooks:
     category: observability
     tools: [claude, codex]
     order: 59
-    async: false
+    async: true
     events:
       - event: UserPromptSubmit
         timeout: 3
@@ -727,45 +719,6 @@ hooks:
       gemini:
         event_override: AfterAgent
         name: task-verification-gate
-
-  - file: sync-claude-md.js
-    category: sync
-    tools: [gemini]
-    order: 64
-    async: false
-    events:
-      - event: PostToolUse
-        matcher: [Edit, Write]
-        timeout: 5
-    overrides:
-      gemini:
-        name: sync-claude-md
-
-  - file: sync-claude-skills.js
-    category: sync
-    tools: [gemini]
-    order: 65
-    async: false
-    events:
-      - event: PostToolUse
-        matcher: [Edit, Write]
-        timeout: 5
-    overrides:
-      gemini:
-        name: sync-claude-skills
-
-  - file: sync-claude-agents.js
-    category: sync
-    tools: [gemini]
-    order: 66
-    async: false
-    events:
-      - event: PostToolUse
-        matcher: [Edit, Write]
-        timeout: 5
-    overrides:
-      gemini:
-        name: sync-claude-agents
 
   - file: reflect-precompact.js
     category: memory

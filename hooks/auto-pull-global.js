@@ -12,6 +12,30 @@ const fs = require('fs');
 const g = require('./lib/git-global.js');
 const { REPOS: repos, run, isGitRepo, getDefaultBranch } = g;
 
+// Git mutex — prevents concurrent git operations on ~/.ai-context/
+const GIT_LOCK_PATH = path.join(os.homedir(), '.ai-context', '.git', 'ai-context.lock');
+const GIT_LOCK_STALE_MS = 120000;
+const GIT_LOCK_TIMEOUT_MS = 30000;
+function acquireGitLock() {
+  const deadline = Date.now() + GIT_LOCK_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    try {
+      fs.writeFileSync(GIT_LOCK_PATH, JSON.stringify({ pid: process.pid, hostname: os.hostname(), created: Date.now() }), { flag: 'wx' });
+      return true;
+    } catch (e) {
+      if (e.code === 'EEXIST') {
+        try {
+          const lock = JSON.parse(fs.readFileSync(GIT_LOCK_PATH, 'utf8'));
+          if (Date.now() - lock.created > GIT_LOCK_STALE_MS) { fs.unlinkSync(GIT_LOCK_PATH); continue; }
+        } catch { try { fs.unlinkSync(GIT_LOCK_PATH); } catch {} continue; }
+        try { require('child_process').execSync('sleep 0.2'); } catch {}
+      } else return false;
+    }
+  }
+  return false;
+}
+function releaseGitLock() { try { fs.unlinkSync(GIT_LOCK_PATH); } catch {} }
+
 // Cooldown: don't pull if we pulled within the last 30 minutes
 const COOLDOWN_MS = 30 * 60 * 1000;
 const cooldownFile = path.join(os.tmpdir(), 'claude-auto-pull-last.json');
@@ -31,6 +55,12 @@ try {
   } catch {}
 
   const messages = [];
+
+  if (!acquireGitLock()) {
+    process.stdout.write(JSON.stringify({ continue: true, systemMessage: '[auto-pull] git lock acquisition timed out — skipping pull' }));
+    process.exit(0);
+  }
+  try {
 
   for (const { dir, label } of repos) {
     if (!isGitRepo(dir)) continue;
@@ -113,6 +143,10 @@ try {
     if (pullOk) {
       messages.push(`${label}: updated from remote (was ${behind} commits behind)`);
     }
+  }
+
+  } finally {
+    releaseGitLock();
   }
 
   // Write cooldown

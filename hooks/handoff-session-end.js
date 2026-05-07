@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(__dirname + "/lib/emit-simple-timing.js").start(__filename);
 'use strict';
 // Stop/SessionEnd hook: finalize session state + update project indices.
 // Handles retention: delete session JSON >30d, prose .md >90d.

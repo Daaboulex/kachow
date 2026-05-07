@@ -287,6 +287,112 @@ try {
     errors.push({ section: 'sync-ai-files', error: e.message, stack: e.stack?.split('\n')[1]?.trim() });
   }
 
+  // ── 5. GEMINI.md → CLAUDE.md reverse sync (merged from sync-claude-md.js, v0.9.5 W2-FIX3) ──
+  try {
+    if (filePath.endsWith('GEMINI.md') &&
+        !normalized.includes('.gemini/GEMINI.md') && !normalized.includes('.gemini\\GEMINI.md')) {
+      const geminiPath = filePath;
+      const claudePath = filePath.replace(/GEMINI\.md$/, 'CLAUDE.md');
+      if (fs.existsSync(geminiPath) && fs.existsSync(claudePath)) {
+        const gemini = fs.readFileSync(geminiPath, 'utf8');
+        const claude = gemini.split('\n').map(line => {
+          const isSyncTableRow = line.includes('→') && line.includes('|') && (
+            line.includes('sync-') || line.includes('commands/') || line.includes('skills/')
+          );
+          if (isSyncTableRow) return line;
+          return line
+            .replace(/^# GEMINI\.md$/g, '# CLAUDE.md')
+            .replace(/"agent":\s*"gemini"/g, '"agent": "claude"')
+            .replace(/as gemini\b/g, 'as claude')
+            .replace(/as Gemini\b/g, 'as Claude')
+            .replace(/commit as Gemini/g, 'commit as Claude')
+            .replace(/Never commit as Gemini/g, 'Never commit as Claude')
+            .replace(/\*\*Gemini CLI\*\*/g, (m, o, s) => s.includes('~/.gemini/') ? m : '**Claude Code**')
+            .replace(/Agent Skills/g, 'Slash Commands')
+            .replace(/gemini-progress\.json/g, 'claude-progress.json')
+            .replace(/gemini-tasks\.json/g, 'claude-tasks.json')
+            .replace(/`\.gemini\/skills`/g, '`.claude/commands`')
+            .replace(/`\.gemini\/skills\/`/g, '`.claude/commands/`')
+            .replace(/\.gemini\/skills\//g, '.claude/commands/')
+            .replace(/`\.gemini\/rules\/`/g, '`.claude/rules/`')
+            .replace(/`\.gemini\/rules`/g, '`.claude/rules`')
+            .replace(/`\.gemini\/gemini-/g, '`.claude/claude-')
+            .replace(/`\.gemini\/`/g, (m, o, s) => s.includes('`.claude/`') ? m : '`.claude/`')
+            .replace(/in `\.gemini\/skills\/`/g, 'in `.claude/commands/`')
+            .replace(/in `\.gemini\//g, (m, o, s) => s.includes('.claude/') ? m : 'in `.claude/')
+            .replace(/\.gemini\/gemini-progress/g, '.claude/claude-progress')
+            .replace(/\.gemini\/gemini-tasks/g, '.claude/claude-tasks')
+            .replace(/`\.gemini\/([\w-]+\.json)`/g, (m, p1, o, s) => s.includes('.claude/') ? m : '`.claude/' + p1 + '`')
+            .replace(/at `\.gemini\//g, 'at `.claude/')
+            .replace(/"~\/\.gemini\/projects/g, '"~/.claude/projects')
+            .replace(/`~\/\.gemini\/projects/g, '`~/.claude/projects')
+            .replace(/gemini-cli/g, (m, o, s) => s.includes('claude-code') ? m : 'claude-code')
+            .replace(/~\/\.gemini\/settings/g, (m, o, s) => s.includes('**Gemini CLI**') ? m : '~/.claude/settings')
+            .replace(/`~\/\.gemini\/`/g, (m, o, s) => (s.includes('**Claude Code**') || s.includes('**Gemini CLI**')) ? m : '`~/.claude/`')
+            .replace(/set `agent` field to `"gemini"`/g, 'set `agent` field to `"claude"`')
+            .replace(/symlinked via `\.gemini\/`/g, 'symlinked via `.claude/`');
+        }).join('\n');
+        fs.writeFileSync(claudePath, claude, 'utf8');
+        process.stdout.write(JSON.stringify({ continue: true, systemMessage: `Auto-synced CLAUDE.md from GEMINI.md (${path.basename(path.dirname(geminiPath))})` }));
+        process.exit(0);
+      }
+    }
+  } catch (e) {
+    errors.push({ section: 'sync-gemini-to-claude-md', error: e.message, stack: e.stack?.split('\n')[1]?.trim() });
+  }
+
+  // ── 6. .gemini/skills|rules → .claude/ reverse sync (merged from sync-claude-skills.js, v0.9.5 W2-FIX3) ──
+  try {
+    if (normalized.includes('.gemini/skills/') && normalized.endsWith('SKILL.md')) {
+      const { reverseToolMap, reverseModelMap, geminiOnlyFields, translateFrontmatter } = require('./lib/platform-map');
+      const skillDir = path.dirname(filePath);
+      const skillName = path.basename(skillDir);
+      const projectRoot = skillDir.replace(/[/\\]\.ai-context[/\\]\.gemini[/\\]skills[/\\][^/\\]+$/, '').replace(/[/\\]\.gemini[/\\]skills[/\\][^/\\]+$/, '');
+      const content = fs.readFileSync(filePath, 'utf8');
+      const translated = translateFrontmatter(content, reverseToolMap, geminiOnlyFields, reverseModelMap);
+      for (const cmdFile of [
+        path.join(projectRoot, '.claude', 'commands', skillName + '.md'),
+        path.join(projectRoot, '.ai-context', '.claude', 'commands', skillName + '.md'),
+      ]) {
+        if (fs.existsSync(path.dirname(cmdFile))) {
+          fs.writeFileSync(cmdFile, translated, 'utf8');
+          process.stdout.write(JSON.stringify({ continue: true, systemMessage: `Auto-synced skill → command: ${skillName}` }));
+          process.exit(0);
+        }
+      }
+    }
+    if (normalized.includes('.gemini/rules/') && normalized.endsWith('.md')) {
+      const ruleName = path.basename(filePath);
+      const claudeRulesDir = path.dirname(filePath).replace(/\.gemini[/\\]rules$/, path.join('.claude', 'rules'));
+      if (fs.existsSync(claudeRulesDir)) {
+        fs.copyFileSync(filePath, path.join(claudeRulesDir, ruleName));
+        process.stdout.write(JSON.stringify({ continue: true, systemMessage: `Auto-synced rule → claude: ${ruleName}` }));
+        process.exit(0);
+      }
+    }
+  } catch (e) {
+    errors.push({ section: 'sync-gemini-to-claude-skills', error: e.message, stack: e.stack?.split('\n')[1]?.trim() });
+  }
+
+  // ── 7. .gemini/agents/*.md → .claude/agents/ reverse sync (merged from sync-claude-agents.js, v0.9.5 W2-FIX3) ──
+  try {
+    if (normalized.match(/\.gemini\/agents\/[^/]+\.md$/)) {
+      const { reverseToolMap, reverseModelMap, geminiOnlyFields, translateFrontmatter } = require('./lib/platform-map');
+      const claudePath2 = filePath.replace(/\.gemini\/agents\//, '.claude/agents/');
+      if (fs.existsSync(filePath)) {
+        const content = fs.readFileSync(filePath, 'utf8');
+        const translated = translateFrontmatter(content, reverseToolMap, geminiOnlyFields, reverseModelMap);
+        const targetDir = path.dirname(claudePath2);
+        if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
+        fs.writeFileSync(claudePath2, translated, 'utf8');
+        process.stdout.write(JSON.stringify({ continue: true, systemMessage: `Auto-synced agent → claude: ${path.basename(filePath, '.md')}` }));
+        process.exit(0);
+      }
+    }
+  } catch (e) {
+    errors.push({ section: 'sync-gemini-to-claude-agents', error: e.message, stack: e.stack?.split('\n')[1]?.trim() });
+  }
+
   // ── Error aggregation (SF-001: surface ANY error, not just 3+ or critical) ──
   if (errors.length > 0) {
     try {

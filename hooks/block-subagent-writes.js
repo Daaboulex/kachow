@@ -25,6 +25,7 @@ require(__dirname + "/lib/emit-simple-timing.js").start(__filename);
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+let _isSubagentCached = undefined;
 
 function passthrough() {
   process.stdout.write('{"continue":true}');
@@ -44,18 +45,18 @@ try {
   if (!sessionId || !command) passthrough();
 
   // Check marker files (written by SubagentStart hook, keyed by session_id-pid).
-  // A marker means THIS process is a subagent. Parent session has a different PID,
-  // so parent's markers don't match (fixing the false-positive block bug).
+  // Module-level cache: computed once per process, avoids readdirSync on every call.
   const tp = require('./lib/tool-paths.js');
   const markerDir = tp.subagentMarkerDir;
-  // Glob for sessionId-*.json (PID differs between inject hook and this hook process)
-  let isSubagent = false;
-  try {
-    for (const f of fs.readdirSync(markerDir)) {
-      if (f.startsWith(sessionId + '-') && f.endsWith('.json')) { isSubagent = true; break; }
-    }
-  } catch {}
-  if (!isSubagent) passthrough();
+  if (_isSubagentCached === undefined) {
+    _isSubagentCached = false;
+    try {
+      for (const f of fs.readdirSync(markerDir)) {
+        if (f.startsWith(sessionId + '-') && f.endsWith('.json')) { _isSubagentCached = true; break; }
+      }
+    } catch {}
+  }
+  if (!_isSubagentCached) passthrough();
 
   // Subagent context confirmed. Check command against blocked patterns.
   // R-AUDIT-5 hardening (2026-04-25):
@@ -130,6 +131,10 @@ try {
   }
 
   if (matchedAtom) {
+    try {
+      const logPath = path.join(os.homedir(), '.ai-context', 'instances', 'subagent-blocks.jsonl');
+      fs.appendFileSync(logPath, JSON.stringify({ ts: new Date().toISOString(), hook: 'block-subagent-writes', blocked: matchedAtom.slice(0, 200), session_id: sessionId }) + '\n');
+    } catch {}
     process.stdout.write(JSON.stringify({
       continue: false,
       decision: 'block',

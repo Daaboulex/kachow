@@ -105,6 +105,7 @@ try {
         status: status,
         source: 'todowrite',
         source_ref: sessionId,
+        owner_session: sessionId,
         created: existing.created || now,
         verifiedBy: existing.verifiedBy || 'not-verified',
         agent_last_worked: agent,

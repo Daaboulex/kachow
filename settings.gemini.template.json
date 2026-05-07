@@ -143,36 +143,6 @@
             "type": "command",
             "command": "node \"$HOME/.gemini/hooks/post-write-sync.js\"",
             "timeout": 5000
-          },
-          {
-            "type": "command",
-            "command": "node \"$HOME/.gemini/hooks/hook-doc-drift-detector.js\"",
-            "timeout": 5000,
-            "name": "hook-doc-drift-detector"
-          },
-          {
-            "type": "command",
-            "command": "node \"$HOME/.gemini/hooks/dead-hook-detector.js\"",
-            "timeout": 5000,
-            "name": "dead-hook-detector"
-          },
-          {
-            "type": "command",
-            "command": "node \"$HOME/.gemini/hooks/sync-claude-md.js\"",
-            "timeout": 5000,
-            "name": "sync-claude-md"
-          },
-          {
-            "type": "command",
-            "command": "node \"$HOME/.gemini/hooks/sync-claude-skills.js\"",
-            "timeout": 5000,
-            "name": "sync-claude-skills"
-          },
-          {
-            "type": "command",
-            "command": "node \"$HOME/.gemini/hooks/sync-claude-agents.js\"",
-            "timeout": 5000,
-            "name": "sync-claude-agents"
           }
         ],
         "matcher": "replace|write_file"
@@ -266,9 +236,14 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$HOME/.gemini/hooks/validate-settings-on-write.js\"",
+            "command": "node \"$HOME/.gemini/hooks/verifiedby-gate.js\"",
             "timeout": 3000
-          },
+          }
+        ],
+        "matcher": "todo_write|write_todos"
+      },
+      {
+        "hooks": [
           {
             "type": "command",
             "command": "node \"$HOME/.gemini/hooks/peer-conflict-check.js\"",
@@ -283,16 +258,6 @@
           }
         ],
         "matcher": "run_shell_command|replace|replace|write_file"
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.gemini/hooks/verifiedby-gate.js\"",
-            "timeout": 3000
-          }
-        ],
-        "matcher": "todo_write|write_todos"
       },
       {
         "hooks": [

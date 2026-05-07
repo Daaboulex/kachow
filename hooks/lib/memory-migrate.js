@@ -115,7 +115,7 @@ function rotate(dir) {
   for (const f of files) {
     const fp = path.join(dir, f);
     const { fm } = parseFrontmatter(fs.readFileSync(fp, 'utf8'));
-    if (!fm || fm.ttl_days === 'permanent' || fm.status === 'active' || !fm.last_verified) continue;
+    if (!fm || fm.ttl_days === 'permanent' || !fm.last_verified) continue;
     const ttl = parseInt(fm.ttl_days, 10);
     if (isNaN(ttl)) continue;
     const ageDays = (Date.now() - new Date(fm.last_verified).getTime()) / 86_400_000;

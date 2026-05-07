@@ -185,6 +185,86 @@ try {
     errors.push({ section: 'workflow-guard', error: e.message, stack: e.stack?.split('\n')[1]?.trim(), critical: true });
   }
 
+  // ── 5. Settings validation guard (merged from validate-settings-on-write.js v0.9.5 W2-FIX3) ──
+  try {
+    if (process.env.SKIP_SETTINGS_VALIDATOR !== '1' && toolName === 'Write') {
+      const settingsMatch = /settings(\.local)?\.json$/.test(filePath) || normalized.includes('ai-context/configs/');
+      if (settingsMatch) {
+        const newContent = (data.tool_input || {}).content || '';
+        if (newContent.trim()) {
+          let parsed;
+          try { parsed = JSON.parse(newContent); } catch (e) {
+            process.stdout.write(JSON.stringify({
+              continue: false, decision: 'block',
+              reason: `settings.json validation failed: invalid JSON.\n\nError: ${e.message}\n\nFix JSON syntax before writing. (Override: SKIP_SETTINGS_VALIDATOR=1)`
+            }));
+            process.exit(0);
+          }
+          const settingsIssues = [];
+          if (parsed.cleanupPeriodDays === 0) {
+            settingsIssues.push('cleanupPeriodDays is 0 — Claude Code v2.1.110+ rejects this. Set to positive value or omit.');
+          }
+          const isClaude = normalized.includes('/.claude/') || normalized.includes('ai-context/configs/claude-settings');
+          if (isClaude) {
+            try {
+              const { findDrift } = require('./lib/settings-schema.js');
+              const drift = findDrift(parsed);
+              if (drift.managedOnly.length > 0) settingsIssues.push(`Managed-only keys: ${drift.managedOnly.join(', ')}`);
+              if (drift.deprecated.length > 0) settingsIssues.push(`Deprecated keys: ${drift.deprecated.join(', ')}`);
+              if (drift.unknown.length > 5) settingsIssues.push(`${drift.unknown.length} unknown keys`);
+            } catch {}
+          }
+          const hooks = parsed.hooks || {};
+          for (const [event, groups] of Object.entries(hooks)) {
+            if (!Array.isArray(groups)) continue;
+            for (const group of groups) {
+              for (const h of (group.hooks || [])) {
+                const cmd = h.command || '';
+                if (!cmd.includes('node ')) continue;
+                if (/node\s+\.(claude|gemini)\/hooks\//.test(cmd)) {
+                  settingsIssues.push(`Event ${event}: command uses relative path — use absolute path or $HOME.`);
+                }
+                if (/node\s+["']?~\//.test(cmd)) {
+                  settingsIssues.push(`Event ${event}: literal ~/ path — node does NOT expand ~. Use $HOME.`);
+                }
+                const fileMatch = cmd.match(/node\s+["']?([^"'\s]+\.js)["']?/);
+                if (fileMatch) {
+                  let resolved = fileMatch[1].replace(/\$HOME/g, os.homedir()).replace(/\${HOME}/g, os.homedir()).replace(/^~\//, os.homedir() + '/');
+                  if (!resolved.includes('$') && resolved.startsWith('/') && !fs.existsSync(resolved)) {
+                    settingsIssues.push(`Event ${event}: hook file does not exist: ${resolved}`);
+                  }
+                }
+                if (h.async) {
+                  try {
+                    let resolved = (fileMatch || [])[1] || '';
+                    resolved = resolved.replace(/\$HOME/g, os.homedir()).replace(/\${HOME}/g, os.homedir()).replace(/^~\//, os.homedir() + '/');
+                    if (!resolved.includes('$') && resolved.startsWith('/') && fs.existsSync(resolved)) {
+                      const src = fs.readFileSync(resolved, 'utf8');
+                      if (/systemMessage/.test(src) || /process\.exit\(2\)/.test(src)) {
+                        settingsIssues.push(`Event ${event}: "${path.basename(resolved)}" is async but emits systemMessage/exit(2) — these are discarded for async hooks.`);
+                      }
+                    }
+                  } catch {}
+                }
+              }
+            }
+          }
+          if (settingsIssues.length > 0) {
+            process.stdout.write(JSON.stringify({
+              continue: false, decision: 'block',
+              reason: `settings.json validation (${settingsIssues.length} issue${settingsIssues.length > 1 ? 's' : ''}):\n\n` +
+                settingsIssues.map((i, n) => `  ${n + 1}. ${i}`).join('\n\n') +
+                `\n\n(Override: SKIP_SETTINGS_VALIDATOR=1)`
+            }));
+            process.exit(0);
+          }
+        }
+      }
+    }
+  } catch (e) {
+    errors.push({ section: 'settings-validation', error: e.message, critical: true });
+  }
+
   // ── Error aggregation ──
   if (errors.length > 0) {
     try {

@@ -19,6 +19,7 @@ require(__dirname + "/lib/emit-simple-timing.js").start(__filename);
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+let _isSubagentCached = undefined;
 
 function passthrough() {
   process.stdout.write('{"continue":true}');
@@ -36,17 +37,18 @@ try {
 
   if (!sessionId || !toolName) passthrough();
 
-  // Subagent context check
+  // Subagent context check — module-level cache avoids readdirSync per call
   const tp = require('./lib/tool-paths.js');
   const markerDir = tp.subagentMarkerDir;
-  // Glob for sessionId-*.json (PID differs between inject hook and this hook process)
-  let isSubagent = false;
-  try {
-    for (const f of fs.readdirSync(markerDir)) {
-      if (f.startsWith(sessionId + '-') && f.endsWith('.json')) { isSubagent = true; break; }
-    }
-  } catch {}
-  if (!isSubagent) passthrough();
+  if (_isSubagentCached === undefined) {
+    _isSubagentCached = false;
+    try {
+      for (const f of fs.readdirSync(markerDir)) {
+        if (f.startsWith(sessionId + '-') && f.endsWith('.json')) { _isSubagentCached = true; break; }
+      }
+    } catch {}
+  }
+  if (!_isSubagentCached) passthrough();
 
   // ── F4.B: MCP filesystem mutation block ──
   // Pattern: mcp__<server>__<verb>. Match all known mutation verbs.
@@ -56,6 +58,10 @@ try {
   ];
 
   if (mcpMutationPatterns.some(re => re.test(toolName))) {
+    try {
+      const logPath = path.join(os.homedir(), '.ai-context', 'instances', 'subagent-blocks.jsonl');
+      fs.appendFileSync(logPath, JSON.stringify({ ts: new Date().toISOString(), hook: 'block-subagent-non-bash-writes', blocked: toolName, session_id: sessionId }) + '\n');
+    } catch {}
     process.stdout.write(JSON.stringify({
       continue: false,
       decision: 'block',
@@ -128,6 +134,10 @@ try {
   if (inAllowed) passthrough();
 
   // Outside allowed roots — block.
+  try {
+    const logPath = path.join(os.homedir(), '.ai-context', 'instances', 'subagent-blocks.jsonl');
+    fs.appendFileSync(logPath, JSON.stringify({ ts: new Date().toISOString(), hook: 'block-subagent-non-bash-writes', blocked: resolved.slice(0, 200), session_id: sessionId }) + '\n');
+  } catch {}
   process.stdout.write(JSON.stringify({
     continue: false,
     decision: 'block',

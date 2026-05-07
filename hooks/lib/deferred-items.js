@@ -118,7 +118,10 @@ function computeStaleness(items, projectKey, sessionId) {
         nonStale.push(item);
       }
     } else if (item.type === 'decision') {
-      if (item.triage_count < 2) {
+      if ((item.triage_count || 0) >= 2) {
+        item.type = 'user-action';
+        stale.push(item);
+      } else {
         stale.push(item);
       }
     }

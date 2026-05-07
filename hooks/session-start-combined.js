@@ -209,7 +209,49 @@ try {
     try {
       const data = JSON.parse(fs.readFileSync(tasksPath, 'utf8'));
       const tasks = data.tasks || [];
+      const completedLog = data.completed_log || [];
       let changed = false;
+      let staleCount = 0;
+
+      // TTL cleanup for in_progress tasks (v0.9.5 W4-FIX2)
+      for (let i = tasks.length - 1; i >= 0; i--) {
+        const t = tasks[i];
+        if (t.status !== 'in_progress') continue;
+        const updatedMs = new Date(t.updated || t.created).getTime();
+        const ageMs = now - updatedMs;
+        const ttlMs = t.owner_session ? 2 * 3600000 : 24 * 3600000;
+        if (ageMs > ttlMs) {
+          t.status = 'stale-expired';
+          t.verifiedBy = 'auto-stale-ttl';
+          t.completedDate = new Date().toISOString();
+          completedLog.push(t);
+          tasks.splice(i, 1);
+          staleCount++;
+          changed = true;
+        }
+      }
+
+      // TTL cleanup for blocked tasks without trigger
+      for (let i = tasks.length - 1; i >= 0; i--) {
+        const t = tasks[i];
+        if (t.status !== 'blocked') continue;
+        if (t.trigger_after && new Date(t.trigger_after).getTime() < now) {
+          t.status = 'in_progress';
+          changed = true;
+          continue;
+        }
+        const updatedMs = new Date(t.updated || t.created).getTime();
+        if (!t.trigger_after && (now - updatedMs) > 7 * 86400000) {
+          t.status = 'stale-expired';
+          t.verifiedBy = 'auto-stale-ttl';
+          tasks.splice(i, 1);
+          completedLog.push(t);
+          staleCount++;
+          changed = true;
+        }
+      }
+
+      // Existing: remove old done tasks
       data.tasks = tasks.filter(t => {
         if (t.status === 'done' && t.completedDate) {
           const age = now - new Date(t.completedDate).getTime();
@@ -217,6 +259,8 @@ try {
         }
         return true;
       });
+      data.completed_log = completedLog.slice(0, 50);
+      if (staleCount > 0) messages.push(`[stale-tasks] Expired ${staleCount} abandoned task(s)`);
       if (changed) fs.writeFileSync(tasksPath, JSON.stringify(data, null, 2));
     } catch {}
     break;

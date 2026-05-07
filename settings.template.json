@@ -443,6 +443,12 @@
             "type": "command",
             "command": "node \"$HOME/.claude/hooks/handoff-triage-gate.js\"",
             "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/per-prompt-overhead.js\"",
+            "timeout": 5,
+            "async": true
           }
         ]
       }
@@ -505,26 +511,6 @@
           }
         ],
         "matcher": "Bash|Skill"
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/hook-doc-drift-detector.js\"",
-            "timeout": 5,
-            "if": "Write(*.claude/hooks/*.js)|Edit(*.claude/hooks/*.js)"
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/dead-hook-detector.js\"",
-            "timeout": 5
-          }
-        ],
-        "matcher": "Edit|Write"
       },
       {
         "hooks": [
@@ -598,11 +584,6 @@
             "type": "command",
             "command": "node \"$HOME/.claude/hooks/block-subagent-writes.js\"",
             "timeout": 3
-          },
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/autosave-before-destructive.js\"",
-            "timeout": 8
           }
         ],
         "matcher": "Bash"
@@ -611,9 +592,24 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$HOME/.claude/hooks/validate-settings-on-write.js\"",
+            "command": "node \"$HOME/.claude/hooks/verifiedby-gate.js\"",
             "timeout": 3
-          },
+          }
+        ],
+        "matcher": "TodoWrite|write_todos"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/autosave-before-destructive.js\"",
+            "timeout": 8,
+            "if": "Bash(rm *) OR Bash(git reset*) OR Bash(git clean*) OR Bash(git checkout -- *)"
+          }
+        ]
+      },
+      {
+        "hooks": [
           {
             "type": "command",
             "command": "node \"$HOME/.claude/hooks/peer-conflict-check.js\"",
@@ -627,16 +623,6 @@
           }
         ],
         "matcher": "Bash|Edit|MultiEdit|Write"
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/verifiedby-gate.js\"",
-            "timeout": 3
-          }
-        ],
-        "matcher": "TodoWrite|write_todos"
       },
       {
         "hooks": [
@@ -755,23 +741,21 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$HOME/.claude/hooks/per-prompt-overhead.js\"",
-            "timeout": 5
-          },
-          {
-            "type": "command",
             "command": "node \"$HOME/.claude/hooks/prompt-item-tracker.js\"",
-            "timeout": 5
+            "timeout": 5,
+            "async": true
           },
           {
             "type": "command",
             "command": "node \"$HOME/.claude/hooks/prompt-clarity-check.js\"",
-            "timeout": 3
+            "timeout": 3,
+            "async": true
           },
           {
             "type": "command",
             "command": "node \"$HOME/.claude/hooks/slash-command-logger.js\"",
-            "timeout": 3
+            "timeout": 3,
+            "async": true
           }
         ]
       }
