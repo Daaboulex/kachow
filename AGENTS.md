@@ -90,6 +90,7 @@ For 3+ tool calls or 2+ file edits, output a **numbered plan** BEFORE first edit
 - **Context thresholds (1M):** degradation ~85-90%. At 85% run `/handoff`. At 92% stop. Do NOT nag below 80%. Do NOT fabricate context percentages.
 - `/handoff` is a checkpoint, NOT a stop signal. Large files (>2000 lines): check `wc -l` first, read in chunks.
 - Specs/plans MUST go in `.superpowers/` (never `docs/`). Location priority: `.ai-context/.superpowers/` > `.claude/.superpowers/` > `.gemini/.superpowers/`. Structure: `{specs,plans}/YYYY-MM-DD-<topic>.md`.
+- Specs, plans, and task descriptions MUST NOT include clock-time or effort estimates (`30min`, `4h`, `~21 hours`, `2 days`, etc.). AI time predictions are always wrong. Use `Complexity: S/M/L/XL` and `Risk: LOW/MEDIUM/HIGH` if sizing needed; otherwise omit sizing entirely.
 
 ## Agent Dispatch Rules
 - ALWAYS specify `model:` when dispatching subagents. Unspecified = inherits parent model (burns opus tokens on trivial tasks).
