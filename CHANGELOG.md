@@ -6,59 +6,157 @@ All notable changes to this framework. See [Semantic Versioning](https://semver.
 
 ## [Unreleased]
 
+## [0.9.5] — 2026-05-07
+
+System overhaul — SessionStart performance, telemetry cleanup, state simplification, 5-tool parity, skills/dream fixes.
+
+### Added
+- **session-health-fast.js** — Phase 1 health checks (symlinks, settings freshness, MEMORY.md index, git state, rule-enforcement). Runs at order 0 before all other SessionStart hooks
+- **memory-index-verify.js** — Stop hook, primary MEMORY.md auto-index mechanism
+- **memory-index-updater.js** — PostToolUse hook, supplementary real-time MEMORY.md updates on LLM memory writes
+- **hook-edit-monitor.js** — merged hook-doc-drift-detector + dead-hook-detector into single PostToolUse monitor
+- **jsonl-rotation.js** — Stop hook, rotates instances/*.jsonl at 1000 lines keeping 500
+- **lib/frontmatter-cache.js** — memory frontmatter cache (276 entries, eliminates 514 file reads at startup)
+- **lib/session-id.js** — shared SESSION_ID resolution (CLAUDE_CODE_SESSION_ID env → stdin → fallback)
+- **instances/subagent-blocks.jsonl** — persistent audit trail for subagent containment blocks
+- **Telemetry epoch markers** — version-change events in episodic JSONL for clean post-change baselines
+- **Verbose escape hatch** — `AI_CONTEXT_STARTUP_VERBOSE=1` for full startup output
+- **triage_count** feature in deferred items (was defined but never implemented)
+- **14 cmd- skills** for Crush+OpenCode via extended convert-commands.mjs
+- **Quick/deep modes** for /consolidate-memory command
+
+### Changed
+- **SessionStart** — 5 network hooks (auto-pull, plugin-checker, skill-upstream, detect-sync-conflicts, tool-parity) converted to `async: true`. p95 ceiling tightened 22s→5s
+- **Memory rotation** — fixed `status === 'active'` bug that prevented ALL rotation (zero rotations ever). Memory count was 9→257 in 16 days unbounded
+- **Dream system** — counters moved from per-tool dirs to shared `~/.ai-context/`. Lock child-exit cleanup added. Dream-auto message improved for urgency
+- **AI-tasks.json** — TTL cleanup: in_progress tasks expire at 2h (with session evidence) / 24h (without). `owner_session` field added
+- **Subagent hooks** — module-level `_isSubagentCached` eliminates repeated readdirSync per-call
+- **4 UserPromptSubmit hooks** → async (per-prompt-overhead, slash-command-logger, prompt-clarity-check, prompt-item-tracker)
+- **Matcher fixes** — scrub-sentinel/research-lint: removed Bash (wasted spawn). skill-completion-correlator: added matcher (was firing on ALL tools)
+- **`if` conditionals** — autosave-before-destructive, validate-settings-on-write get Claude-only spawn filters with selftest
+- **skill-auto-updater** — now syncs portable skills to all 5 tools (was Claude→Codex only)
+- **skill-drift-guard** — tool-agnostic .ai-context/memory path check (was 2-tool biased)
+- **Git mutex** — O_EXCL lock in .git/ai-context.lock for auto-push/pull serialization
+- **Per-host presence sharding** — project-level active-sessions now hostname-sharded (was single file)
+- **Gemini** — `autoMemory: false` to prevent double memory injection
+- **KNOWN-LIMITS.md** — Codex hooks confirmed stable v0.128.0, Crush skill dedup fixed v0.66.0, OpenCode repo updated to sst/opencode
+
+### Removed
+- **AI-progress.json** — killed (deprecated stub kept one release cycle). Replaced by handoff session state
+- **validate-instructions-sync.js** — guaranteed no-op with one-brain symlinks. Replaced by isSymbolicLink() assertions in session-health-fast
+- **injection-size-monitor.js** — cascade-broken (read stale data). Injection check moved inline
+- **prompt-hash-logger.js** — all entries hashed empty string (wrong field name). No consumer
+- **subagent-claim-logger.js** — archived (wrong field extraction, empty data). Replaced by subagent-blocks.jsonl
+- **5 canonical skills** (zero invocations across 3572 sessions): code-quality, code-review-and-quality, debugging-and-error-recovery, incremental-implementation, spec-driven-development
+- **6 hooks merged** into 3: hook-doc-drift-detector+dead-hook-detector→hook-edit-monitor, validate-settings-on-write→pre-write-combined-guard, sync-claude-md+skills+agents→post-write-sync
+
+### Fixed
+- **Memory rotation** — `status === 'active'` skip condition removed from memory-migrate.js (line 118). All files now eligible for TTL-based rotation
+- **MCP list_tasks** — field name mismatch (`t.subject` vs `t.title`) fixed in ai-context-bridge server.js
+- **Stale task cleanup path** — was searching .claude/AI-tasks.json, now uses findCanonicalDir() for project-state/ paths
+- **reflect-proposals location** — was written to .claude/ (tool-specific), now .ai-context/ (canonical). 5 file refs updated
+- **computeStaleness bug** — decision items with triage_count≥2 were silently dropped. Now escalate to user-action
+- **hook-utilization-report path** — was reading ~/.claude/projects/, now reads ~/.ai-context/project-state/
+- **Stale selftest references** — removed validate-symlinks.js and gsd-check-update.js from hook-selftest.sh
+- **scrub-for-publish.sh** — removed 6 phantom/deleted entries from PORTABLE_HOOKS whitelist
+- **post-write-sync.js** — removed AI-progress.json bidirectional sync code
+- **auto-push-global.js** — removed AI-progress.json from TRACKED array
+- **Dream lock stale** — child.on('exit') cleanup added to stop-sleep-consolidator
+
+### Security
+- **W2-FIX4** — env var subagent gate rejected (SEC-4 violation). Module-level cache used instead
+- **R13** — explicit no-async constraint for critical-5 PreToolUse hooks (enforced by validate-manifest.mjs)
+- **R14** — selftest required for critical hooks with `if` conditionals
+
 ## [0.9.1] — 2026-05-06
 
 One-brain hardening — proactive provisioning, 5-tool scalability, security fixes.
 
 ### Added
-- **lib/tool-paths.js** — single import for all tool-aware paths
-- **system-integrity-check.mjs** — automated contract verifier
-- **commands/** — centralized user commands as canonical source
+- **lib/tool-paths.js** — single import for all tool-aware paths (54 tests)
+- **system-integrity-check.mjs** — 10-category contract verifier
+- **commands/** — 14 user commands centralized as canonical source
 - **Proactive project-state provisioning** — new projects auto-provisioned from first session
-- **Crush support** in generate-settings.mjs
-- **MCP lazy MEMORY_DIRS** — dynamic project discovery
+- **Crush support in generate-settings.mjs** — full generate/apply/check/preview
+- **MCP lazy MEMORY_DIRS** — new project-state dirs visible without server restart
+- **migrate-project-memories.mjs** — one-time migration script
+- **macbook-catchup-v080.sh** — automated cross-machine migration
 
 ### Changed
-- 14 hooks migrated from hardcoded .claude paths to tool-paths.js
-- Session context loader: dash-prefix discovery, peer detection, FULL_N default 8
-- install-adapters.mjs: commands + portable skills + Codex auto-conversion
-- Crush tool_name normalization in critical safety hooks
-- Unified .ai-context symlink pattern across all projects
+- **session-start-combined.js** — 14 hardcoded .claude paths → configDir via tool-paths.js
+- **session-context-loader.js** — dash-prefix memory discovery, peer detection via allHostPresencePaths(), deferred-work reads canonical items.json, FULL_N default 3 → 8
+- **auto-push-global.js** — stripped 100 lines dead code, single-repo model
+- **12 hooks migrated** to tool-paths.js (block-subagent-*, meta-system-stop, skill-*, detect-sync-conflicts, etc.)
+- **post-write-sync.js** — detects .ai-context/commands/ + .gemini/commands/ paths for Codex sync
+- **install-adapters.mjs** — commands symlinks, portable skill symlinks, auto Codex conversion
+- **convert-commands.mjs** — reads from ai-context/commands/ (canonical source)
+- **reflect-stop.js** — uses detectTool() for lastAgent, configDir for state files
+- **stop-sleep-consolidator.js** — tool-aware memory dir + platform label
+- **mirror-kachow.js** — cache paths moved to ai-context/cache/
+- **scrub-sentinel.js** + **pre-write-combined-guard.js** — Crush tool_name case normalization + notebookedit
+- **memory-rotate** — skips status:active memories
+- **Unified .ai-context symlink** pattern across fahlke-monorepo, nix, documents
 
 ### Fixed
-- Subagent marker PID mismatch — guards were non-functional since creation
-- Memory provisioning — 47 of 52 project dirs were real, not symlinked
-- Ghost hooks in MANIFEST — archived files still registered
-- atomicMigrate data loss — conflict preservation + copy error abort
-- Pre-commit hook not executable
+- **Subagent marker PID mismatch** — block-subagent-writes + non-bash-writes + quality-gate all used process.pid but each hook is a separate process. Guards were completely non-functional. Fixed: glob sessionId-*.json
+- **agentDir undefined** — ensure-portable-memory never worked (47 of 52 project memory dirs were real). Fixed: proactive provisioning
+- **Ghost hooks** — sync-memory-dirs.js + claude-gemini-json-sync.js archived but still in MANIFEST/configs. Fixed: removed + regenerated
+- **stignore (?d)projects/** too broad — blocked handoffs/projects/. Fixed: anchored to /projects/
+- **deriveKey → deriveProjectKey** wrong function name in provisioning
+- **atomicMigrate data loss** — silently skipped conflicting files + deleted source on copy error. Fixed: conflict files preserved, abort on error
+- **Pre-commit hook** not executable since creation
+- **Nix Syncthing config** — removed claude/gemini/codex folders (overrideFolders would have recreated them)
+- **GitHub repo description** — updated from "Tri-tool" to "5-tool"
+- **CHANGELOG footer links** — added v0.8.0 + v0.7.1 entries
+
+### Removed
+- 7 dead scripts, 4 dead lib modules, 2 dead sync hooks (archived)
+- 47 empty Claude project dirs, 19 orphan files from tool dirs
+- 3 junk project-state entries (created by opening Claude in internal dirs)
+- ~/.claude/scripts/ (23 orphaned pre-consolidation scripts)
+- ~/Documents/.planning, .audit, .agents, .codex (stale/empty)
+- 376MB ~/Documents/.stversions/ (Syncthing recreates as needed)
 
 ### Security
-- Subagent write guards functional (PID glob fix)
-- Crush tool_name normalization in scrub-sentinel + pre-write-combined-guard
-- Symlink traversal guard in provisioning
-- Memory-rotate skips status:active memories
+- Subagent write guards actually functional (PID fix)
+- Crush tool_name normalization in critical hooks
+- Symlink traversal guard in createSymlinkSafe
+- scrub-sentinel env var hint removed from block messages
+- atomicMigrate preserves conflict files instead of silent data loss
 
 ## [0.8.0] — 2026-05-06
 
 Infrastructure consolidation — one brain architecture.
 
 ### Added
-- **project-state/** — centralized project memories for per-repo context
-- **configs/** — centralized tool settings (Claude, Gemini, Codex)
+- **project-state/** — centralized project memories (nix 195, fahlke-monorepo 101, documents 85)
+- **configs/** — centralized tool settings (claude-settings.json, gemini-settings.json, codex-config.toml)
+- **kachow-mirror/** — moved from `~/.kachow-mirror` into ai-context
 - CI settings.json stub for hook-test-suite
 
 ### Changed
-- **install-adapters.mjs** — settings symlinks for all 5 tools
-- **auto-push-global.js** — explicit pathspec replaces `git add -A`
-- **mirror-kachow.js** — simplified trigger model (single source)
-- **reflect-stop.js** — file mtime heuristic replaces git status
-- **tri-tool-parity-check.js** — removed dead .git checks
-- **validate-settings-on-write.js** — recognizes centralized config paths
-- **git-global.js REPOS** — single repo model
+- **install-adapters.mjs** — added claude/gemini/codex settings as EXTRA_SYMLINKS
+- **auto-push-global.js** — explicit TRACKED pathspec replaces `git add -A`
+- **mirror-kachow.js** — v3 trigger model (ai-context only, removed claude/gemini HEAD)
+- **reflect-stop.js** — file mtime heuristic replaces git status (tool dirs no longer git repos)
+- **tri-tool-parity-check.js** — removed .git existence check for tool dirs
+- **validate-settings-on-write.js** — recognizes ai-context/configs/ paths
+- **dead-hook-detector.js** — symlink-aware settings resolution
+- **scrub-sentinel.js** — updated PUBLIC_ROOTS to ai-context/kachow-mirror
+- **publish.sh** — updated default MIRROR path
+- **git-global.js REPOS** — trimmed to ai-context only
 
 ### Removed
-- `.git` from tool dirs — tool dirs are now derived state via symlinks
-- Syncthing folders for individual tool dirs
+- `.git` from `~/.claude/`, `~/.gemini/`, `~/.codex/` — tool dirs are derived state
+- Syncthing folders for claude/gemini/codex — synced via ai-context only
+- `~/.kachow-release` directory
+- `~/Documents/.superpowers/` — consolidated into ai-context
+- Nix `.ai-context` submodule — replaced with symlink to project-state/nix
+- 70 Syncthing `.stversions/` files from git tracking
+
+### Fixed
+- `.gitignore` — added `.stversions/`, `.stfolder`, `kachow-mirror/`; replaced `projects/` exclusion
+- Stale memory fixes — 6 global memories updated/archived (wrong versions, missing index entries)
 
 ## [0.7.1] — 2026-05-06
 
@@ -248,7 +346,8 @@ Initial public release. *Ka-chow.*
 - Obfuscated personal-token patterns in CI (printf-concatenated, no literals)
 - `deep-verify-scrub` maintainer tool cross-references a master personal-token list beyond scrub-config
 
-[Unreleased]: https://github.com/Daaboulex/kachow/compare/v0.9.1...HEAD
+[Unreleased]: https://github.com/Daaboulex/kachow/compare/v0.9.5...HEAD
+[0.9.5]: https://github.com/Daaboulex/kachow/compare/v0.9.1...v0.9.5
 [0.9.1]: https://github.com/Daaboulex/kachow/compare/v0.8.0...v0.9.1
 [0.8.0]: https://github.com/Daaboulex/kachow/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/Daaboulex/kachow/compare/v0.7.0...v0.7.1
