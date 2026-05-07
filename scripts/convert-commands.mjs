@@ -1,16 +1,20 @@
 #!/usr/bin/env node
 // convert-commands.mjs
-// Auto-converts Claude user commands to Codex skills and Gemini commands.
+// Auto-converts Claude user commands to skills/commands for all 5 tools.
 //
 // Source:  ~/.ai-context/commands/*.md (canonical, symlinked to tool dirs)
 // Codex:   ~/.codex/skills/cmd-{name}/SKILL.md  (cmd- prefix avoids collision with plugin skills)
 // Gemini:  ~/.gemini/commands/{name}.md          (verbatim copy)
+// Crush:   ~/.agents/skills/cmd-{name}/SKILL.md  (shared skill path, cmd- prefix)
+// OpenCode:~/.agents/skills/cmd-{name}/SKILL.md  (same shared path — both discover ~/.agents/skills)
 //
 // Flags:
-//   --dry-run     (default) show plan, no writes
-//   --force       write files
-//   --gemini-only skip Codex
-//   --codex-only  skip Gemini
+//   --dry-run       (default) show plan, no writes
+//   --force         write files
+//   --gemini-only   only Gemini
+//   --codex-only    only Codex
+//   --crush-only    only Crush/OpenCode (shared ~/.agents/skills/)
+//   --agents-only   alias for --crush-only (Crush+OpenCode share ~/.agents/skills/)
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -21,6 +25,7 @@ const HOME = homedir();
 const CLAUDE_COMMANDS_DIR = join(HOME, '.ai-context', 'commands');
 const CODEX_SKILLS_DIR    = join(HOME, '.codex', 'skills');
 const GEMINI_COMMANDS_DIR = join(HOME, '.gemini', 'commands');
+const AGENTS_SKILLS_DIR   = join(HOME, '.agents', 'skills'); // Shared by Crush + OpenCode
 
 // Protected: skip entirely (never overwrite)
 const PROTECTED = new Set([]);
@@ -45,9 +50,11 @@ const PATH_SUBS = [
 
 // ── Flags ────────────────────────────────────────────────────────────────────
 
-const DRY_RUN     = !process.argv.includes('--force');
-const GEMINI_ONLY = process.argv.includes('--gemini-only');
-const CODEX_ONLY  = process.argv.includes('--codex-only');
+const DRY_RUN      = !process.argv.includes('--force');
+const GEMINI_ONLY  = process.argv.includes('--gemini-only');
+const CODEX_ONLY   = process.argv.includes('--codex-only');
+const AGENTS_ONLY  = process.argv.includes('--crush-only') || process.argv.includes('--agents-only');
+const SKIP_AGENTS  = GEMINI_ONLY || CODEX_ONLY; // Skip agents-skills when targeting a specific tool
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -237,6 +244,24 @@ for (const file of mdFiles) {
         writeFile(geminiFile, geminiContent);
       }
       countConverted++;
+    }
+  }
+
+  // ── Agents skills (Crush + OpenCode shared path) ──
+  if (!SKIP_AGENTS) {
+    const agentsSkillDir  = join(AGENTS_SKILLS_DIR, `cmd-${cmdName}`);
+    const agentsSkillFile = join(agentsSkillDir, 'SKILL.md');
+    const agentsContent   = buildCodexSkillContent(cmdName, description, body, needsWarning);
+
+    const existingAgents = safeRead(agentsSkillFile);
+    const agentsUnchanged = existingAgents !== null && existingAgents === agentsContent;
+
+    if (!agentsUnchanged) {
+      if (!DRY_RUN) {
+        ensureDir(agentsSkillDir);
+        writeFile(agentsSkillFile, agentsContent);
+      }
+      console.log(`  AGENTS:  ${file} → cmd-${cmdName}/SKILL.md (Crush+OpenCode)`);
     }
   }
 }

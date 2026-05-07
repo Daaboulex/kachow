@@ -50,9 +50,10 @@ try {
   const cacheDir = path.join(configDir, 'cache');
   try { fs.mkdirSync(cacheDir, { recursive: true }); } catch {}
 
-  // Dual-gate reuse — same counters as dream-auto for consistency
-  const lastFile = path.join(configDir, '.dream-last');
-  const counterFile = path.join(configDir, '.dream-session-count');
+  // Dual-gate reuse — same counters as dream-auto (v0.9.5: shared ~/.ai-context/, not per-tool)
+  const sharedDir = path.join(home, '.ai-context');
+  const lastFile = path.join(sharedDir, '.dream-last');
+  const counterFile = path.join(sharedDir, '.dream-session-count');
   const { DREAM_COOLDOWN_MS, DREAM_MIN_SESSIONS } = require('./lib/constants.js');
   const { readCounter } = require('./lib/atomic-counter.js');
 
@@ -81,7 +82,7 @@ try {
   } catch { passthrough(); }
 
   // Check if dream-auto already handling consolidation
-  const dreamLockPath = path.join(configDir, '.dream-lock');
+  const dreamLockPath = path.join(sharedDir, '.dream-lock');
   if (fs.existsSync(dreamLockPath)) {
     // dream-auto already fired — skip detached subprocess
     try { fs.unlinkSync(lockFile); } catch {}
@@ -117,6 +118,9 @@ try {
     });
     child.on('error', (err) => {
       try { fs.appendFileSync(logFile, `SPAWN_ERROR: ${err.message}\n`); } catch {}
+      try { fs.unlinkSync(lockFile); } catch {}
+    });
+    child.on('exit', () => {
       try { fs.unlinkSync(lockFile); } catch {}
     });
     child.unref();

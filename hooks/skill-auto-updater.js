@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // skill-auto-updater.js — Stop hook (async)
-// Auto-updates Claude plugins + syncs portable skills to Codex.
+// Auto-updates Claude plugins + syncs portable skills to Codex, Gemini, and shared agents dir (Crush/OpenCode).
 // 24h cooldown. Runs silently at session end.
 
 const fs = require('fs');
@@ -157,6 +157,44 @@ try {
 
     if (synced > 0) {
       log({ action: 'codex-skill-sync', synced });
+    }
+  }
+
+  // Phase 4: Sync canonical skills from ~/.ai-context/skills/ to Gemini + shared agents dir
+  // (v0.9.5 W7-HIGH-3: was Claude→Codex only, now all 5 tools)
+  const canonicalSkills = path.join(home, '.ai-context', 'skills');
+  const syncTargets = [
+    path.join(home, '.gemini', 'skills'),
+    path.join(home, '.agents', 'skills'),
+  ];
+
+  if (fs.existsSync(canonicalSkills)) {
+    const canonicalEntries = fs.readdirSync(canonicalSkills, { withFileTypes: true })
+      .filter(d => d.isDirectory());
+    let canonicalSynced = 0;
+
+    for (const target of syncTargets) {
+      if (!fs.existsSync(target)) continue;
+      for (const entry of canonicalEntries) {
+        const srcDir = path.join(canonicalSkills, entry.name);
+        const srcSkill = path.join(srcDir, 'SKILL.md');
+        const dstDir = path.join(target, entry.name);
+        const dstSkill = path.join(dstDir, 'SKILL.md');
+
+        if (!fs.existsSync(srcSkill)) continue;
+        try {
+          const srcContent = fs.readFileSync(srcSkill, 'utf8');
+          const dstContent = fs.existsSync(dstSkill) ? fs.readFileSync(dstSkill, 'utf8') : '';
+          if (srcContent !== dstContent) {
+            fs.cpSync(srcDir, dstDir, { recursive: true });
+            canonicalSynced++;
+          }
+        } catch {}
+      }
+    }
+
+    if (canonicalSynced > 0) {
+      log({ action: 'canonical-skill-sync', synced: canonicalSynced, targets: syncTargets.map(t => path.basename(path.dirname(t))) });
     }
   }
 

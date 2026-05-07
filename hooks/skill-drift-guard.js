@@ -39,7 +39,7 @@ try {
   const cwd = input.cwd || process.cwd();
 
   // Scope check — only fire in tracked projects
-  const projectMarker = (() => { const t = require(__dirname + '/lib/tool-detect.js').detectTool(); return path.join(cwd, t === 'gemini' ? '.gemini' : '.claude', 'memory'); })();
+  const projectMarker = path.join(cwd, '.ai-context', 'memory');
   if (!fs.existsSync(projectMarker)) passthrough();
 
   // Per-session counter (per-machine, gitignored)

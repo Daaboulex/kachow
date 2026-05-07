@@ -16,11 +16,12 @@ const os = require('os');
 const home = os.homedir();
 
 const { detectTool, toolHomeDir } = require('./lib/tool-detect.js');
-const configDir = toolHomeDir();
+// v0.9.5 W7-CRIT-3: use shared ~/.ai-context/ for dream state (not per-tool dir)
+const sharedDir = path.join(home, '.ai-context');
 
-const lastFile = path.join(configDir, '.dream-last');
-const counterFile = path.join(configDir, '.dream-session-count');
-const lockFile = path.join(configDir, '.dream-lock');
+const lastFile = path.join(sharedDir, '.dream-last');
+const counterFile = path.join(sharedDir, '.dream-session-count');
+const lockFile = path.join(sharedDir, '.dream-lock');
 
 // Constants centralized in lib/constants.js (CI-001)
 const { DREAM_COOLDOWN_MS, DREAM_MIN_SESSIONS, DREAM_LOCK_STALE_MS } = require('./lib/constants.js');
@@ -110,8 +111,9 @@ try {
   try { require('./lib/observability-logger.js').logEvent(process.cwd(), { type: 'dream_trigger', source: 'dream-auto', meta: { memoryFiles: files.length, sessionCount } }); } catch {}
 
   // Must emit systemMessage to trigger agent action
+  const daysSince = Math.round(elapsed / 86400000);
   process.stdout.write(JSON.stringify({
-    systemMessage: `[consolidate-memory] Run /consolidate-memory on ${memDir.path} (${files.length} memory files, ${sessionCount} sessions since last consolidation). After consolidation, reset counters: write '0' to ${configDir}/.dream-session-count, touch ${configDir}/.dream-last, delete ${configDir}/.dream-lock`,
+    systemMessage: `[ACTION REQUIRED] Memory consolidation overdue (${sessionCount} sessions, ${daysSince}d since last). Run /consolidate-memory now — memory corpus is ${files.length} files and growing unbounded. Target: ${memDir.path}. After consolidation, reset counters: write '0' to ~/.ai-context/.dream-session-count, touch ~/.ai-context/.dream-last, delete ~/.ai-context/.dream-lock`,
     continue: true
   }));
 } catch (e) {
