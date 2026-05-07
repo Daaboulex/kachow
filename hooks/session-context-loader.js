@@ -485,37 +485,16 @@ try {
     }
   } catch {}
 
-  // CE plugin artifact discovery (added 2026-04-16):
-  // /ce:ideate writes docs/ideation/, /ce:brainstorm writes docs/requirements/,
-  // /ce:plan writes docs/plans/, /ce:compound writes docs/solutions/.
-  // Surface counts + most recent so agent knows artifacts exist and can read on demand.
+  // [removed v0.9.5] CE artifact recursive scan — unbounded I/O. Replaced with flat count.
   try {
-    const ceDirs = {
-      ideation: path.join(cwd, 'docs', 'ideation'),
-      requirements: path.join(cwd, 'docs', 'requirements'),
-      plans: path.join(cwd, 'docs', 'plans'),
-      solutions: path.join(cwd, 'docs', 'solutions'),
-    };
+    const ceDirs = { ideation: 'docs/ideation', requirements: 'docs/requirements', plans: 'docs/plans', solutions: 'docs/solutions' };
     const ceParts = [];
-    for (const [type, dir] of Object.entries(ceDirs)) {
+    for (const [type, rel] of Object.entries(ceDirs)) {
+      const dir = path.join(cwd, rel);
       if (!fs.existsSync(dir)) continue;
       try {
-        // Recursive .md scan (solutions/ has best-practices/ subdir per CE convention)
-        const collectMd = (d) => {
-          let out = [];
-          for (const e of fs.readdirSync(d, { withFileTypes: true })) {
-            const p = path.join(d, e.name);
-            if (e.isDirectory()) out = out.concat(collectMd(p));
-            else if (e.name.endsWith('.md')) {
-              try { out.push({ path: p, name: e.name, mtime: fs.statSync(p).mtimeMs }); } catch {}
-            }
-          }
-          return out;
-        };
-        const files = collectMd(dir).sort((a, b) => b.mtime - a.mtime);
-        if (files.length === 0) continue;
-        const newest = path.relative(cwd, files[0].path);
-        ceParts.push(`${type}:${files.length} (latest: ${newest})`);
+        const count = fs.readdirSync(dir).filter(f => f.endsWith('.md')).length;
+        if (count > 0) ceParts.push(`${type}:${count}`);
       } catch {}
     }
     if (ceParts.length > 0) {
@@ -652,28 +631,7 @@ try {
     }
   } catch {}
 
-  // In-flight PR detection (added 2026-04-17): open PR on current branch.
-  // Uses gh CLI if available + repo has github remote. Silent fail if no gh or no remote.
-  try {
-    // Fast check: does project-identity block gh? (local-private repos)
-    const identityFile = path.join(cwd, '.claude', 'project-identity.json');
-    let ghBlocked = false;
-    try {
-      const ident = JSON.parse(fs.readFileSync(identityFile, 'utf8'));
-      if (Array.isArray(ident.forbidCommands) && ident.forbidCommands.some(c => c.includes('gh'))) ghBlocked = true;
-    } catch {}
-    if (!ghBlocked) {
-      const prJson = execSync(
-        'gh pr view --json number,title,state,isDraft,reviewDecision,mergeable',
-        { cwd, timeout: 3000, encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] }
-      ).trim();
-      if (prJson) {
-        const pr = JSON.parse(prJson);
-        const status = pr.isDraft ? 'DRAFT' : (pr.reviewDecision || pr.state);
-        parts.push(`PR #${pr.number}: ${pr.title.slice(0, 60)} [${status}${pr.mergeable ? '' : ', conflicts'}]`);
-      }
-    }
-  } catch {}
+  // [removed v0.9.5] gh pr view — network I/O (3s timeout) moved to async SessionStart hooks
 
   // Cross-agent concurrent edit warning: warn if peer agent active on any host.
   // Reads per-host presence files (hostname-sharded since 2026-04).

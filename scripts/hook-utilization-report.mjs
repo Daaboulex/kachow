@@ -31,6 +31,16 @@ function getArg(name, defaultVal) {
 const WINDOW_DAYS = parseInt(getArg('--days', '7'), 10);
 const SHOW_ALL = process.argv.includes('--all');
 
+function getTelemetryEpochMs() {
+  try {
+    const epoch = JSON.parse(readFileSync(join(HOME, '.ai-context', 'telemetry-epoch.json'), 'utf8'));
+    const ts = Date.parse(epoch.cutoff_ts || epoch.timestamp || '');
+    return Number.isFinite(ts) ? ts : 0;
+  } catch {
+    return 0;
+  }
+}
+
 function safeReaddir(p) {
   try { return readdirSync(p, { withFileTypes: true }); } catch { return []; }
 }
@@ -144,8 +154,10 @@ function fmt(agg) {
 
 // ── Main ──
 const cutoffMs = Date.now() - WINDOW_DAYS * 24 * 3600 * 1000;
+const epochMs = getTelemetryEpochMs();
+const effectiveCutoffMs = Math.max(cutoffMs, epochMs);
 const files = findEpisodicFiles();
-const events = loadEvents(files, cutoffMs);
+const events = loadEvents(files, effectiveCutoffMs);
 const bySource = aggregateBySource(events);
 
 const rows = [...bySource.values()]
@@ -157,6 +169,8 @@ const flagged = rows.filter(r => r.flags.length > 0);
 const summary = {
   window_days: WINDOW_DAYS,
   cutoff: new Date(cutoffMs).toISOString(),
+  telemetry_epoch_cutoff: epochMs ? new Date(epochMs).toISOString() : null,
+  effective_cutoff: new Date(effectiveCutoffMs).toISOString(),
   generated_at: new Date().toISOString(),
   episodic_files_scanned: files.length,
   total_events: events.length,
@@ -174,6 +188,9 @@ console.log(`# Hook Utilization Report`);
 console.log('');
 console.log(`Generated: ${summary.generated_at}`);
 console.log(`Window: last ${WINDOW_DAYS}d (since ${summary.cutoff})`);
+if (summary.telemetry_epoch_cutoff) {
+  console.log(`Telemetry epoch: ${summary.telemetry_epoch_cutoff} (effective since ${summary.effective_cutoff})`);
+}
 console.log(`Sources: ${summary.unique_sources} unique • Events: ${summary.total_events} • Episodic files: ${summary.episodic_files_scanned}`);
 console.log('');
 

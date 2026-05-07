@@ -645,7 +645,7 @@ hooks:
 
   - file: memory-index-updater.js
     category: memory
-    tools: [claude, gemini]
+    tools: [claude, codex, gemini]
     order: 552
     async: true
     events:

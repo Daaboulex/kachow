@@ -270,30 +270,7 @@ try {
   errors.push({ section: 'stale-task-cleanup', error: e.message, stack: e.stack?.split('\n')[1]?.trim() });
 }
 
-// ── 4. Sync hook versions (GSD version tag patching) ──
-_startSection('sync-versions');
-try {
-  const versionFile = path.join(configDir, 'get-shit-done', 'VERSION');
-  if (fs.existsSync(versionFile)) {
-    const gsdVersion = fs.readFileSync(versionFile, 'utf8').trim();
-    if (gsdVersion) {
-      const CUSTOM_HOOKS = ['enhanced-statusline.js', 'plugin-update-checker.js', 'sync-hook-versions.js'];
-      for (const hookFile of CUSTOM_HOOKS) {
-        const filePath = path.join(configDir, 'hooks', hookFile);
-        if (!fs.existsSync(filePath)) continue;
-        let content = fs.readFileSync(filePath, 'utf8');
-        const match = content.match(/^\/\/ gsd-hook-version: (.+)$/m);
-        if (match && match[1].trim() !== gsdVersion) {
-          content = content.replace(/^\/\/ gsd-hook-version: .+$/m, `// gsd-hook-version: ${gsdVersion}`);
-          fs.writeFileSync(filePath, content);
-        }
-      }
-    }
-  }
-  _endSection('sync-versions');
-} catch (e) {
-  errors.push({ section: 'sync-hook-versions', error: e.message, stack: e.stack?.split('\n')[1]?.trim() });
-}
+// [removed v0.9.5] Section 4: GSD sync-hook-versions — dead code, references hooks that no longer exist (enhanced-statusline.js, sync-hook-versions.js)
 
 // ── 5. Proactive project-state provisioning ──
 // On EVERY session: ensure project-state/<key>/memory/ exists + symlinked from tool dirs.
@@ -496,52 +473,7 @@ try {
   errors.push({ section: 'ensure-portable-memory', error: e.message, stack: e.stack?.split('\n')[1]?.trim(), critical: true });
 }
 
-// ── 6. Sync memory dirs ──
-_startSection('sync-memory');
-try {
-  function syncDirs(src, dest) {
-    let count = 0;
-    for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
-      const srcFile = path.join(src, entry.name);
-      const destFile = path.join(dest, entry.name);
-      try {
-        if (entry.isDirectory()) {
-          fs.mkdirSync(destFile, { recursive: true });
-          count += syncDirs(srcFile, destFile);
-        } else if (entry.isFile()) {
-          if (!fs.existsSync(destFile)) { fs.copyFileSync(srcFile, destFile); count++; }
-          else if (fs.statSync(srcFile).mtimeMs > fs.statSync(destFile).mtimeMs) { fs.copyFileSync(srcFile, destFile); count++; }
-        }
-      } catch {}
-    }
-    return count;
-  }
-  const claudeMemory = path.join(projectDir, '.claude', 'memory');
-  const geminiMemory = path.join(projectDir, '.gemini', 'memory');
-  if (fs.existsSync(claudeMemory) && fs.existsSync(geminiMemory)) {
-    // Skip if both resolve to same directory (symlinked — copying is a no-op)
-    let skipSync = false;
-    try { skipSync = fs.realpathSync(claudeMemory) === fs.realpathSync(geminiMemory); } catch {}
-    if (!skipSync) {
-      syncDirs(claudeMemory, geminiMemory);
-      syncDirs(geminiMemory, claudeMemory);
-    }
-  }
-  // C-004: Also sync ~/.codex/memories/ if it exists and isn't already the same target
-  // Crush and OpenCode have no native memory dir — they use MCP personal-context instead.
-  const codexMemory = path.join(home, '.codex', 'memories');
-  if (fs.existsSync(codexMemory) && fs.existsSync(claudeMemory)) {
-    let skipCodex = false;
-    try { skipCodex = fs.realpathSync(codexMemory) === fs.realpathSync(claudeMemory); } catch {}
-    if (!skipCodex) {
-      syncDirs(claudeMemory, codexMemory);
-      syncDirs(codexMemory, claudeMemory);
-    }
-  }
-  _endSection('sync-memory');
-} catch (e) {
-  errors.push({ section: 'portable-memory', error: e.message, stack: e.stack?.split('\n')[1]?.trim() });
-}
+// [removed v0.9.5] Section 6: sync-memory-dirs — redundant with one-brain symlinks (all tool memory dirs point to ~/.ai-context/memory/)
 
 // ── 7. Session catchup (missed reflect detection) ──
 _startSection('catchup');
@@ -611,27 +543,13 @@ try {
     try { lastVersion = fs.readFileSync(versionFile, 'utf8').trim(); } catch {}
 
     if (lastVersion && lastVersion !== currentVersion) {
-      // Version changed — auto-fetch release notes, write dated memory, surface breaking-hook signals
-      let signals = [];
-      let memPath = null;
+      // [v0.9.5] Version changed — detect + log only, no network fetch (release notes fetched by async hooks if needed)
+      const today = new Date().toISOString().slice(0, 10);
+      const memPath = path.join(home, '.ai-context', 'memory',
+        `project_${today}_claude-code-v${currentVersion}.md`);
       try {
-        const { diffReleaseNotes } = require('./lib/release-notes-cache.js');
-        const diff = diffReleaseNotes(lastVersion, currentVersion);
-        if (diff) {
-          signals = diff.breakingHookSignals || [];
-          const today = new Date().toISOString().slice(0, 10);
-          memPath = path.join(home, '.ai-context', 'memory',
-            `project_${today}_claude-code-v${currentVersion}.md`);
-          const description = signals.length > 0
-            ? `Upgrade notes ${lastVersion}→${currentVersion} — ${signals.length} potential breaking-hook signal(s) detected`
-            : `Upgrade notes ${lastVersion}→${currentVersion} — non-breaking for hooks`;
-          const frontmatter = `---\nname: Claude Code ${lastVersion}→${currentVersion} upgrade notes\ndescription: ${description}\ntype: project\n---\n\n`;
-          const signalsBlock = signals.length > 0
-            ? signals.map(s => `- ${s}`).join('\n')
-            : '_none detected_';
-          const bodyBlock = `# Upgrade ${lastVersion} → ${currentVersion}\n\nPublished: ${diff.publishedAt || 'unknown'}\n\n## Breaking hook signals (auto-detected)\n\n${signalsBlock}\n\n## Full release notes\n\n${diff.body || '_notes unavailable_'}\n`;
-          try { fs.writeFileSync(memPath, frontmatter + bodyBlock); } catch {}
-        }
+        const frontmatter = `---\nname: Claude Code ${lastVersion}→${currentVersion} upgrade\ndescription: Version change detected ${today}. Check release notes manually or wait for async fetch.\ntype: project\n---\n\n# Upgrade ${lastVersion} → ${currentVersion}\n\nDetected: ${today}\n`;
+        if (!fs.existsSync(memPath)) fs.writeFileSync(memPath, frontmatter);
       } catch {}
       try {
         require('./lib/observability-logger.js').logEvent(projectDir, {
@@ -639,6 +557,17 @@ try {
           source: 'session-start-combined',
           meta: { from: lastVersion, to: currentVersion, signals: signals.length }
         });
+      } catch {}
+      // Write epoch marker for telemetry baseline reset (v0.9.5)
+      try {
+        const epochDirs = [path.join(home, '.ai-context', 'memory', 'episodic')];
+        if (canonicalDir) epochDirs.push(path.join(canonicalDir, 'memory', 'episodic'));
+        const epochHostname = require('os').hostname();
+        const epochDate = new Date().toISOString().slice(0, 10);
+        const epochEvent = JSON.stringify({ ts: new Date().toISOString(), type: 'epoch_marker', source: 'version-change', payload: { from: lastVersion, to: currentVersion } }) + '\n';
+        for (const ed of epochDirs) {
+          try { if (fs.existsSync(ed)) fs.appendFileSync(path.join(ed, `${epochDate}-${epochHostname}.jsonl`), epochEvent); } catch {}
+        }
       } catch {}
       const signalNote = signals.length > 0
         ? ` — ${signals.length} potential breaking-hook signal(s), review ${memPath}`

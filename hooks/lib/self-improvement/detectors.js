@@ -7,6 +7,22 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
+function getTelemetryEpochMs(configDir) {
+  try {
+    const epoch = JSON.parse(fs.readFileSync(path.join(configDir, 'telemetry-epoch.json'), 'utf8'));
+    const ts = Date.parse(epoch.cutoff_ts || epoch.timestamp || '');
+    return Number.isFinite(ts) ? ts : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function eventAtOrAfterEpoch(event, epochMs) {
+  if (!epochMs) return true;
+  const ts = Date.parse(event.ts || event.timestamp || '');
+  return Number.isFinite(ts) && ts >= epochMs;
+}
+
 // ── R1: hook_timeout_streak ──
 // Fires when same hook file produces 'hook_timeout' events in 3+ consecutive sessions
 function detectHookTimeoutStreak(ctx) {
@@ -644,27 +660,47 @@ function detectDeadLibModule(ctx) {
 }
 
 // ── R15: session_start_p95_regression ──
-// SessionStart p95 exceeds baseline + 30% headroom (2026-04-23 baseline 6977ms → 9070ms ceiling).
-// Gate uses measured p95 × 1.3, NOT avg × 1.3 (avg-based ceiling false-positives at p95 tail).
+// Measures TOTAL blocking SessionStart time (Phases 1+2+3) per session.
+// v0.9.5: expanded from session-start-combined-only to full blocking pipeline.
+// Respects telemetry epoch markers — only uses post-epoch data.
 function detectSessionStartP95Regression(ctx) {
   const findings = [];
   try {
-    const events = ctx.readEvents(ctx.cwd, 7, { eventTypes: ['hook_timing'] }) || [];
-    const samples = events
-      .filter(e => (e.source === 'session-start-combined') && e.meta && typeof e.meta.total_ms === 'number')
-      .map(e => e.meta.total_ms)
-      .sort((a, b) => a - b);
-    if (samples.length < 10) return findings; // variance-dominated, not gate-eligible
+    const BLOCKING_SOURCES = ['session-start-combined', 'session-context-loader', 'session-health-fast'];
+    const allEvents = ctx.readEvents(ctx.cwd, 7, { eventTypes: ['hook_timing', 'epoch_marker'] }) || [];
+    const telemetryEpochMs = getTelemetryEpochMs(ctx.configDir);
+
+    // Find latest episodic epoch marker, then combine with root telemetry epoch.
+    let epochMs = telemetryEpochMs;
+    for (const e of allEvents) {
+      if (e.type !== 'epoch_marker') continue;
+      const markerMs = Date.parse(e.ts || e.timestamp || '');
+      if (Number.isFinite(markerMs) && markerMs > epochMs) epochMs = markerMs;
+    }
+
+    const events = allEvents
+      .filter(e => e.type === 'hook_timing')
+      .filter(e => eventAtOrAfterEpoch(e, epochMs));
+
+    // Sum per-session across all blocking SessionStart hooks
+    const perSession = new Map();
+    for (const e of events) {
+      if (!BLOCKING_SOURCES.includes(e.source) || !e.meta || typeof e.meta.total_ms !== 'number') continue;
+      const sid = e.session_id || e.meta?.session_id || 'unknown';
+      perSession.set(sid, (perSession.get(sid) || 0) + e.meta.total_ms);
+    }
+    const samples = [...perSession.values()].sort((a, b) => a - b);
+    if (samples.length < 10) return findings;
     const idx = Math.max(0, Math.ceil(0.95 * samples.length) - 1);
     const p95 = samples[idx];
-    const CEILING_MS = parseInt(process.env.SESSION_START_P95_CEILING_MS, 10) || 15000;
+    const CEILING_MS = parseInt(process.env.SESSION_START_P95_CEILING_MS, 10) || 5000;
     if (p95 > CEILING_MS) {
       findings.push({
         rule: 'session_start_p95_regression',
         tier: 'BLOCKER',
-        target: { type: 'hook', path: '~/.claude/hooks/session-start-combined.js' },
-        evidence: { p95_ms: +p95.toFixed(1), ceiling_ms: CEILING_MS, sample_n: samples.length },
-        proposal: `SessionStart p95=${p95.toFixed(0)}ms exceeds ${CEILING_MS}ms ceiling. Investigate slowest section via hook-stats.sh + observability episodic logs.`,
+        target: { type: 'hook', path: '~/.ai-context/hooks/ (SessionStart pipeline)' },
+        evidence: { p95_ms: +p95.toFixed(1), ceiling_ms: CEILING_MS, sample_n: samples.length, epoch: epochMs ? new Date(epochMs).toISOString() : 'none' },
+        proposal: `SessionStart p95=${p95.toFixed(0)}ms exceeds ${CEILING_MS}ms ceiling. Investigate via: node scripts/hook-utilization-report.mjs`,
         auto_applicable: false,
         fingerprint_class: 'hook_perf'
       });
@@ -726,6 +762,7 @@ function detectSkillFollowedByBandaidLoop(ctx) {
 function detectToolCallP95Regression(ctx) {
   const findings = [];
   try {
+    const epochMs = getTelemetryEpochMs(ctx.configDir);
     const events = ctx.readEvents(ctx.cwd, 7, { eventTypes: ['hook_timing'] }) || [];
     // Collect PostToolUse hook timings, grouped by approximate tool-call timestamp
     // (hooks firing within 500ms of each other are the same tool call)
@@ -739,6 +776,7 @@ function detectToolCallP95Regression(ctx) {
       'notify-with-fallback', 'memory-post-compact', 'cwd-changed-watcher', 'file-changed-notify',
     ]);
     const postToolTimings = events
+      .filter(e => eventAtOrAfterEpoch(e, epochMs))
       .filter(e => e.source && !NON_TOOL_CALL_HOOKS.has(e.source))
       .filter(e => e.meta && typeof e.meta.total_ms === 'number')
       .map(e => e.meta.total_ms);
