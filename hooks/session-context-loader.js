@@ -2,6 +2,7 @@
 require(__dirname + "/lib/emit-simple-timing.js").start(__filename);
 require(__dirname + '/lib/safety-timeout.js');
 const { decayConfidence } = require('./lib/confidence-decay.js');
+const { getCachedEntries } = require('./lib/frontmatter-cache.js');
 // SessionStart hook: Auto-display AI-tasks + AI-progress + git status summary.
 // Replaces LLM spending turns reading these files manually at session start.
 // Outputs a systemMessage with the key state so the LLM has it immediately.
@@ -10,6 +11,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { execSync } = require('child_process');
+const VERBOSE = process.env.AI_CONTEXT_STARTUP_VERBOSE === '1';
 
 try {
   let raw = '';
@@ -299,27 +301,22 @@ try {
             .filter(l => l.trim().startsWith('- ['))
             .map(l => l.trim().replace(/^- /, ''));
 
-          // ── Temporal-frontmatter filter (v3 Phase A) ──
-          // Drop memories marked `superseded_by:` or past `valid_until:` from top-5 pool.
-          // They stay in MEMORY.md (audit trail) but are not injected as live context.
-          // Reads frontmatter only (first 15 lines) for speed.
+          // ── Temporal-frontmatter filter (v3 Phase A) — uses frontmatter cache ──
+          // Drop memories marked `superseded_by:` or past `valid_until:`.
+          // Uses cached frontmatter (v0.9.5 W1-OPT1) instead of per-file reads.
+          const memDir = path.dirname(memPath);
+          let _fmCache;
+          try { _fmCache = getCachedEntries(memDir); } catch { _fmCache = {}; }
           try {
-            const memDir = path.dirname(memPath);
-            const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+            const today = new Date().toISOString().slice(0, 10);
             const suppressed = new Set();
             for (const e of allEntries) {
               const m = e.match(/\(([^)]+\.md)\)/);
               if (!m) continue;
-              const fname = m[1];
-              const fp = path.join(memDir, fname);
-              if (!fs.existsSync(fp)) continue;
-              try {
-                const head = fs.readFileSync(fp, 'utf8').split('\n').slice(0, 15).join('\n');
-                const supMatch = head.match(/^superseded_by:\s*(\S+)/im);
-                const untilMatch = head.match(/^valid_until:\s*(\d{4}-\d{2}-\d{2})/im);
-                if (supMatch) { suppressed.add(e); continue; }
-                if (untilMatch && untilMatch[1] < today) { suppressed.add(e); }
-              } catch {}
+              const cached = _fmCache[m[1]];
+              if (!cached) continue;
+              if (cached.superseded_by) { suppressed.add(e); continue; }
+              if (cached.valid_until && cached.valid_until < today) { suppressed.add(e); }
             }
             if (suppressed.size > 0) {
               allEntries = allEntries.filter(e => !suppressed.has(e));
@@ -344,22 +341,18 @@ try {
           const TYPE_BOOST = { feedback: 5, reference: 2, user: 3, project: 0 };
           // observation_level boost: inductive knowledge (derived from patterns) > deductive > explicit.
           const OBS_LEVEL_BOOST = { inductive: 3, deductive: 1, explicit: 0 };
+          // getTypeInfo uses frontmatter cache (v0.9.5 W1-OPT1) instead of per-file reads
           const getTypeInfo = (entry) => {
             try {
               const m = entry.match(/\(([^)]+\.md)\)/);
               if (!m) return { boost: 0, memType: 'unknown', decayedConfidence: null };
-              const fp = path.join(path.dirname(memPath), m[1]);
-              if (!fs.existsSync(fp)) return { boost: 0, memType: 'unknown', decayedConfidence: null };
-              const head = fs.readFileSync(fp, 'utf8').split('\n').slice(0, 20).join('\n');
-              const typeMatch = head.match(/^type:\s*(\w+)/im);
-              const memType = typeMatch ? typeMatch[1] : 'unknown';
+              const cached = _fmCache[m[1]];
+              if (!cached) return { boost: 0, memType: 'unknown', decayedConfidence: null };
+              const memType = cached.type || 'unknown';
               const typeBoost = TYPE_BOOST[memType] || 0;
-              const obsMatch = head.match(/^observation_level:\s*(\w+)/im);
-              const obsBoost = obsMatch ? (OBS_LEVEL_BOOST[obsMatch[1]] || 0) : 0;
-              const confMatch = head.match(/^confidence:\s*([0-9.]+)/im);
-              const accessMatch = head.match(/^last_accessed:\s*(\S+)/im);
-              const rawConf = confMatch ? parseFloat(confMatch[1]) : null;
-              const rawAccess = accessMatch ? accessMatch[1] : null;
+              const obsBoost = cached.observation_level ? (OBS_LEVEL_BOOST[cached.observation_level] || 0) : 0;
+              const rawConf = cached.confidence;
+              const rawAccess = cached.last_accessed;
               const dc = (rawConf !== null || rawAccess !== null)
                 ? decayConfidence(rawConf !== null ? rawConf : 1.0, rawAccess)
                 : null;
@@ -810,7 +803,10 @@ try {
   if (parts.length > 0) {
     // R-CTX hard byte cap: prevent runaway SessionStart token cost.
     // Default 1500B; override via SESSION_CTX_MAX_BYTES env var.
-    const MAX_MSG_BYTES = parseInt(process.env.SESSION_CTX_MAX_BYTES, 10) || 1500;
+    // VERBOSE mode (AI_CONTEXT_STARTUP_VERBOSE=1) raises cap to 10000B for debugging.
+    const MAX_MSG_BYTES = VERBOSE
+      ? (parseInt(process.env.SESSION_CTX_MAX_BYTES, 10) || 10000)
+      : (parseInt(process.env.SESSION_CTX_MAX_BYTES, 10) || 1500);
     let msg = `[Session context] ${parts.join(' | ')}`;
     if (Buffer.byteLength(msg, 'utf8') > MAX_MSG_BYTES) {
       // UTF-8 safe truncation — slice on bytes then trim trailing partial char
@@ -818,7 +814,13 @@ try {
       const room = MAX_MSG_BYTES - 60;
       let truncated = buf.slice(0, room).toString('utf8');
       // Buffer.toString may have trimmed trailing partial; safe.
-      msg = truncated + ` ... [TRUNCATED ${parts.length} sections — /memory + Read for more]`;
+      // Count how many ' | ' delimiters survived to estimate surviving sections
+      const survivedSections = (truncated.match(/ \| /g) || []).length + 1;
+      const suppressedCount = parts.length - survivedSections;
+      const footer = !VERBOSE && suppressedCount > 0
+        ? ` (${suppressedCount} sections suppressed → startup-log.jsonl)`
+        : '';
+      msg = truncated + ` ... [TRUNCATED ${parts.length} sections — /memory + Read for more]` + footer;
     }
     // D2 instrumentation — Discovery 2026-04-28
     // Log per-session SessionStart byte size for per-prompt overhead measurement.

@@ -407,7 +407,8 @@
           {
             "type": "command",
             "command": "node \"$HOME/.claude/hooks/auto-pull-global.js\"",
-            "timeout": 20
+            "timeout": 20,
+            "async": true
           },
           {
             "type": "command",
@@ -427,17 +428,20 @@
           {
             "type": "command",
             "command": "node \"$HOME/.claude/hooks/plugin-update-checker.js\"",
-            "timeout": 10
+            "timeout": 10,
+            "async": true
           },
           {
             "type": "command",
             "command": "node \"$HOME/.claude/hooks/skill-upstream-checker.js\"",
-            "timeout": 10
+            "timeout": 10,
+            "async": true
           },
           {
             "type": "command",
             "command": "node \"$HOME/.claude/hooks/tool-parity-check.js\"",
-            "timeout": 5
+            "timeout": 5,
+            "async": true
           },
           {
             "type": "command",
@@ -661,7 +665,8 @@
           {
             "type": "command",
             "command": "node \"$HOME/.claude/hooks/tool-parity-check.js\"",
-            "timeout": 5
+            "timeout": 5,
+            "async": true
           }
         ]
       }

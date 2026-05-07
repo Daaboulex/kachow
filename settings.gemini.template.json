@@ -15,7 +15,8 @@
       "enabled": true,
       "maxAge": "30d"
     },
-    "preferredEditor": "vscodium"
+    "preferredEditor": "vscodium",
+    "autoMemory": false
   },
   "env": {
     "OTEL_EXPORTER_OTLP_ENDPOINT": ""

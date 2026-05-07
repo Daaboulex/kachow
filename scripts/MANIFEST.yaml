@@ -2,11 +2,20 @@
 # Canonical names use Claude event/tool names (platform-map.js translates)
 
 hooks:
+  - file: session-health-fast.js
+    category: lifecycle
+    tools: [claude, codex, gemini]
+    order: 0
+    async: false
+    events:
+      - event: SessionStart
+        timeout: 3
+
   - file: auto-pull-global.js
     category: meta
     tools: [claude, codex, gemini]
     order: 1
-    async: false
+    async: true
     events:
       - event: SessionStart
         timeout: 20
@@ -58,7 +67,7 @@ hooks:
     category: meta
     tools: [claude, gemini, codex]
     order: 6
-    async: false
+    async: true
     events:
       - event: SessionStart
         timeout: 10
@@ -70,7 +79,7 @@ hooks:
     category: meta
     tools: [claude, codex, gemini]
     order: 7
-    async: false
+    async: true
     events:
       - event: SessionStart
         timeout: 10
@@ -95,7 +104,7 @@ hooks:
     category: meta
     tools: [claude, codex, gemini]
     order: 9
-    async: false
+    async: true
     events:
       - event: SessionStart
         timeout: 10
@@ -167,7 +176,7 @@ hooks:
     category: meta
     tools: [claude, codex, gemini]
     order: 17
-    async: false
+    async: true
     events:
       - event: SessionStart
         timeout: 5
