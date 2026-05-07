@@ -20,7 +20,7 @@ try {
   const input = JSON.parse(raw || '{}');
 
   const { deriveProjectKeyCached } = require('./lib/project-key.js');
-  const { readItems, incrementDeferCounts, computeStaleness } = require('./lib/deferred-items.js');
+  const { readItems, incrementDeferCounts, incrementTriageCounts, computeStaleness } = require('./lib/deferred-items.js');
 
   const cwd = input.cwd || process.cwd();
   const proj = deriveProjectKeyCached(cwd);
@@ -49,6 +49,7 @@ try {
     if (stale.length > 5) msg += `... and ${stale.length - 5} more\n`;
     msg += 'For each: KEEP / DROP / DO-NOW / → USER-ACTION / → BLOCKED:<trigger>';
     parts.push(msg);
+    incrementTriageCounts(stale.map(i => i.id));
   }
 
   // User-action reminders (quiet, ≤200B)

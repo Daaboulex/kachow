@@ -53,7 +53,7 @@ function autoCommit(dir, label) {
   const TRACKED = ['AGENTS.md', 'AGENTS-*.md', 'CHANGELOG.md', 'VERSION', 'README.md',
     'hooks/', 'memory/', 'skills/', 'scripts/', 'configs/', 'mcp/',
     '.superpowers/', 'project-state/', 'instances/', 'handoffs/', 'docs/',
-    '.gitignore', '.pre-commit-scrub.sh', 'AI-progress.json'];
+    '.gitignore', '.pre-commit-scrub.sh'];
   run(`git add ${TRACKED.join(' ')}`, dir);
   const committed = run(`git commit -m "chore: auto-sync from session end" --no-gpg-sign`, dir);
   return committed !== null;

@@ -257,7 +257,7 @@ For each proposal, show the EXACT target path (not just "project memory" — sho
 # This ensures Phase 7 has a definitive reference to read back
 ```
 
-Use the Write tool to save the structured proposals to `.claude/.reflect-proposals.md`. Include:
+Use the Write tool to save the structured proposals to `~/.ai-context/.reflect-proposals.md`. Include:
 - Every file path, action (NEW/UPDATE/REMOVE), and full content
 - The signals that motivated each change
 
@@ -271,7 +271,7 @@ Do NOT proceed silently. Do NOT assume approval. Wait for the user to respond.
 
 ## Phase 7: Apply + Sync
 
-**FIRST**: Read back `.claude/.reflect-proposals.md` to restore full context of what was approved.
+**FIRST**: Read back `~/.ai-context/.reflect-proposals.md` to restore full context of what was approved.
 
 When user approves:
 
@@ -282,7 +282,7 @@ When user approves:
    - Skill: copy directory to `.gemini/skills/<name>/`
    - AGENTS.md/CLAUDE.md edits: `sync-gemini-md.js` hook handles Claude→Gemini automatically; Codex/Crush/OpenCode read from `~/.ai-context/` symlinks directly
 3. **Update MEMORY.md** index in the same directory (for memory changes)
-4. **Do NOT commit** — let the user decide when to commit
+4. **Do NOT commit** — let the user decide when to commit (Note: `auto-push-global.js` handles commits at session end — this instruction means the LLM should not run git-commit during reflect)
 
 ### Skill sync details
 When creating or updating a skill, it must exist in BOTH `.claude/skills/` and `.gemini/skills/`.
@@ -299,7 +299,7 @@ skill should be synced there too — but DON'T auto-copy to other projects witho
 
 Delete the temp proposals file:
 ```bash
-rm -f .claude/.reflect-proposals.md
+rm -f ~/.ai-context/.reflect-proposals.md
 ```
 
 ## Phase 8: Verify

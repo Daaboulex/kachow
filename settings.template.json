@@ -436,16 +436,6 @@
           },
           {
             "type": "command",
-            "command": "node \"$HOME/.claude/hooks/validate-instructions-sync.js\"",
-            "timeout": 5
-          },
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/injection-size-monitor.js\"",
-            "timeout": 5
-          },
-          {
-            "type": "command",
             "command": "node \"$HOME/.claude/hooks/tool-parity-check.js\"",
             "timeout": 5
           },
@@ -479,11 +469,6 @@
           {
             "type": "command",
             "command": "node \"$HOME/.claude/hooks/context-pressure-enforce.js\"",
-            "timeout": 3
-          },
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/research-lint.js\"",
             "timeout": 3
           }
         ],
@@ -581,7 +566,18 @@
             "timeout": 5,
             "async": true
           }
-        ]
+        ],
+        "matcher": "Bash|Edit|Skill|Write"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/research-lint.js\"",
+            "timeout": 3
+          }
+        ],
+        "matcher": "Edit|MultiEdit|Write"
       },
       {
         "hooks": [
@@ -628,11 +624,6 @@
             "type": "command",
             "command": "node \"$HOME/.claude/hooks/pre-write-combined-guard.js\"",
             "timeout": 3
-          },
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/scrub-sentinel.js\"",
-            "timeout": 3
           }
         ],
         "matcher": "Bash|Edit|MultiEdit|Write"
@@ -646,6 +637,16 @@
           }
         ],
         "matcher": "TodoWrite|write_todos"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/scrub-sentinel.js\"",
+            "timeout": 3
+          }
+        ],
+        "matcher": "Edit|MultiEdit|Write"
       },
       {
         "hooks": [
@@ -759,11 +760,6 @@
           },
           {
             "type": "command",
-            "command": "node \"$HOME/.claude/hooks/prompt-hash-logger.js\"",
-            "timeout": 5
-          },
-          {
-            "type": "command",
             "command": "node \"$HOME/.claude/hooks/prompt-item-tracker.js\"",
             "timeout": 5
           },
@@ -814,12 +810,6 @@
             "type": "command",
             "command": "node \"$HOME/.claude/hooks/task-verification-gate.js\"",
             "timeout": 3
-          },
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/subagent-claim-logger.js\"",
-            "timeout": 3,
-            "async": true
           }
         ]
       }

@@ -37,15 +37,20 @@ function safeReaddir(p) {
 
 // Find all episodic jsonl files across all project memory dirs
 function findEpisodicFiles() {
-  const projectsRoot = join(HOME, '.claude', 'projects');
+  const roots = [
+    join(HOME, '.ai-context', 'project-state'),  // new centralized path
+    join(HOME, '.claude', 'projects'),            // old path (historical fallback)
+  ];
   const files = [];
-  for (const project of safeReaddir(projectsRoot)) {
-    if (!project.isDirectory()) continue;
-    const epDir = join(projectsRoot, project.name, 'memory', 'episodic');
-    if (!existsSync(epDir)) continue;
-    for (const f of safeReaddir(epDir)) {
-      if (f.isFile() && f.name.endsWith('.jsonl')) {
-        files.push(join(epDir, f.name));
+  for (const projectsRoot of roots) {
+    for (const project of safeReaddir(projectsRoot)) {
+      if (!project.isDirectory()) continue;
+      const epDir = join(projectsRoot, project.name, 'memory', 'episodic');
+      if (!existsSync(epDir)) continue;
+      for (const f of safeReaddir(epDir)) {
+        if (f.isFile() && f.name.endsWith('.jsonl')) {
+          files.push(join(epDir, f.name));
+        }
       }
     }
   }

@@ -76,26 +76,9 @@ try {
     }
   } catch {}
 
-  // Touch AI-progress.json timestamp so it's never completely stale
-  // This is minimal bookkeeping — just marks "a session happened here"
+  // AI-progress.json writes removed in v0.9.5 W4-FIX1.
+  // active-sessions.jsonl (via session-presence-end.js) tracks session end events.
   const cwd = process.cwd();
-  for (const progPath of [
-    path.join(cwd, '.ai-context', 'AI-progress.json'),
-    path.join(cwd, '.claude', 'AI-progress.json'),
-    path.join(cwd, 'AI-progress.json'),
-  ]) {
-    if (fs.existsSync(progPath)) {
-      try {
-        const prog = JSON.parse(fs.readFileSync(progPath, 'utf8'));
-        prog.lastSessionEnd = new Date().toISOString();
-        prog.lastAgent = detectTool();
-        if (!prog.inFlight) prog.inFlight = {};
-        // Don't overwrite existing inFlight details — just mark that a session touched it
-        fs.writeFileSync(progPath, JSON.stringify(prog, null, 2));
-      } catch {}
-      break;
-    }
-  }
 
   // Observability: emit session-end event
   try { require('./lib/observability-logger.js').logEvent(cwd, { type: 'session_end', source: 'reflect-stop', meta: { aiContextChanged, wrapUpRecent } }); } catch {}

@@ -75,31 +75,8 @@ try {
     }
   }
 
-  // ── Append subagent summary to parent AI-progress.json ──
-  // Prior: subagent work invisible to parent after SubagentStop. Now recorded.
-  try {
-    const progressPaths = [
-      path.join(cwd, '.claude', 'AI-progress.json'),
-      path.join(cwd, '.ai-context', 'AI-progress.json'),
-    ];
-    for (const p of progressPaths) {
-      if (!fs.existsSync(p)) continue;
-      let data;
-      try { data = JSON.parse(fs.readFileSync(p, 'utf8')); } catch { continue; }
-      if (!Array.isArray(data.subagent_log)) data.subagent_log = [];
-      data.subagent_log.push({
-        ts: new Date().toISOString(),
-        type: agentType || 'unknown',
-        session_id: sessionId || null,
-        summary: lastMsg.slice(0, 500),
-        warnings: warnings.length,
-      });
-      // Cap log at 50 most recent entries to avoid unbounded growth
-      if (data.subagent_log.length > 50) data.subagent_log = data.subagent_log.slice(-50);
-      try { fs.writeFileSync(p, JSON.stringify(data, null, 2), 'utf8'); } catch {}
-      break;
-    }
-  } catch {}
+  // AI-progress.json subagent_log removed in v0.9.5 W4-FIX1.
+  // Subagent audit trail moves to instances/subagent-blocks.jsonl (Release 2).
 
   if (warnings.length > 0) {
     process.stdout.write(JSON.stringify({

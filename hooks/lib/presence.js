@@ -10,15 +10,7 @@ const RETAIN_LIVE_LINES = 500;
 const ROTATE_THRESHOLD = 5000;
 const HEARTBEAT_INTERVAL = 10;
 
-function findCanonicalDir(cwd) {
-  for (const candidate of ['.ai-context', '.claude']) {
-    const p = path.join(cwd, candidate);
-    try {
-      if (fs.existsSync(p) && fs.statSync(p).isDirectory()) return p;
-    } catch {}
-  }
-  return null;
-}
+const { findCanonicalDir } = require('./tool-paths.js');
 
 function globalPresencePath() {
   // Per-host shard — avoids Syncthing merge-conflicts across machines.
@@ -33,7 +25,32 @@ function readActiveSessionsAllHosts(sinceMs) {
 
 function projectPresencePath(cwd) {
   const canonical = findCanonicalDir(cwd);
-  return canonical ? path.join(canonical, 'active-sessions.jsonl') : null;
+  if (!canonical) return null;
+  const { hostname } = require('./hostname-presence.js');
+  return path.join(canonical, `active-sessions-${hostname()}.jsonl`);
+}
+
+function readProjectSessionsAllHosts(cwd, sinceMs) {
+  const canonical = findCanonicalDir(cwd);
+  if (!canonical) return [];
+  try {
+    const files = fs.readdirSync(canonical)
+      .filter(f => f.startsWith('active-sessions-') && f.endsWith('.jsonl'))
+      .map(f => path.join(canonical, f));
+    const byKey = new Map();
+    for (const fp of files) {
+      const sessions = readActiveSessions(fp, sinceMs) || [];
+      for (const s of sessions) {
+        const host = s.host || path.basename(fp).replace(/^active-sessions-|\.jsonl$/g, '');
+        const key = `${s.sid}@${host}`;
+        const ts = s.ts ? (typeof s.ts === 'number' ? s.ts : new Date(s.ts).getTime()) : 0;
+        if (!byKey.has(key) || (byKey.get(key)._cmpTs || 0) < ts) {
+          byKey.set(key, { ...s, host, _cmpTs: ts });
+        }
+      }
+    }
+    return [...byKey.values()].map(s => { delete s._cmpTs; return s; });
+  } catch { return []; }
 }
 
 function rotateIfNeeded(filePath) {
@@ -149,5 +166,5 @@ module.exports = {
   RETAIN_LIVE_LINES, ROTATE_THRESHOLD, HEARTBEAT_INTERVAL,
   findCanonicalDir, globalPresencePath, projectPresencePath,
   appendJsonl, appendToAll, bumpCounter, clearCounter,
-  readActiveSessions, readActiveSessionsAllHosts,
+  readActiveSessions, readActiveSessionsAllHosts, readProjectSessionsAllHosts,
 };

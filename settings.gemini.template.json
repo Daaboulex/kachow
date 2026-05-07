@@ -81,18 +81,6 @@
           },
           {
             "type": "command",
-            "command": "node \"$HOME/.gemini/hooks/validate-instructions-sync.js\"",
-            "timeout": 5000,
-            "name": "validate-instructions-sync"
-          },
-          {
-            "type": "command",
-            "command": "node \"$HOME/.gemini/hooks/injection-size-monitor.js\"",
-            "timeout": 5000,
-            "name": "injection-size-monitor"
-          },
-          {
-            "type": "command",
             "command": "node \"$HOME/.gemini/hooks/tool-parity-check.js\"",
             "timeout": 5000,
             "name": "tool-parity-check"
@@ -129,12 +117,6 @@
             "command": "node \"$HOME/.gemini/hooks/context-pressure-enforce.js\"",
             "timeout": 3000,
             "name": "context-pressure-enforce"
-          },
-          {
-            "type": "command",
-            "command": "node \"$HOME/.gemini/hooks/research-lint.js\"",
-            "timeout": 3000,
-            "name": "research-lint"
           },
           {
             "type": "command",
@@ -247,7 +229,19 @@
             "timeout": 5000,
             "name": "skill-completion-correlator"
           }
-        ]
+        ],
+        "matcher": "run_shell_command|replace|activate_skill|write_file"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/research-lint.js\"",
+            "timeout": 3000,
+            "name": "research-lint"
+          }
+        ],
+        "matcher": "replace|replace|write_file"
       }
     ],
     "BeforeTool": [
@@ -286,12 +280,6 @@
             "command": "node \"$HOME/.gemini/hooks/pre-write-combined-guard.js\"",
             "timeout": 3000,
             "name": "pre-write-combined-guard-bash"
-          },
-          {
-            "type": "command",
-            "command": "node \"$HOME/.gemini/hooks/scrub-sentinel.js\"",
-            "timeout": 3000,
-            "name": "scrub-sentinel"
           }
         ],
         "matcher": "run_shell_command|replace|replace|write_file"
@@ -310,14 +298,10 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$HOME/.gemini/hooks/prefer-editing-nudge.js\"",
-            "timeout": 3000
-          }
-        ],
-        "matcher": "write_file"
-      },
-      {
-        "hooks": [
+            "command": "node \"$HOME/.gemini/hooks/scrub-sentinel.js\"",
+            "timeout": 3000,
+            "name": "scrub-sentinel"
+          },
           {
             "type": "command",
             "command": "node \"$HOME/.gemini/hooks/block-subagent-non-bash-writes.js\"",
@@ -326,6 +310,16 @@
           }
         ],
         "matcher": "replace|replace|write_file"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/prefer-editing-nudge.js\"",
+            "timeout": 3000
+          }
+        ],
+        "matcher": "write_file"
       }
     ],
     "SessionEnd": [
@@ -443,11 +437,6 @@
             "command": "node \"$HOME/.gemini/hooks/task-verification-gate.js\"",
             "timeout": 3000,
             "name": "task-verification-gate"
-          },
-          {
-            "type": "command",
-            "command": "node \"$HOME/.gemini/hooks/subagent-claim-logger.js\"",
-            "timeout": 3000
           }
         ]
       }

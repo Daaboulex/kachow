@@ -170,20 +170,6 @@ hooks:
       codex:
         matcher_raw: ^write_todos$
 
-  - file: injection-size-monitor.js
-    category: meta
-    tools: [claude, codex, gemini]
-    order: 15
-    async: false
-    events:
-      - event: SessionStart
-        timeout: 5
-    overrides:
-      codex:
-        matcher_raw: 'startup|resume'
-      gemini:
-        name: injection-size-monitor
-
   - file: autosave-before-destructive.js
     category: safety
     critical: true
@@ -305,22 +291,13 @@ hooks:
     async: false
     events:
       - event: PreToolUse
-        matcher: [Bash, Edit, MultiEdit, Write]
+        matcher: [Edit, MultiEdit, Write]
         timeout: 3
     overrides:
       codex:
         matcher_raw: '^(apply_patch|shell)$'
       gemini:
         name: scrub-sentinel
-
-  - file: prompt-hash-logger.js
-    category: observability
-    tools: [claude, codex]
-    order: 26
-    async: false
-    events:
-      - event: UserPromptSubmit
-        timeout: 5
 
   - file: context-pressure-enforce.js
     category: meta
@@ -500,6 +477,7 @@ hooks:
     async: true
     events:
       - event: PostToolUse
+        matcher: [Bash, Edit, Skill, Write]
         timeout: 5
     overrides:
       gemini:
@@ -524,7 +502,7 @@ hooks:
     async: false
     events:
       - event: PostToolUse
-        matcher: [Bash, Edit, MultiEdit, Write]
+        matcher: [Edit, MultiEdit, Write]
         timeout: 3
     overrides:
       codex:
@@ -749,15 +727,6 @@ hooks:
       gemini:
         event_override: AfterAgent
         name: task-verification-gate
-
-  - file: subagent-claim-logger.js
-    category: observability
-    tools: [claude, gemini]
-    order: 63
-    async: true
-    events:
-      - event: SubagentStop
-        timeout: 3
 
   - file: sync-claude-md.js
     category: sync

@@ -261,13 +261,12 @@ try {
     errors.push({ section: 'sync-skills-commands-rules', error: e.message, stack: e.stack?.split('\n')[1]?.trim() });
   }
 
-  // ── 4. AI-tasks.json / AI-progress.json bidirectional sync (non-critical) ──
+  // ── 4. AI-tasks.json bidirectional sync (non-critical) ──
+  // AI-progress.json removed — killed in v0.9.5 W4-FIX1
   try {
     const syncPairs = [
       { pattern: '.claude/AI-tasks.json', from: /\.claude[/\\]/, to: '.gemini/' },
-      { pattern: '.claude/AI-progress.json', from: /\.claude[/\\]/, to: '.gemini/' },
       { pattern: '.gemini/AI-tasks.json', from: /\.gemini[/\\]/, to: '.claude/' },
-      { pattern: '.gemini/AI-progress.json', from: /\.gemini[/\\]/, to: '.claude/' },
     ];
 
     for (const pair of syncPairs) {

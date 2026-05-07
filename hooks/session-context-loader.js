@@ -122,28 +122,8 @@ try {
     }
   }
 
-  // Check AI-progress.json (search both .claude/ and .gemini/ for cross-platform)
-  for (const progPath of [
-    path.join(cwd, '.claude', 'AI-progress.json'),
-    path.join(cwd, '.gemini', 'AI-progress.json'),
-    path.join(cwd, 'AI-progress.json'),
-    path.join(cwd, '.ai-context', 'AI-progress.json'),
-  ]) {
-    if (fs.existsSync(progPath)) {
-      try {
-        const prog = JSON.parse(fs.readFileSync(progPath, 'utf8'));
-        const sessions = prog.sessions || [];
-        if (sessions.length > 0) {
-          const last = sessions[sessions.length - 1];
-          parts.push(`Last session (${last.agent || '?'}, ${last.timestamp || '?'}): ${last.summary || 'no summary'}`);
-        }
-        if (prog.inFlight && prog.inFlight.status) {
-          parts.push(`In-flight: ${prog.inFlight.description || '?'} [${prog.inFlight.status}]`);
-        }
-      } catch {}
-      break;
-    }
-  }
+  // AI-progress.json reading removed in v0.9.5 W4-FIX1.
+  // Last-session summary comes from handoff session state (scanned below).
 
   // Concurrent-session handoff support: scan ALL .session-handoff-*.md files in known
   // locations + the unsuffixed pointer. Show top 2 most recent (last 24h) so multiple
@@ -274,15 +254,6 @@ try {
         } catch {}
 
         if (summaryParts.length > 0 || progressBadge) {
-          // If handoff is newer than AI-progress.json, remove stale in-flight from parts
-          // (handoff has the real current state)
-          const idx = parts.findIndex(p => p.startsWith('In-flight:'));
-          if (idx !== -1) {
-            // Replace stale AI-progress in-flight with handoff in-flight
-            if (inFlightMatch) {
-              parts[idx] = 'In-flight (from handoff): ' + inFlightMatch[1].trim().split('\n')[0];
-            }
-          }
           const badgePart = progressBadge ? ` ${progressBadge}` : '';
           parts.push(`⚡ HANDOFF from previous session${badgePart}: ${summaryParts.join(' | ')} — Read ${handoffPath} for full context`);
           handoffFound = true;

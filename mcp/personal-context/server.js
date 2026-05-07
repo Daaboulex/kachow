@@ -387,7 +387,7 @@ const TOOLS = {
         const d = JSON.parse(fs.readFileSync(p, 'utf8'));
         const tasks = d.tasks || [];
         if (tasks.length === 0) return { content: [{ type: 'text', text: 'no open tasks' }] };
-        const out = tasks.map(t => `[${t.status}] ${t.subject || t.content || '(unnamed)'}\n  src=${t.source||'?'} verifiedBy=${t.verifiedBy||'not-verified'}`).join('\n');
+        const out = tasks.map(t => `[${t.status}] ${t.title || t.subject || t.content || '(unnamed)'}\n  src=${t.source||'?'} verifiedBy=${t.verifiedBy||'not-verified'}`).join('\n');
         return { content: [{ type: 'text', text: out }] };
       } catch (e) {
         return { content: [{ type: 'text', text: 'error: ' + e.message }], isError: true };
@@ -396,28 +396,15 @@ const TOOLS = {
   },
 
   read_progress: {
-    description: 'Read the latest AI-progress.json entries (most recent sessions) for a project. Returns summary of recent work.',
+    description: 'Deprecated in v0.9.5. Use list_handoffs for session summaries.',
     inputSchema: {
       type: 'object',
       properties: {
         cwd: { type: 'string', description: 'Optional starting directory' },
-        limit: { type: 'integer', description: 'Max recent sessions (default 5)', default: 5 },
       },
     },
-    handler: ({ cwd, limit = 5 } = {}) => {
-      const canonical = findCanonicalDir(cwd);
-      if (!canonical) return { content: [{ type: 'text', text: 'no canonical dir found' }] };
-      const p = path.join(canonical, 'AI-progress.json');
-      if (!fs.existsSync(p)) return { content: [{ type: 'text', text: 'no AI-progress.json' }] };
-      try {
-        const d = JSON.parse(fs.readFileSync(p, 'utf8'));
-        const sessions = (d.sessions || []).slice(-limit).reverse();
-        if (sessions.length === 0) return { content: [{ type: 'text', text: 'no session entries' }] };
-        const out = sessions.map(s => `## ${s.timestamp || '?'} (${s.duration || '?'})\n${s.summary || ''}\nFiles: ${(s.files_changed || []).slice(0, 5).join(', ')}`).join('\n\n');
-        return { content: [{ type: 'text', text: out }] };
-      } catch (e) {
-        return { content: [{ type: 'text', text: 'error: ' + e.message }], isError: true };
-      }
+    handler: () => {
+      return { content: [{ type: 'text', text: 'AI-progress.json deprecated in v0.9.5 (W4-FIX1). Use list_handoffs for session summaries.' }] };
     },
   },
 

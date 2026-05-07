@@ -218,13 +218,13 @@ Run the /reflect workflow inline (don't invoke the skill — execute its phases 
 - Rule changes
 - CLAUDE.md updates
 
-**2d. Save proposals** — Write to `.claude/.reflect-proposals.md` before asking approval.
+**2d. Save proposals** — Write to `~/.ai-context/.reflect-proposals.md` before asking approval.
 
 **2e. Ask approval** — Present all proposals. Wait for user.
 
 **2f. Apply + sync** — Read proposals back from file, write changes, sync to Gemini.
 
-**2g. Cleanup** — Delete `.claude/.reflect-proposals.md`.
+**2g. Cleanup** — Delete `~/.ai-context/.reflect-proposals.md`.
 
 If no signals detected, say "No learnings to persist" and continue to Step 3.
 

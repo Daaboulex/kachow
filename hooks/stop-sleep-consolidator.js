@@ -80,6 +80,14 @@ try {
     fs.writeFileSync(lockFile, String(process.pid) + '\n' + new Date().toISOString(), { flag: 'wx' });
   } catch { passthrough(); }
 
+  // Check if dream-auto already handling consolidation
+  const dreamLockPath = path.join(configDir, '.dream-lock');
+  if (fs.existsSync(dreamLockPath)) {
+    // dream-auto already fired — skip detached subprocess
+    try { fs.unlinkSync(lockFile); } catch {}
+    passthrough();
+  }
+
   const binary = tool === 'gemini' ? 'gemini' : tool === 'codex' ? 'codex' : tool === 'crush' ? 'crush' : tool === 'opencode' ? 'opencode' : 'claude';
   const prompt = '/consolidate-memory deep';
   const logFile = path.join(cacheDir, `sleep-consolidator-${host}.log`);

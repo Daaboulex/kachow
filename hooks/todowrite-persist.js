@@ -16,16 +16,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { toolHomeDir, toolCacheDir } = require('./lib/tool-detect.js');
-
-function findCanonicalDir(cwd) {
-  for (const candidate of ['.ai-context', '.claude']) {
-    const p = path.join(cwd, candidate);
-    try {
-      if (fs.existsSync(p) && fs.statSync(p).isDirectory()) return p;
-    } catch {}
-  }
-  return null;
-}
+const { findCanonicalDir } = require('./lib/tool-paths.js');
 
 try {
   let raw = '';

@@ -143,8 +143,20 @@ function incrementDeferCounts(projectKey, sessionId) {
   return changed;
 }
 
+function incrementTriageCounts(itemIds) {
+  const data = readItems('deferred');
+  let changed = false;
+  for (const item of data.items) {
+    if (!itemIds.includes(item.id)) continue;
+    item.triage_count = (item.triage_count || 0) + 1;
+    changed = true;
+  }
+  if (changed) writeItems('deferred', data);
+  return changed;
+}
+
 module.exports = {
   DEFERRED_PATH, USER_ACTIONS_PATH,
   readItems, writeItems, addItem, archiveItem, reclassifyItem,
-  computeStaleness, incrementDeferCounts,
+  computeStaleness, incrementDeferCounts, incrementTriageCounts,
 };
