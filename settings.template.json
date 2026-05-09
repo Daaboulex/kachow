@@ -1,8 +1,8 @@
 {
-  "_": "Template settings \u2014 run scripts/customize.sh to populate env/allow/hooks for your stack. Add optional add-ons from settings.embedded.json.example / settings.nix.json.example / etc.",
+  "_": "Template settings — run scripts/customize.sh to populate env/allow/hooks for your stack. Add optional add-ons from settings.embedded.json.example / settings.nix.json.example / etc.",
   "statusLine": {
     "type": "command",
-    "command": "bash \"$HOME/.claude/statusline.sh\"",
+    "command": "bash $HOME/.claude/statusline.sh",
     "hideVimModeIndicator": false
   },
   "env": {
