@@ -434,15 +434,15 @@ Initial public release. *Ka-chow.*
 - Obfuscated personal-token patterns in CI (printf-concatenated, no literals)
 - `deep-verify-scrub` maintainer tool cross-references a master personal-token list beyond scrub-config
 
-[Unreleased]: https://github.com/username/kachow/compare/v0.9.5...HEAD
-[0.9.5]: https://github.com/username/kachow/compare/v0.9.1...v0.9.5
-[0.9.1]: https://github.com/username/kachow/compare/v0.8.0...v0.9.1
-[0.8.0]: https://github.com/username/kachow/compare/v0.7.1...v0.8.0
-[0.7.1]: https://github.com/username/kachow/compare/v0.7.0...v0.7.1
-[0.7.0]: https://github.com/username/kachow/compare/v0.6.0...v0.7.0
-[0.6.0]: https://github.com/username/kachow/compare/v0.5.0...v0.6.0
-[0.5.0]: https://github.com/username/kachow/compare/v0.4.0...v0.5.0
-[0.4.0]: https://github.com/username/kachow/compare/v0.3.0...v0.4.0
-[0.3.0]: https://github.com/username/kachow/compare/v0.2.0...v0.3.0
-[0.2.0]: https://github.com/username/kachow/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/username/kachow/releases/tag/v0.1.0
+[Unreleased]: https://github.com/Daaboulex/kachow/compare/v0.9.5...HEAD
+[0.9.5]: https://github.com/Daaboulex/kachow/compare/v0.9.1...v0.9.5
+[0.9.1]: https://github.com/Daaboulex/kachow/compare/v0.8.0...v0.9.1
+[0.8.0]: https://github.com/Daaboulex/kachow/compare/v0.7.1...v0.8.0
+[0.7.1]: https://github.com/Daaboulex/kachow/compare/v0.7.0...v0.7.1
+[0.7.0]: https://github.com/Daaboulex/kachow/compare/v0.6.0...v0.7.0
+[0.6.0]: https://github.com/Daaboulex/kachow/compare/v0.5.0...v0.6.0
+[0.5.0]: https://github.com/Daaboulex/kachow/compare/v0.4.0...v0.5.0
+[0.4.0]: https://github.com/Daaboulex/kachow/compare/v0.3.0...v0.4.0
+[0.3.0]: https://github.com/Daaboulex/kachow/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/Daaboulex/kachow/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/Daaboulex/kachow/releases/tag/v0.1.0

@@ -6,7 +6,7 @@ Thanks for considering a contribution.
 
 1. Run `bash scripts/health-check.sh` — must pass.
 2. Run `node hooks/lib/hook-selftest.js` — must pass.
-3. Run `node hooks/lib/hook-topology.js` — no new collisions introduced.
+3. Run `node scripts/validate-manifest.mjs` — no new collisions introduced.
 4. New hooks MUST add a `SPECS` entry in `hooks/lib/hook-selftest.js`.
 5. New memory files MUST use the v2 frontmatter schema (see `memory/example.md`).
 

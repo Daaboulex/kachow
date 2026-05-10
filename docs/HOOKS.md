@@ -1,6 +1,6 @@
 # Hooks catalog
 
-65+ shipped hooks + 28 library helpers. Every one is pure Node with no external deps; runs identically on Linux, macOS, and Windows (where the host AI CLI supports hooks). Hooks marked ⁱ are documented for reference but excluded from the public mirror.
+65+ shipped hooks + 26 library helpers. Every one is pure Node with no external deps; runs identically on Linux, macOS, and Windows (where the host AI CLI supports hooks). Hooks marked ⁱ are documented for reference but excluded from the public mirror.
 
 Registered under `hooks.<event>[].hooks[]` in the tool's settings JSON. See `settings.template.json` for the wiring.
 

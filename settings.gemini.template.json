@@ -382,9 +382,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$HOME/.gemini/hooks/sub[agent-skill]-inject.js\"",
+            "command": "node \"$HOME/.gemini/hooks/subagent-harness-inject.js\"",
             "timeout": 3000,
-            "name": "sub[agent-skill]-inject"
+            "name": "subagent-harness-inject"
           }
         ]
       }

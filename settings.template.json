@@ -806,7 +806,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$HOME/.claude/hooks/sub[agent-skill]-inject.js\"",
+            "command": "node \"$HOME/.claude/hooks/subagent-harness-inject.js\"",
             "timeout": 3
           }
         ]
