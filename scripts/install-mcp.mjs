@@ -38,9 +38,11 @@ const claudeJson = join(HOME, '.claude.json');
 if (existsSync(claudeJson)) {
   const d = readJson(claudeJson);
   d.mcpServers = d.mcpServers || {};
-  d.mcpServers['personal-context'] = { type: 'stdio', command: 'node', args: [SERVER] };
+  d.mcpServers['personal-context'] = { type: 'stdio', command: 'node', args: [SERVER], alwaysLoad: true };
+  d.mcpServers['ai-context-vault'] = { type: 'stdio', command: 'npx', args: ['@bitbonsai/mcpvault@latest', join(AI)] };
+  d.mcpServers['filesystem'] = { type: 'stdio', command: 'npx', args: ['-y', '@modelcontextprotocol/server-filesystem', join(HOME, 'Documents')] };
   writeJson(claudeJson, d);
-  console.log('✓ Claude Code');
+  console.log('✓ Claude Code (3 MCP servers)');
 } else {
   console.log("- Claude Code: ~/.claude.json missing — run 'claude' once to create");
 }
