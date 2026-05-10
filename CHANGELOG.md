@@ -6,6 +6,60 @@ All notable changes to this framework. See [Semantic Versioning](https://semver.
 
 ## [Unreleased]
 
+## [0.9.7] — 2026-05-10
+
+Deep cleanup, cross-tool parity, plugin skill installation, Obsidian vault verification, documentation overhaul.
+
+### Added
+- **Auto-bootstrap** — `session-health-fast.js` auto-runs `bootstrap.mjs` when critical symlinks missing (zero manual setup on new machines)
+- **Plugin skills** — caveman, superpowers, compound-engineering, impeccable installed via `npx skills add` to `.agents/skills/` (61 skills)
+- **MCPVault** (`ai-context-vault`) — configured for all 5 tools as headless Obsidian vault access
+- **Filesystem MCP** — added to Codex, Crush, OpenCode (was Claude+Gemini only)
+- **Context-pressure bridge** — `statusline.sh` writes `/tmp/claude-ctx-<session>.json` so `context-pressure-enforce.js` hook works again (was inert since enhanced-statusline.js archived)
+- `.superpowers/` symlinks for Crush + OpenCode
+- `deep-research.md` slash command file (was missing for `cmd-deep-research` skill)
+- `SLASH_COMMAND_TOOL_CHAR_BUDGET=80000` env var (official skill budget mechanism)
+
+### Fixed
+- **pre-write-combined-guard.js** — missing `const os = require('os')` (async hook validation was dead code)
+- **MCP server** — removed `@owner` PII hardcode from `add_debt` tool → `@owner`
+- **MCP server** — removed deprecated `read_progress` tool (grace period passed, zero callers)
+- **Codex skills** — 14 stale real dirs replaced with symlinks to canonical
+- **Gemini skills** — 16 stale real dirs replaced with symlinks to canonical
+- **Codex `nix-flake`** — was missing, symlinked
+- **8 memory files** — double-prefix naming (`feedback_feedback_*`, `project_project_*`) corrected
+- **2 memory files** — type/filename prefix mismatch (`feedback_` → `reference_`)
+- **1 memory file** — missing type prefix (`peer-card.md` → `user_peer-card.md`)
+- **1 memory file** — moved from subdir to flat (`reference/self-improvement-feedback.md`)
+- **AGENTS.md** — version v0.9.4→v0.9.6, "5 tools"→"4 tools" for generate-settings, GPG exception widened for autosave phantom commits
+- **AGENTS-architecture.md** — 6 stale refs (persistence layers count, subagent-writes scope, tool counts, name typo)
+- **COVERAGE.md** — hook count 72→65, removed 5 ghost Gemini-only hooks + 1 ghost prompt-hash-logger
+- **INVENTORY.md** — command count 14→15, removed 5 nonexistent skills
+- **KNOWN-LIMITS.md** — version, permission counts, command counts updated
+- **README.md** — MCP line count 526→625, removed stale sync-claude ref
+- **publish-assets/** — HOOKS.md: 10 dead hooks removed + hook-edit-monitor added; README: MCP name + hook counts; SECURITY: MCP path; CHANGELOG synced
+- **post-write-sync.js** — stale AI-progress.json comment removed
+- **settings-schema.js** — added `editorMode`, `skillOverrides`, `skillListingBudgetFraction`, `skillListingMaxDescChars`
+- **install-mcp.mjs** — now installs all 3 servers (ai-context-bridge + ai-context-vault + filesystem)
+- **Skill duplication** — removed 61 symlinks in `skills/` that pointed to `.agents/skills/` (caused Claude to load plugins twice)
+
+### Removed
+- `AI-progress.json` — deletion committed (was tracked as deleted but unstaged)
+- `Untitled.base` — Obsidian artifact
+- 19 stale specs archived to `specs/archive/`
+- 4 stale plans archived to `plans/archive/`
+- 6 stale reports archived to `reports/archive/`
+- 2 superseded repo_standard memories archived
+- `skillListingBudgetMode` setting (never existed as stable key)
+- Stale `.bak` dirs from Claude + Gemini
+
+### Changed
+- Three-layer skill architecture: canonical (20, your code) → plugin (61, third-party) → tool-native plugins
+- `~/.ai-context/.agents/skills/` tracked in git for Syncthing cross-machine sync
+- `.gitignore` — added `.trash/`, `skills-lock.json`, `telemetry-epoch.json`, `memory/.frontmatter-cache.json`, `project-state/*/memory/.frontmatter-cache.json`
+- NixOS stignore — added `.auto-push-last`, `telemetry-epoch.json` to both hosts
+- Misplaced plan moved from `docs/plans/` to `.superpowers/plans/`
+
 ## [0.9.6] — 2026-05-10
 
 Session system improvements — startup fixes, Claude Code v132-137 config alignment, version drift resolution, agent dispatch enforcement, status line redesign, Obsidian integration.
@@ -18,9 +72,8 @@ Session system improvements — startup fixes, Claude Code v132-137 config align
 - **Session-type label logging** — meta-system-stop.js logs `session_type_label` to episodic JSONL (v1 of skill-from-session)
 - **Plugin hook +x auto-repair** — session-health-fast.js fixes Syncthing-stripped execute bits on plugin hooks
 - **Obsidian integration** — nixpkgs native package (replacing Flatpak), MCPVault-ready, `.obsidian/` in .stignore/.gitignore
-- `worktree.baseRef: "fresh"` globally, `"head"` override for fahlke-monorepo
+- `worktree.baseRef: "fresh"` globally, `"head"` override for example-monorepo
 - `autoMode.hard_deny` — nuclear operations blocked even with skipDangerousModePermissionPrompt
-- `skillListingBudgetFraction`, `skillListingMaxDescChars`, `skillListingBudgetMode` — tune for 81+ skills
 - Subagent harness: input file existence verification rule
 - rule-enforcement-check.js: dependency violation detection (Rule 5)
 
@@ -30,7 +83,7 @@ Session system improvements — startup fixes, Claude Code v132-137 config align
 - **9 broken symlinks** — 4 sandbox-cwd + 5 skills pointing to nonexistent targets
 - **publish.sh** — now tags source repo (not just mirror). Fixed `$AI` variable reference
 - **scrub-for-publish.sh** — VERSION file now included in publish output
-- **kachow-mirror template** — `sub[agent-skill]-inject.js` typo → `subagent-harness-inject.js`, `mcp__personal-context` → `mcp__ai-context-bridge`
+- **kachow-mirror template — verified scrub rules working correctly (personal-context + agent-skill naming are intentional public branding)`
 - **Status line** — hardcoded `/home/user` paths → `$HOME`/`$CLAUDE_CONFIG_DIR`, redesigned to minimal style
 
 ### Removed
@@ -130,7 +183,7 @@ One-brain hardening — proactive provisioning, 5-tool scalability, security fix
 - **mirror-kachow.js** — cache paths moved to ai-context/cache/
 - **scrub-sentinel.js** + **pre-write-combined-guard.js** — Crush tool_name case normalization + notebookedit
 - **memory-rotate** — skips status:active memories
-- **Unified .ai-context symlink** pattern across fahlke-monorepo, nix, documents
+- **Unified .ai-context symlink** pattern across example-monorepo, nix, documents
 
 ### Fixed
 - **Subagent marker PID mismatch** — block-subagent-writes + non-bash-writes + quality-gate all used process.pid but each hook is a separate process. Guards were completely non-functional. Fixed: glob sessionId-*.json
@@ -164,7 +217,7 @@ One-brain hardening — proactive provisioning, 5-tool scalability, security fix
 Infrastructure consolidation — one brain architecture.
 
 ### Added
-- **project-state/** — centralized project memories (nix 195, fahlke-monorepo 101, documents 85)
+- **project-state/** — centralized project memories (nix 195, example-monorepo 101, documents 85)
 - **configs/** — centralized tool settings (claude-settings.json, gemini-settings.json, codex-config.toml)
 - **kachow-mirror/** — moved from `~/.kachow-mirror` into ai-context
 - CI settings.json stub for hook-test-suite
@@ -381,15 +434,15 @@ Initial public release. *Ka-chow.*
 - Obfuscated personal-token patterns in CI (printf-concatenated, no literals)
 - `deep-verify-scrub` maintainer tool cross-references a master personal-token list beyond scrub-config
 
-[Unreleased]: https://github.com/Daaboulex/kachow/compare/v0.9.5...HEAD
-[0.9.5]: https://github.com/Daaboulex/kachow/compare/v0.9.1...v0.9.5
-[0.9.1]: https://github.com/Daaboulex/kachow/compare/v0.8.0...v0.9.1
-[0.8.0]: https://github.com/Daaboulex/kachow/compare/v0.7.1...v0.8.0
-[0.7.1]: https://github.com/Daaboulex/kachow/compare/v0.7.0...v0.7.1
-[0.7.0]: https://github.com/Daaboulex/kachow/compare/v0.6.0...v0.7.0
-[0.6.0]: https://github.com/Daaboulex/kachow/compare/v0.5.0...v0.6.0
-[0.5.0]: https://github.com/Daaboulex/kachow/compare/v0.4.0...v0.5.0
-[0.4.0]: https://github.com/Daaboulex/kachow/compare/v0.3.0...v0.4.0
-[0.3.0]: https://github.com/Daaboulex/kachow/compare/v0.2.0...v0.3.0
-[0.2.0]: https://github.com/Daaboulex/kachow/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/Daaboulex/kachow/releases/tag/v0.1.0
+[Unreleased]: https://github.com/username/kachow/compare/v0.9.5...HEAD
+[0.9.5]: https://github.com/username/kachow/compare/v0.9.1...v0.9.5
+[0.9.1]: https://github.com/username/kachow/compare/v0.8.0...v0.9.1
+[0.8.0]: https://github.com/username/kachow/compare/v0.7.1...v0.8.0
+[0.7.1]: https://github.com/username/kachow/compare/v0.7.0...v0.7.1
+[0.7.0]: https://github.com/username/kachow/compare/v0.6.0...v0.7.0
+[0.6.0]: https://github.com/username/kachow/compare/v0.5.0...v0.6.0
+[0.5.0]: https://github.com/username/kachow/compare/v0.4.0...v0.5.0
+[0.4.0]: https://github.com/username/kachow/compare/v0.3.0...v0.4.0
+[0.3.0]: https://github.com/username/kachow/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/username/kachow/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/username/kachow/releases/tag/v0.1.0
