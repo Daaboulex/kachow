@@ -1,5 +1,25 @@
 {
   "_": "Template settings — run scripts/customize.sh to populate env/allow/hooks for your stack. Add optional add-ons from settings.embedded.json.example / settings.nix.json.example / etc.",
+  "worktree": {
+    "baseRef": "fresh"
+  },
+  "autoMode": {
+    "hard_deny": [
+      "rm -rf /",
+      "rm -rf ~",
+      "rm -rf /*",
+      "git reset --hard",
+      "git push --force origin main",
+      "git push --force origin master",
+      "git push -f origin main",
+      "git push -f origin master",
+      "dd if=/dev",
+      "mkfs.",
+      "shutdown -h",
+      "reboot",
+      ":(){ :|:& };:"
+    ]
+  },
   "statusLine": {
     "type": "command",
     "command": "bash $HOME/.claude/statusline.sh",

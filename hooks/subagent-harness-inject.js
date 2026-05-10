@@ -122,6 +122,9 @@ try {
     }
   } catch {}
 
+  // Always: verify input file existence before starting work
+  rules.push('Before starting work, verify that any input files referenced in your task exist (Read or stat them). If a file you need to read or review does not exist, report immediately and exit — do not retry or wait.');
+
   if (hasSafetyCode) {
     rules.push(`SAFETY: Files in ${safetyDirs.join('/, ')}/ are safety-critical (IEC 61508 domain). Do NOT edit these in a subagent — flag for manual review.`);
   }

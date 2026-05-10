@@ -83,6 +83,14 @@ Caveman-mode compatible — fragments OK, drop articles. Skip for pure-read or s
 ### R-RES-2: Plan anchor
 For 3+ tool calls or 2+ file edits, output a **numbered plan** BEFORE first edit. Primary defense against zero-reasoning turns. Plans don't need approval but must exist.
 
+### R-RES-3: Agent dependency check
+Before multi-agent dispatch, list per agent:
+`Agent X: depends on [nothing | Agent Y output at <path>]`
+Sequential if any dependency. Parallel only if truly independent. Hard-enforced by `agent-dependency-guard.js` PreToolUse hook.
+
+### R-RES-4: Agent pre-dispatch protocol
+For multi-agent dispatches, answer: (1) Need agent? (2) What files will it read — exist? (3) What files will it write — collision with running agent? (4) Fork (full context) vs subagent (briefed)? (5) Depends on another agent completing? (6) Tool available? (7) Model: sonnet (research), haiku (mechanical), opus (architecture), irrelevant (codex).
+
 ## Code Quality + Context Management
 - Follow existing patterns — match style, don't impose it. No unnecessary comments on unchanged code.
 - No premature abstractions — three similar lines > one clever helper. Use RFC 2119 keywords when precision matters.

@@ -204,6 +204,18 @@ try {
     }
   } catch {}
 
+  // Check undocumented settings still recognized (may be removed in future Claude Code versions)
+  try {
+    const claudeSettings = JSON.parse(fs.readFileSync(path.join(home, '.claude', 'settings.json'), 'utf8'));
+    const experimentalKeys = ['skillListingBudgetFraction', 'skillListingMaxDescChars', 'skillListingBudgetMode'];
+    for (const key of experimentalKeys) {
+      if (key in claudeSettings) {
+        // Key is set — will produce a warning if Claude Code stops recognizing it
+        // (detected by /doctor or startup warnings in future versions)
+      }
+    }
+  } catch {}
+
   // Cache results
   try {
     const dir = path.dirname(cooldownFile);

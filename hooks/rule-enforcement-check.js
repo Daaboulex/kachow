@@ -74,6 +74,15 @@ try {
     }
   }
 
+  // Rule 5: dependency check — does prompt reference files that don't exist?
+  const pathMatches = prompt.match(/~\/[.\w\-\/]+\.\w+/g) || [];
+  for (const p of pathMatches) {
+    const expanded = p.replace('~', os.homedir());
+    if (!fs.existsSync(expanded)) {
+      warnings.push(`Agent prompt references non-existent file: ${p} — possible dependency violation`);
+    }
+  }
+
   if (warnings.length > 0) {
     process.stderr.write(`[rule-enforcer] ${warnings.join(' | ')}\n`);
   }
