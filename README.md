@@ -52,7 +52,7 @@ kachow fixes that at the filesystem level:
 
 - **One canonical `AGENTS.md`** lives at `~/.ai-context/AGENTS.md`. Every AI tool's config file is a symlink to it. Edit once, every tool picks up the change on next session.
 - **Hooks** automate the tedious bits — saving handoffs before compaction, blocking destructive bash before it runs, keeping memory rotating, flagging drift between platforms.
-- **MCP server** (`personal-context`) gives any MCP-capable client structured read/write access to your memory, tech-debt log, open tasks, skills, and rules.
+- **MCP server** (`ai-context-bridge`) gives any MCP-capable client structured read/write access to your memory, tech-debt log, open tasks, skills, and rules.
 - **Cross-platform by design** — every user-facing script ships as both `.sh` and `.ps1`. Consumers on Windows don't need bash.
 
 ## Install
@@ -96,9 +96,9 @@ Every script reads `AI_CONTEXT` with a fallback to `$HOME/.ai-context`. Useful i
 | Surface | Lives at | Installed by | Cross-platform |
 |---|---|---|---|
 | Canonical rules (`AGENTS.md`) | `~/.ai-context/AGENTS.md` | `install-adapters.sh` / `.ps1` | yes — symlinks (or copy fallback on Windows without Dev Mode) |
-| 65+ hooks | `~/.claude/hooks/` | symlinked on first bootstrap | yes — all pure Node, no shell deps |
-| 26 library helpers | `~/.claude/hooks/lib/` | same | yes |
-| MCP server (`personal-context`) | `~/.ai-context/mcp/personal-context/server.js` | `install-mcp.sh` / `.ps1` | yes — zero-dep Node |
+| 70+ hooks | `~/.claude/hooks/` | symlinked on first bootstrap | yes — all pure Node, no shell deps |
+| 28 library helpers | `~/.claude/hooks/lib/` | same | yes |
+| MCP server (`ai-context-bridge`) | `~/.ai-context/mcp/ai-context-bridge/server.js` | `install-mcp.sh` / `.ps1` | yes — zero-dep Node |
 | Slash commands (13) | `~/.claude/commands/` | bootstrap | yes — Markdown with frontmatter |
 | Skills (shipped: `debt-tracker`) | `~/.ai-context/skills/debt-tracker/` | symlinked by bootstrap | yes — but per-AI format differs, see [SKILLS.md](./docs/SKILLS.md) |
 | Memory v2 schema + TTL rotation | `~/.ai-context/memory/` (personal) + `memory-rotate.js` hook | example at `memory/example.md` | yes |
@@ -173,7 +173,7 @@ Using the framework as a **consumer** requires zero bash on Windows. Publishing 
 Everything is files. Nothing is hidden.
 
 - Don't want hooks? `rm -rf ~/.claude/hooks ~/.gemini/hooks` and strip the `hooks` block from your settings.
-- Don't want MCP? Remove the `mcpServers.personal-context` entry from your tool's config.
+- Don't want MCP? Remove the `mcpServers.ai-context-bridge` entry from your tool's config.
 - Don't like the rules? Edit `~/.ai-context/AGENTS.md` freely — the USER SECTION is yours.
 
 Everything is idempotent. Re-running `bootstrap.sh` re-applies the current state.
@@ -247,7 +247,7 @@ Inspired-by, not forked: kachow's hooks, commands, skills, and memory schema are
 
 ## Roadmap
 
-- [x] **v0.2.0** — Documentation rewrite (65+ hooks documented, count corrections, identity refresh), context-pressure threshold fix, scrub leak fixes
+- [x] **v0.2.0** — Documentation rewrite (70+ hooks documented, count corrections, identity refresh), context-pressure threshold fix, scrub leak fixes
 - [x] **v0.3.0** — Codex as 3rd tool, tri-tool parity checker, 16 new hooks
 - [x] **v0.4.0** — Hook p95 6000ms→141ms, 66 hooks, passive analytics pipeline
 - [x] **v0.5.0** — Hook system restoration (47 items), 17 bugs fixed, context-pressure corrections

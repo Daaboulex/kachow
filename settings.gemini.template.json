@@ -90,6 +90,11 @@
             "type": "command",
             "command": "node \"$HOME/.gemini/hooks/handoff-triage-gate.js\"",
             "timeout": 5000
+          },
+          {
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/session-health-fast.js\"",
+            "timeout": 3000
           }
         ]
       }
@@ -216,6 +221,16 @@
       }
     ],
     "BeforeTool": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.gemini/hooks/agent-dependency-guard.js\"",
+            "timeout": 3000
+          }
+        ],
+        "matcher": "spawn_agent"
+      },
       {
         "hooks": [
           {

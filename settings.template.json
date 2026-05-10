@@ -478,6 +478,11 @@
             "command": "node \"$HOME/.claude/hooks/per-prompt-overhead.js\"",
             "timeout": 5,
             "async": true
+          },
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/session-health-fast.js\"",
+            "timeout": 3
           }
         ]
       }
@@ -607,6 +612,16 @@
       }
     ],
     "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/agent-dependency-guard.js\"",
+            "timeout": 3
+          }
+        ],
+        "matcher": "Agent"
+      },
       {
         "hooks": [
           {

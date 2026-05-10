@@ -19,7 +19,7 @@ Common: `~/.claude.json` missing (run Claude Code at least once first).
 ## Hook not firing
 
 1. `node -c ~/.claude/hooks/<hook>.js` — syntax?
-2. `node scripts/validate-manifest.mjs` — is it registered?
+2. `node hooks/lib/hook-topology.js` — is it registered?
 3. `node hooks/lib/hook-selftest.js --hook=<hook.js>` — does its spec pass?
 
 ## Image preview (`/preview`) empty output

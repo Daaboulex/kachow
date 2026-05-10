@@ -1,0 +1,1 @@
+Invoke the deep-research skill: formalize investigation-to-spec workflow. Parse startup context, dispatch research agents with proper R-RES-4 protocol, consolidate findings, generate spec. Use for complex multi-topic investigation sessions.
