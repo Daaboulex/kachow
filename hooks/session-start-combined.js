@@ -555,7 +555,7 @@ try {
         require('./lib/observability-logger.js').logEvent(projectDir, {
           type: 'version_change',
           source: 'session-start-combined',
-          meta: { from: lastVersion, to: currentVersion, signals: signals.length }
+          meta: { from: lastVersion, to: currentVersion }
         });
       } catch {}
       // Write epoch marker for telemetry baseline reset (v0.9.5)
@@ -569,9 +569,7 @@ try {
           try { if (fs.existsSync(ed)) fs.appendFileSync(path.join(ed, `${epochDate}-${epochHostname}.jsonl`), epochEvent); } catch {}
         }
       } catch {}
-      const signalNote = signals.length > 0
-        ? ` — ${signals.length} potential breaking-hook signal(s), review ${memPath}`
-        : (memPath ? ` — notes saved to ${memPath}` : '');
+      const signalNote = memPath ? ` — notes saved to ${memPath}` : '';
       messages.push(`[version-change] Claude Code ${lastVersion} → ${currentVersion}${signalNote}`);
     }
 

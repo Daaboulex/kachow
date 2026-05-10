@@ -235,6 +235,13 @@ try {
   try { require(path.join(configDir, 'hooks', 'lib', 'observability-logger.js')).logEvent(cwd, { type: 'hook_errors', source: 'meta-system-stop', errors: [{ section: 'self-improvement', error: e.message }] }); } catch {}
 }
 
+// --- Session-type label (v1: log only, no automation) ---
+try {
+  const { logEvent: _logLabel } = require(path.join(configDir, 'hooks', 'lib', 'observability-logger.js'));
+  const sessionLabel = `session at ${cwd} — tools used in this session`;
+  _logLabel(cwd, { type: 'session_type_label', source: 'meta-system-stop', meta: { label: sessionLabel, project_key: cwd } });
+} catch {}
+
 // --- Output ---
 if (messages.length > 0) {
   __emitTiming(0); process.stdout.write(JSON.stringify({

@@ -212,9 +212,6 @@
       "Bash(xxd *)",
       "mcp__personal-context",
       "mcp__filesystem",
-      "mcp__git",
-      "mcp__fetch",
-      "mcp__memory",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:docs.anthropic.com)",
       "WebFetch(domain:code.claude.com)",
@@ -405,6 +402,9 @@
   },
   "effortLevel": "xhigh",
   "editorMode": "vim",
+  "skillListingBudgetFraction": 0.5,
+  "skillListingMaxDescChars": 400,
+  "skillListingBudgetMode": "truncate",
   "hooks": {
     "SessionStart": [
       {

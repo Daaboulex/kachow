@@ -125,6 +125,16 @@ hooks:
       codex:
         matcher_raw: ^shell$
 
+  - file: agent-dependency-guard.js
+    category: safety
+    tools: [claude, codex, gemini]
+    order: 10
+    async: false
+    events:
+      - event: PreToolUse
+        matcher: [Agent]
+        timeout: 3
+
   - file: block-subagent-writes.js
     category: safety
     critical: true
