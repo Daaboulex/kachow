@@ -50,7 +50,7 @@ const restoreTimestamp = (() => {
   return i !== -1 ? args[i + 1] : null;
 })();
 
-// --apply defaults to codex only; --apply --all does all three
+// --apply defaults to codex only; --apply --all does all four
 const DEFAULT_APPLY_TOOLS = ['codex'];
 let targetTools;
 if (toolArg === 'all' || ALL) {

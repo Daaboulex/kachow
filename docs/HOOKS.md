@@ -1,6 +1,6 @@
 # Hooks catalog
 
-70+ shipped hooks + 28 library helpers. Every one is pure Node with no external deps; runs identically on Linux, macOS, and Windows (where the host AI CLI supports hooks). Hooks marked ⁱ are documented for reference but excluded from the public mirror.
+65+ shipped hooks + 28 library helpers. Every one is pure Node with no external deps; runs identically on Linux, macOS, and Windows (where the host AI CLI supports hooks). Hooks marked ⁱ are documented for reference but excluded from the public mirror.
 
 Registered under `hooks.<event>[].hooks[]` in the tool's settings JSON. See `settings.template.json` for the wiring.
 
@@ -15,10 +15,8 @@ Fires once at the beginning of every session.
 | `session-start-combined` | 11 subsystems merged into one Node process (reflect-enabled check, consolidate-memory counter, stale task cleanup, symlink integrity check, etc.). Saves ~200 ms of spawn time. |
 | `skill-upstream-checker` | Checks upstream skill repos for updates on a 7-day cooldown. Network failures silently skip — never blocks session start. |
 | `session-presence-start` | Registers this session in the presence files so other sessions can see who's active. |
-| `validate-instructions-sync` | Validates `CLAUDE.md ↔ GEMINI.md` drift. Fires at `SessionStart`. |
 | ~~validate-symlinks~~ | **Merged** into `session-start-combined` section 10. No standalone file. |
 | `session-context-loader` | Loads rules summary, memories, tasks, git status, handoffs, and self-improvement queue at session start. Primary context injector (~1100 tokens). |
-| `injection-size-monitor` | Monitors total injection bytes at session start. Warns on stderr if total exceeds budget. |
 | `handoff-triage-gate` | Checks for stale deferred items at session start. Surfaces unresolved handoffs from previous sessions. |
 | `tool-parity-check` | Detects hook registration drift between Claude, Gemini, Codex, Crush, and OpenCode on a 24h cooldown. Reports only actionable gaps (excludes structural event differences). |
 | `detect-sync-conflicts` ⁱ | Scans for Syncthing conflict files in AI context directories. Silent when clean. |
@@ -34,8 +32,6 @@ Fires after each tool call (matcher-scoped — not every hook runs on every tool
 | `context-pressure-enforce` | `Write\|Edit\|MultiEdit\|Bash` | Enforces the context pressure thresholds documented in `AGENTS.md` — EARLY warning at 80% used, SOFT nudge at 85%, HARD enforce at 92%. |
 | `post-write-sync` | `Write\|Edit` | Combined sync hook — `CLAUDE.md → GEMINI.md` translation, `commands/skills/rules` mirroring, `AI-tasks / AI-progress` bidirectional sync. Runs 4 ops in one process. |
 | `skill-invocation-logger` | `Skill` | Logs skill invocations to a session-local temp file. Feeds `track-skill-usage` at Stop. |
-| `hook-doc-drift-detector` | `Write\|Edit` on `*.claude/hooks/*.js` | When a hook is edited, scans project `CLAUDE.md` files for stale references to that hook. |
-| `dead-hook-detector` | `Write\|Edit` | When a hook file is modified, checks it's registered in `settings.json` — flags orphans. |
 | `memory-retrieval-logger` | `Read` | Logs memory-file reads to a per-machine retrieval log (informs the memory decay schedule). |
 | `research-lint` | `Write\|Edit` | Lints research writes under `~/Documents/research/` for source-citation drift. Requires `~/Documents/research` directory to be present (Node-native, no platform gate). |
 | `bandaid-loop-detector` | `Write\|Edit` | Detects 3+ edits to the same file within one session. Prompts root-cause reflection instead of continuing patch-on-patch. |
@@ -53,7 +49,6 @@ Fires before tool execution. Returning a non-zero exit can block the tool call.
 | Hook | Matcher | What it does |
 |---|---|---|
 | `verifiedby-gate` | `TodoWrite` | Blocks TodoWrite attempts that mark a task done with an empty `verifiedBy` field. |
-| `validate-settings-on-write` | `Write` on settings.json | Validates the edit BEFORE it's written. Prevents broken hooks from silently killing settings. |
 | `prefer-editing-nudge` | `Write` | Warns when a Write creates `foo-v2.ts` next to an existing `foo.ts`. |
 | `block-subagent-writes` | `Bash` (subagent ctx) | Hard-blocks subagents from running state-changing git commands (`commit / push / reset --hard / rebase / merge / cherry-pick / ...`). |
 | `autosave-before-destructive` | `Bash` | Auto-git-stash before `rm -rf`, `git reset --hard`, and similar. |
@@ -96,7 +91,6 @@ Fires once at session end. Data-safety hooks (commit local before network) come 
 |---|---|
 | `task-verification-gate` | If the task description suggests code changes, enforces a verification step before the task can be marked done. |
 | `subagent-quality-gate` | Quality gate for subagent output — flags low-confidence claims and unverified assertions. |
-| `subagent-claim-logger` | Logs subagent claims for post-session meta-verification. Records what agents claimed vs what was verified. |
 
 ## PreCompact
 
@@ -118,7 +112,6 @@ Claude Code only — fires after each user message, before the model processes i
 | Hook | What it does |
 |---|---|
 | `per-prompt-overhead` | D2 instrumentation — logs per-prompt injection byte overhead for budget tracking. |
-| `prompt-hash-logger` | D4 instrumentation — hashes each prompt for deduplication and pattern analysis. |
 | `prompt-item-tracker` | Tracks scope items mentioned in user prompts. Detects scope drift when new items appear mid-session. |
 | `slash-command-logger` | Logs slash command invocations for skill utilization analytics. |
 | `caveman-post-compact-reinject` ⁱ | Re-injects caveman mode rules after context compaction (which strips hook-injected state). |
@@ -139,9 +132,6 @@ These fire under AfterTool in Gemini CLI and handle Gemini→Claude direction sy
 
 | Hook | What it does |
 |---|---|
-| `sync-claude-md` | Syncs CLAUDE.md changes from Gemini's write to Claude's copy. |
-| `sync-claude-skills` | Syncs skill changes from Gemini to Claude. |
-| `sync-claude-agents` | Syncs agent file changes from Gemini to Claude. |
 
 ## Library helpers (`hooks/lib/`)
 
@@ -188,4 +178,4 @@ See [ADDING-A-HOOK.md](./ADDING-A-HOOK.md).
 Two options:
 
 1. **Per-event.** Remove the entry from `~/.claude/settings.json → hooks.<event>` and/or `~/.gemini/settings.json`. The hook file stays on disk but stops firing.
-2. **Delete the file.** `rm ~/.claude/hooks/<name>.js`. On the next session start, `dead-hook-detector` flags the now-orphan settings entry so you can clean it up.
+2. **Delete the file.** `rm ~/.claude/hooks/<name>.js`. On the next session start, `hook-edit-monitor` flags the now-orphan settings entry so you can clean it up.

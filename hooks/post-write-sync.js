@@ -6,7 +6,7 @@
 //   1. CLAUDE.md → GEMINI.md translation (27 surgical replacements)
 //   2. .claude/commands|skills|rules → .gemini/ equivalents (with frontmatter translation)
 //   3. .claude/agents/*.md → .gemini/agents/*.md (with frontmatter translation)
-//   4. AI-tasks.json / AI-progress.json bidirectional sync
+//   4. AI-tasks.json bidirectional sync
 
 const TIMER_START = process.hrtime.bigint();
 const fs = require('fs');

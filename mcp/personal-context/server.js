@@ -395,19 +395,6 @@ const TOOLS = {
     },
   },
 
-  read_progress: {
-    description: 'Deprecated in v0.9.5. Use list_handoffs for session summaries.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        cwd: { type: 'string', description: 'Optional starting directory' },
-      },
-    },
-    handler: () => {
-      return { content: [{ type: 'text', text: 'AI-progress.json deprecated in v0.9.5 (W4-FIX1). Use list_handoffs for session summaries.' }] };
-    },
-  },
-
   add_memory: {
     description: 'Append a new memory file to ~/.ai-context/memory/. Requires name, type (user|feedback|project|reference), description, and body content.',
     inputSchema: {
@@ -493,7 +480,7 @@ const TOOLS = {
         const ids = [...current.matchAll(/\[D-(\d+)\]/g)].map(m => parseInt(m[1], 10));
         const nextId = (ids.length ? Math.max(...ids) : 0) + 1;
         const today = new Date().toISOString().slice(0, 10);
-        const entry = `\n### [D-${nextId}] ${title}\n- **Discovered:** ${today}\n- **Symptom:** ${symptom}\n${workaround ? `- **Workaround:** ${workaround}\n` : ''}${fix_approach ? `- **Fix approach:** ${fix_approach}\n` : ''}- **Severity:** ${severity}\n- **Owner:** @[user]\n`;
+        const entry = `\n### [D-${nextId}] ${title}\n- **Discovered:** ${today}\n- **Symptom:** ${symptom}\n${workaround ? `- **Workaround:** ${workaround}\n` : ''}${fix_approach ? `- **Fix approach:** ${fix_approach}\n` : ''}- **Severity:** ${severity}\n- **Owner:** @owner\n`;
         // Insert after "## Open"
         let updated;
         if (/^## Open\s*$/m.test(current)) {

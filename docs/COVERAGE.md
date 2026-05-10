@@ -1,7 +1,7 @@
 # Hook Coverage — Structural Asymmetry Across AI Tools
 
 Documents which hook events exist in which tools, why gaps are structural (not bugs),
-and what coverage the 72 hooks in MANIFEST.yaml actually achieve.
+and what coverage the 65 hooks in MANIFEST.yaml actually achieve.
 
 Generated from: `scripts/MANIFEST.yaml` + architecture docs.
 Last updated: 2026-05-06 (5-tool architecture, v0.9.4).
@@ -48,15 +48,15 @@ Claude canonical names used throughout. Gemini/Codex/Crush names shown in parent
 
 ## Hook Coverage Summary
 
-Counts derived from `scripts/MANIFEST.yaml` (72 hooks, order 1–72).
+Counts derived from `scripts/MANIFEST.yaml` (65 hooks, order 1–72).
 
 | Coverage | Count | Notes |
 |---|---|---|
-| Total hooks in manifest | 72 | All hooks across all tools |
-| Registered in all 3 tools | 40 | `tools: [claude, codex, gemini]` |
-| Claude + Gemini only | 18 | No Codex/Crush equivalent event or not ported |
-| Claude + Codex only | 6 | All on `UserPromptSubmit` (Gemini/Crush dropped event) |
-| Gemini only | 5 | Gemini-side sync hooks (`sync-claude-md`, `sync-claude-skills`, `sync-claude-agents`, `claude-gemini-json-sync`, `sync-memory-dirs`) |
+| Total hooks in manifest | 65 | All hooks across all tools |
+| Registered in all 3 tools | 43 | `tools: [claude, codex, gemini]` |
+| Claude + Gemini only | 6 | No Codex/Crush equivalent event or not ported |
+| Claude + Codex only | 5 | All on `UserPromptSubmit` (Gemini/Crush dropped event) |
+| Gemini only | 0 | Gemini-side sync hooks (`sync-claude-md`, `sync-claude-skills`, `sync-claude-agents`, `claude-gemini-json-sync`, `sync-memory-dirs`) |
 | Claude only | 3 | `memory-post-compact.js`, `cwd-changed-watcher.js`, `file-changed-notify.js` — events don't exist elsewhere |
 | Crush only | 1 | `block-subagent-writes.js` on `PreToolUse` (5 critical PreToolUse hooks active) |
 
@@ -67,7 +67,7 @@ Counts derived from `scripts/MANIFEST.yaml` (72 hooks, order 1–72).
 | Claude | 40 + 18 + 6 + 3 = 67 | 93% |
 | Gemini | 40 + 18 + 5 = 63 | 88% |
 | Codex | 40 + 6 = 46 | 64% |
-| Crush | 5 (PreToolUse only) | 7% |
+| Crush | 8 (PreToolUse only) | 12% |
 | OpenCode | 0 | 0% (no hooks) |
 
 ---
@@ -104,7 +104,6 @@ Gemini and Codex have no filesystem watcher API. External file changes are invis
 
 Gemini CLI had this event added but it never fired reliably and was subsequently removed.
 Six hooks use `UserPromptSubmit`: `caveman-post-compact-reinject.js`, `per-prompt-overhead.js`,
-`prompt-hash-logger.js`, `prompt-item-tracker.js`, `prompt-clarity-check.js`,
 `slash-command-logger.js`. All are registered for claude+codex, none for gemini.
 
 Consequence: per-prompt guardrails (caveman reinject, prompt clarity, slash-command logging)
@@ -142,8 +141,6 @@ or log token usage per-request. No Claude or Codex equivalent. Currently unused.
 
 ### Gemini-only sync hooks (5 hooks)
 
-`sync-claude-md.js`, `sync-claude-skills.js`, `sync-claude-agents.js`,
-`claude-gemini-json-sync.js`, `sync-memory-dirs.js` — these exist because Gemini writes to its
 own config tree and needs to mirror changes back to canonical `~/.ai-context/` and `~/.claude/`.
 Claude and Codex don't need equivalent hooks because they write directly to canonical paths or
 their symlinks are one-way.
@@ -152,7 +149,7 @@ their symlinks are one-way.
 
 ## Command / Skill Coverage
 
-14 user-facing commands (slash commands in Claude, contextual skills in Gemini, `cmd-*` in Codex):
+15 user-facing commands (slash commands in Claude, contextual skills in Gemini, `cmd-*` in Codex):
 
 | Command | Claude | Gemini | Codex |
 |---|---|---|---|

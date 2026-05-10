@@ -20,7 +20,7 @@ Your personal rules go between the USER SECTION markers — they survive updates
 > **Canonical source of truth.** This file at `~/.ai-context/AGENTS.md` is the single master prompt for ALL AI coding tools.
 > Symlinked from: `~/.claude/CLAUDE.md`, `~/.gemini/GEMINI.md`, `~/.codex/AGENTS.md`, `~/.config/opencode/AGENTS.md`, `~/.config/aider/AGENTS.md`.
 > Override per-project: drop `AGENTS.md` at repo root — deepest wins.
-> **Last updated:** 2026-05-06 (v0.9.4 — standardization pass)
+> **Last updated:** 2026-05-06 (v0.9.6 — session system improvements)
 
 ## Identity
 
@@ -49,7 +49,7 @@ Your personal rules go between the USER SECTION markers — they survive updates
 - NEVER auto-commit without the user seeing the diff and approving
 - NEVER commit changes that haven't been verified (at minimum: eval passes)
 - Prefer editing existing files over creating new ones. Keep changes minimal — no drive-by refactors.
-- **GPG sign exception:** `auto-push-global.js` Stop hook uses `--no-gpg-sign` for mechanical `chore: auto-sync from session end` commits in `~/.ai-context` only.
+- **GPG sign exception:** `auto-push-global.js` Stop hook uses `--no-gpg-sign` for mechanical `chore: auto-sync from session end` commits in `~/.ai-context` only. `autosave-before-destructive.js` also uses `--no-gpg-sign` for phantom reflog-only commits (immediately destroyed via reset — signing a never-persisted breadcrumb has zero security value).
 
 ### Safety-Critical Code
 - Code paths involving [safety-module]/, [safety-module], [safety-domain], [safety-component]: respond in **normal prose, not caveman**. Fragment misread risk too high.
@@ -109,7 +109,7 @@ For multi-agent dispatches, answer: (1) Need agent? (2) What files will it read 
 
 ## Architecture Pointers
 - **One Brain:** `~/.ai-context/` is the ONLY git repo + Syncthing folder. Tool dirs are derived state (symlinks). Full table: `AGENTS-architecture.md`.
-- **Hook registration:** edit `scripts/MANIFEST.yaml` → run `scripts/generate-settings.mjs --apply --all`. All 5 tool configs regenerated.
+- **Hook registration:** edit `scripts/MANIFEST.yaml` → run `scripts/generate-settings.mjs --apply --all`. 4 tool configs regenerated (Claude, Gemini, Codex, Crush — OpenCode uses JS plugins).
 - **Domain rules:** `~/.ai-context/AGENTS-domain-specific.md` (cwd-gated).
 - **Architecture, memory format, portable context, tool read paths:** `~/.ai-context/AGENTS-architecture.md`.
 - **Other tools (Aider/Cursor/Windsurf/Copilot/Cline):** see `AGENTS-architecture.md` "Other-tools specifics" section.

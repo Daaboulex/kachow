@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 require(__dirname + "/lib/emit-simple-timing.js").start(__filename);
+const os = require('os');
 // Combined pre-write guard for write tools across all 3 CLIs.
 // Event names per tool: PreToolUse (Claude/Codex), BeforeTool (Gemini).
 // Tool-aware via lib/tool-detect.js (path-based + env-based detection).
