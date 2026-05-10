@@ -424,7 +424,7 @@
   "effortLevel": "xhigh",
   "editorMode": "vim",
   "skillListingBudgetFraction": 0.5,
-  "skillListingMaxDescChars": 400,
+  "skillListingMaxDescChars": 800,
   "hooks": {
     "SessionStart": [
       {
