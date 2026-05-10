@@ -231,6 +231,7 @@
       "Bash(hexdump *)",
       "Bash(xxd *)",
       "mcp__personal-context",
+      "mcp__ai-context-vault",
       "mcp__filesystem",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:docs.anthropic.com)",
@@ -424,7 +425,6 @@
   "editorMode": "vim",
   "skillListingBudgetFraction": 0.5,
   "skillListingMaxDescChars": 400,
-  "skillListingBudgetMode": "truncate",
   "hooks": {
     "SessionStart": [
       {
