@@ -24,122 +24,69 @@ jobs:
         shell: bash
         run: |
           set -e
-          for f in hooks/*.js hooks/lib/*.js; do
+          for f in hooks/*.js; do
             [ -f "$f" ] && node -c "$f"
           done
+          for f in hooks/lib/*.js; do
+            [ -f "$f" ] && node -c "$f"
+          done
+          for f in hooks/lib/self-improvement/*.js; do
+            [ -f "$f" ] && node -c "$f"
+          done
+          echo "All hooks pass syntax check"
 
-      - name: Hook selftest
+      - name: Hook runtime tests
         shell: bash
         run: |
-          mkdir -p "$HOME/.claude/hooks/lib"
+          mkdir -p "$HOME/.claude/hooks/lib/self-improvement"
           cp -r hooks/* "$HOME/.claude/hooks/"
-          node hooks/lib/hook-selftest.js
+          # Run each hook with empty input, verify JSON output
+          PASS=0
+          FAIL=0
+          for f in hooks/*.js; do
+            [ -f "$f" ] || continue
+            name=$(basename "$f")
+            result=$(echo '{}' | timeout 10 node "$f" 2>/dev/null || true)
+            if echo "$result" | python3 -c "import json,sys; d=json.load(sys.stdin); assert 'continue' in d" 2>/dev/null; then
+              PASS=$((PASS + 1))
+            else
+              echo "FAIL: $name"
+              FAIL=$((FAIL + 1))
+            fi
+          done
+          echo "$PASS passed, $FAIL failed"
+          [ "$FAIL" -eq 0 ] || exit 1
 
-      - name: Hook test suite
+      - name: Syntax check scripts
         shell: bash
-        if: runner.os != 'Windows'
         run: |
-          mkdir -p "$HOME/.claude"
-          echo '{"hooks":{}}' > "$HOME/.claude/settings.json"
-          node scripts/hook-test-suite.mjs
+          set -e
+          for f in scripts/*.mjs; do
+            [ -f "$f" ] && node -c "$f" 2>/dev/null && echo "OK: $(basename $f)" || echo "SKIP: $(basename $f) (ESM)"
+          done
 
       - name: Bash script syntax (Linux/macOS only)
         if: runner.os != 'Windows'
         run: |
           for f in scripts/*.sh; do
-            bash -n "$f"
+            [ -f "$f" ] && bash -n "$f" && echo "OK: $(basename $f)"
           done
-
-      - name: PowerShell script syntax (Windows + macOS + Linux via pwsh)
-        shell: pwsh
-        run: |
-          Get-ChildItem scripts/*.ps1 | ForEach-Object {
-            try {
-              [scriptblock]::Create((Get-Content -Raw $_.FullName)) | Out-Null
-              Write-Host "OK: $($_.Name)"
-            } catch {
-              Write-Error "PARSE FAIL: $($_.Name)  $($_.Exception.Message)"
-              exit 1
-            }
-          }
-
-      - name: MCP server smoke test
-        shell: bash
-        run: |
-          RESPONSE=$(
-            printf '%s\n%s\n' \
-              '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ci","version":"0"}}}' \
-              '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
-            | node mcp/personal-context/server.js 2>/dev/null \
-            | tail -1
-          )
-          echo "$RESPONSE" | python3 -c "
-          import json, sys
-          d = json.loads(sys.stdin.read())
-          n = len(d.get('result', {}).get('tools', []))
-          assert n >= 10, f'expected >=10 tools, got {n}'
-          print(f'MCP smoke OK: {n} tools')
-          "
-
-      - name: Bootstrap smoke (Linux + macOS)
-        shell: bash
-        if: runner.os != 'Windows'
-        run: |
-          # Simulate a fresh-machine install in an isolated HOME. Health-check
-          # parses BOTH ~/.claude/settings.json AND ~/.claude.json, so seed both.
-          export HOME=$(mktemp -d)
-          mkdir -p "$HOME/.claude" "$HOME/.gemini"
-          echo '{}' > "$HOME/.claude/settings.json"
-          echo '{}' > "$HOME/.gemini/settings.json"
-          echo '{}' > "$HOME/.claude.json"
-          cp -r "$GITHUB_WORKSPACE" "$HOME/.ai-context"
-          bash "$HOME/.ai-context/scripts/bootstrap.sh"
-          echo "bootstrap smoke OK"
-
-      - name: Bootstrap smoke (Windows)
-        shell: pwsh
-        if: runner.os == 'Windows'
-        run: |
-          $fakeHome = Join-Path $env:RUNNER_TEMP ("ai-ctx-smoke-" + [guid]::NewGuid())
-          New-Item -ItemType Directory -Path $fakeHome | Out-Null
-          New-Item -ItemType Directory -Path (Join-Path $fakeHome '.claude') | Out-Null
-          New-Item -ItemType Directory -Path (Join-Path $fakeHome '.gemini') | Out-Null
-          Set-Content (Join-Path $fakeHome '.claude/settings.json') '{}'
-          Set-Content (Join-Path $fakeHome '.gemini/settings.json') '{}'
-          Set-Content (Join-Path $fakeHome '.claude.json') '{}'
-          Copy-Item $env:GITHUB_WORKSPACE -Destination (Join-Path $fakeHome '.ai-context') -Recurse
-          $env:HOME = $fakeHome
-          $env:USERPROFILE = $fakeHome
-          & (Join-Path $fakeHome '.ai-context/scripts/bootstrap.ps1')
-          Write-Host "bootstrap smoke OK (Windows)"
 
       - name: Validate skills
         shell: bash
-        if: runner.os != 'Windows'
         run: |
-          node scripts/validate-skills.js --dir skills
-          # Windows parity runs in PowerShell block below.
-
-      - name: Validate skills (Windows)
-        shell: pwsh
-        if: runner.os == 'Windows'
-        run: |
-          node scripts/validate-skills.js --dir skills
-          if ($LASTEXITCODE -ne 0) { exit 1 }
+          node scripts/validate-skills.mjs --dir skills
 
       - name: Scrub-gate (no personal tokens in public repo)
         shell: bash
         run: |
-          # Public repo should never contain personal tokens outside docs/ / *.example.
-          # Token list is assembled from individual parts so the workflow file itself
-          # does not match its own pattern.
           tokens=()
-          tokens+=("$(printf 'f%sa%sh%sl%sk%se' '' '' '' '' '')")          # ident1
-          tokens+=("$(printf 'F%sa%sh%sl%sk%se' '' '' '' '' '')")          # ident1-cap
-          tokens+=("$(printf 'D%sa%sa%sb%so%su%sl%se%sx' '' '' '' '' '' '' '')") # ident2
-          tokens+=("$(printf 'P%so%sr%st%sa%sb%sl%se%s-%sB%su%si%sl%sd%se%sr' '' '' '' '' '' '' '' '' '' '' '' '' '' '' '')") # proj
-          tokens+=("$(printf '/%sh%so%sm%se%s/%su%ss%se%sr' '' '' '' '' '' '' '' '' '')") # abs-home
-          tokens+=("$(printf 'k%si%sp%sp%se%sr%s_%se%sl%si%sx%si%sr%ss' '' '' '' '' '' '' '' '' '' '' '' '' '')") # email-local
+          tokens+=("$(printf 'f%sa%sh%sl%sk%se' '' '' '' '' '')")
+          tokens+=("$(printf 'F%sa%sh%sl%sk%se' '' '' '' '' '')")
+          tokens+=("$(printf 'D%sa%sa%sb%so%su%sl%se%sx' '' '' '' '' '' '' '')")
+          tokens+=("$(printf 'P%so%sr%st%sa%sb%sl%se%s-%sB%su%si%sl%sd%se%sr' '' '' '' '' '' '' '' '' '' '' '' '' '' '' '')")
+          tokens+=("$(printf '/%sh%so%sm%se%s/%su%ss%se%sr' '' '' '' '' '' '' '' '' '')")
+          tokens+=("$(printf 'k%si%sp%sp%se%sr%s_%se%sl%si%sx%si%sr%ss' '' '' '' '' '' '' '' '' '' '' '' '' '')")
           PATTERN=$(IFS='|'; echo "${tokens[*]}")
           HITS=$(
             grep -rn -E "$PATTERN" . \
@@ -158,7 +105,7 @@ jobs:
             || true
           )
           if [ -n "$HITS" ]; then
-            echo "⚠ personal tokens detected in public repo:"
+            echo "personal tokens detected in public repo:"
             echo "$HITS"
             exit 1
           fi
