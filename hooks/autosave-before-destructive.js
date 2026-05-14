@@ -108,7 +108,7 @@ try {
   // Hard-block dangerous root paths regardless of git state
   const hardBlocked = HARD_BLOCK_PATTERNS.some(re => re.test(cmd));
   if (hardBlocked) {
-    process.stderr.write(`autosave-before-destructive: BLOCKED dangerous command matching hard-block pattern\n  cmd: ${cmd}\n`);
+    try { require('./lib/hook-logger.js').logError('autosave-before-destructive', `BLOCKED dangerous command: ${cmd}`); } catch {}
     process.stdout.write(JSON.stringify({
       decision: 'block',
       reason: 'Matches a hard-blocked pattern (dangerous system root). Refuse even with autosave.',

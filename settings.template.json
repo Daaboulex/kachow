@@ -1,893 +1,104 @@
 {
   "_": "Template settings — run scripts/customize.sh to populate env/allow/hooks for your stack. Add optional add-ons from settings.embedded.json.example / settings.nix.json.example / etc.",
-  "worktree": {
-    "baseRef": "fresh"
-  },
-  "autoMode": {
-    "hard_deny": [
-      "rm -rf /",
-      "rm -rf ~",
-      "rm -rf /*",
-      "git reset --hard",
-      "git push --force origin main",
-      "git push --force origin master",
-      "git push -f origin main",
-      "git push -f origin master",
-      "dd if=/dev",
-      "mkfs.",
-      "shutdown -h",
-      "reboot",
-      ":(){ :|:& };:"
-    ]
-  },
-  "statusLine": {
-    "type": "command",
-    "command": "bash $HOME/.claude/statusline.sh",
-    "hideVimModeIndicator": false
-  },
+  "skillListingBudgetFraction": 0.05,
+  "editorMode": "vim",
   "env": {
     "OTEL_EXPORTER_OTLP_ENDPOINT": ""
   },
-  "attribution": {
-    "commit": "",
-    "pr": ""
-  },
   "permissions": {
-    "allow": [
-      "Read",
-      "Glob",
-      "Grep",
-      "Agent",
-      "Write(/tmp/claude-*)",
-      "Write(/tmp/ai-ctx-*)",
-      "Edit(/tmp/claude-*)",
-      "Edit(/tmp/ai-ctx-*)",
-      "Bash(git status*)",
-      "Bash(git diff*)",
-      "Bash(git log*)",
-      "Bash(git branch*)",
-      "Bash(git show*)",
-      "Bash(git rev-parse*)",
-      "Bash(git ls-files*)",
-      "Bash(git stash list*)",
-      "Bash(git remote -v*)",
-      "Bash(git add *)",
-      "Bash(git commit *)",
-      "Bash(git checkout *)",
-      "Bash(git switch *)",
-      "Bash(git merge *)",
-      "Bash(git rebase *)",
-      "Bash(git cherry-pick *)",
-      "Bash(git fetch*)",
-      "Bash(git pull*)",
-      "Bash(git clone *)",
-      "Bash(git worktree *)",
-      "Bash(ls *)",
-      "Bash(ls)",
-      "Bash(pwd)",
-      "Bash(which *)",
-      "Bash(whoami)",
-      "Bash(uname *)",
-      "Bash(cat *)",
-      "Bash(head *)",
-      "Bash(tail *)",
-      "Bash(wc *)",
-      "Bash(sort *)",
-      "Bash(uniq *)",
-      "Bash(cut *)",
-      "Bash(tr *)",
-      "Bash(find *)",
-      "Bash(fd *)",
-      "Bash(rg *)",
-      "Bash(fzf *)",
-      "Bash(jq *)",
-      "Bash(python3 *)",
-      "Bash(node *)",
-      "Bash(npm *)",
-      "Bash(npx *)",
-      "Bash(cargo *)",
-      "Bash(rustc *)",
-      "Bash(go *)",
-      "Bash(dotnet *)",
-      "Bash(make *)",
-      "Bash(cmake *)",
-      "Bash(gcc *)",
-      "Bash(g++ *)",
-      "Bash(cp *)",
-      "Bash(mv *)",
-      "Bash(mkdir *)",
-      "Bash(touch *)",
-      "Bash(chmod *)",
-      "Bash(stat *)",
-      "Bash(file *)",
-      "Bash(du *)",
-      "Bash(df *)",
-      "Bash(free *)",
-      "Bash(top -bn1*)",
-      "Bash(ps *)",
-      "Bash(systemctl status *)",
-      "Bash(systemctl list-*)",
-      "Bash(journalctl *)",
-      "Bash(ip *)",
-      "Bash(ss *)",
-      "Bash(curl *)",
-      "Bash(wget *)",
-      "Bash(gh *)",
-      "Bash(ssh-keygen -l *)",
-      "Bash(date*)",
-      "Bash(env)",
-      "Bash(printenv *)",
-      "Bash(echo *)",
-      "Bash(printf *)",
-      "Bash(test *)",
-      "Bash(diff *)",
-      "Bash(patch *)",
-      "Bash(tar *)",
-      "Bash(zip *)",
-      "Bash(unzip *)",
-      "Bash(prettier *)",
-      "Bash(bat *)",
-      "Bash(eza *)",
-      "Bash(zoxide *)",
-      "Bash(sed *)",
-      "Bash(awk *)",
-      "Bash(xargs *)",
-      "Bash(tee *)",
-      "Bash(basename *)",
-      "Bash(dirname *)",
-      "Bash(realpath *)",
-      "Bash(readlink *)",
-      "Bash(journalctl -b *)",
-      "Bash(journalctl -u *)",
-      "Bash(clang-tidy *)",
-      "Bash(cppcheck *)",
-      "Bash(clippy *)",
-      "Bash(clippy-driver *)",
-      "Bash(ruff *)",
-      "Bash(mypy *)",
-      "Bash(black --check*)",
-      "Bash(pytest *)",
-      "Bash(tsc *)",
-      "Bash(eslint *)",
-      "Bash(uv *)",
-      "Bash(pwsh *)",
-      "Bash(powershell *)",
-      "Bash(pnpm *)",
-      "Bash(yarn *)",
-      "Bash(bun *)",
-      "Bash(deno *)",
-      "Bash(rustup show*)",
-      "Bash(rustup which*)",
-      "Bash(podman ps*)",
-      "Bash(podman images*)",
-      "Bash(podman inspect*)",
-      "Bash(podman logs*)",
-      "Bash(podman top*)",
-      "Bash(podman stats --no-stream*)",
-      "Bash(podman info*)",
-      "Bash(podman version)",
-      "Bash(podman network ls*)",
-      "Bash(podman volume ls*)",
-      "Bash(podman port*)",
-      "Bash(podman diff*)",
-      "Bash(skopeo inspect*)",
-      "Bash(skopeo list-tags*)",
-      "Bash(buildah images*)",
-      "Bash(buildah containers*)",
-      "Bash(systemctl show*)",
-      "Bash(systemctl is-active*)",
-      "Bash(systemctl is-enabled*)",
-      "Bash(systemctl is-failed*)",
-      "Bash(systemctl cat*)",
-      "Bash(loginctl list-sessions*)",
-      "Bash(loginctl show-user*)",
-      "Bash(ssh-add -l*)",
-      "Bash(ssh-add -L*)",
-      "Bash(ssh -V)",
-      "Bash(ssh -G*)",
-      "Bash(yq *)",
-      "Bash(dasel *)",
-      "Bash(xmlstarlet sel*)",
-      "Bash(sha256sum *)",
-      "Bash(b2sum *)",
-      "Bash(md5sum *)",
-      "Bash(dig +short*)",
-      "Bash(echo hello)",
-      "Bash(nslookup *)",
-      "Bash(uptime)",
-      "Bash(pgrep -l*)",
-      "Bash(pgrep -af*)",
-      "Bash(pgrep -f*)",
-      "Bash(lsof -p*)",
-      "Bash(lsof -i*)",
-      "Bash(* --version)",
-      "Bash(* -V)",
-      "Bash(* --help)",
-      "Bash(git stash show*)",
-      "Bash(git stash push*)",
-      "Bash(git stash pop*)",
-      "Bash(git stash apply*)",
-      "Bash(git stash drop*)",
-      "Bash(git blame*)",
-      "Bash(git describe*)",
-      "Bash(git grep*)",
-      "Bash(git rev-list*)",
-      "Bash(git ls-tree*)",
-      "Bash(git shortlog*)",
-      "Bash(git reflog*)",
-      "Bash(git fsck*)",
-      "Bash(git config --get*)",
-      "Bash(git config --list*)",
-      "Bash(git remote get-url*)",
-      "Bash(git worktree list*)",
-      "Bash(paste *)",
-      "Bash(join *)",
-      "Bash(column *)",
-      "Bash(expr *)",
-      "Bash(bc *)",
-      "Bash(true)",
-      "Bash(false)",
-      "Bash(sleep *)",
-      "Bash(hexdump *)",
-      "Bash(xxd *)",
-      "mcp__personal-context",
-      "mcp__ai-context-vault",
-      "mcp__filesystem",
-      "WebFetch(domain:github.com)",
-      "WebFetch(domain:docs.anthropic.com)",
-      "WebFetch(domain:code.claude.com)",
-      "WebFetch(domain:modelcontextprotocol.io)",
-      "WebFetch(domain:agents.md)"
-    ],
-    "deny": [
-      "Bash(rm -rf /)",
-      "Bash(rm -rf /*)",
-      "Bash(rm -rf ~)",
-      "Bash(rm -rf ~/)",
-      "Bash(git push * --force*)",
-      "Bash(git push --force*)",
-      "Bash(git push * -f *)",
-      "Bash(git reset --hard*)",
-      "Bash(git clean -f*)",
-      "Bash(dd if=*)",
-      "Bash(mkfs.*)",
-      "Bash(fdisk *)",
-      "Bash(parted *)",
-      "Bash(shutdown *)",
-      "Bash(reboot*)",
-      "Bash(systemctl start *)",
-      "Bash(systemctl stop *)",
-      "Bash(systemctl restart *)",
-      "Bash(systemctl enable *)",
-      "Bash(systemctl disable *)",
-      "Bash(kill -9 *)",
-      "Bash(killall *)",
-      "Bash(pkill *)",
-      "Read(.env)",
-      "Read(.env.local*)",
-      "Read(.env.production*)",
-      "Read(.env.secret*)",
-      "Read(.env.prod*)",
-      "Read(**/secrets/**)",
-      "Read(**/.credentials*)",
-      "Read(**/id_rsa*)",
-      "Read(**/id_ed25519*)",
-      "Read(**/id_ecdsa*)",
-      "Read(**/*.pem)",
-      "Read(**/*.p12)",
-      "Read(**/oauth_creds*)",
-      "Read(~/.ssh/**)",
-      "Read(~/.aws/**)",
-      "Read(~/.gnupg/**)",
-      "Read(**/*_token*)",
-      "Read(**/*.key)",
-      "Bash(find * -delete*)",
-      "Bash(find * -exec rm*)",
-      "Bash(find * -exec sudo*)",
-      "Bash(xargs rm*)",
-      "Bash(xargs sudo*)",
-      "Bash(nix copy *)",
-      "Bash(nix store gc*)",
-      "Bash(nix store delete*)",
-      "Bash(nix-collect-garbage*)",
-      "Bash(npm publish*)",
-      "Bash(npm link*)",
-      "Bash(npm install -g*)",
-      "Bash(pnpm publish*)",
-      "Bash(pnpm link*)",
-      "Bash(yarn publish*)",
-      "Bash(cargo publish*)",
-      "Bash(cargo install *)",
-      "Bash(cargo fix*)",
-      "Bash(rustup update*)",
-      "Bash(rustup default*)",
-      "Bash(rustup install*)",
-      "Bash(pip install *)",
-      "Bash(pip uninstall*)",
-      "Bash(uv pip install *)",
-      "Bash(uv pip uninstall*)",
-      "Bash(dotnet nuget push*)",
-      "Bash(dotnet tool install -g*)",
-      "Bash(eas build*)",
-      "Bash(eas submit*)",
-      "Bash(eas update*)",
-      "Bash(pio run *upload*)",
-      "Bash(pio run * -t upload*)",
-      "Bash(pio run * --target upload*)",
-      "Bash(pio device monitor*)",
-      "Bash(esptool.py * write_flash*)",
-      "Bash(esptool.py * erase_flash*)",
-      "Bash(openocd *program*)",
-      "Bash(podman run*)",
-      "Bash(podman exec*)",
-      "Bash(podman rm *)",
-      "Bash(podman rmi*)",
-      "Bash(podman volume rm*)",
-      "Bash(podman system prune*)",
-      "Bash(podman push*)",
-      "Bash(buildah commit*)",
-      "Bash(buildah push*)",
-      "Bash(skopeo copy*)",
-      "Bash(skopeo delete*)",
-      "Bash(eslint * --fix*)",
-      "Bash(clang-tidy * --fix*)",
-      "Bash(prettier * --write*)",
-      "Bash(gh pr merge*)",
-      "Bash(gh pr close*)",
-      "Bash(gh issue close*)",
-      "Bash(gh release delete*)",
-      "Bash(gh repo delete*)",
-      "Bash(gh auth login*)",
-      "Bash(gh auth logout*)",
-      "Bash(scp *)",
-      "Bash(ssh * rm*)",
-      "Bash(ssh * sudo*)",
-      "Bash(rsync * --delete*)"
-    ],
-    "defaultMode": "acceptEdits"
+    "defaultMode": "auto"
   },
   "skillOverrides": {
-    "gsd-add-backlog": "name-only",
-    "gsd-add-phase": "name-only",
-    "gsd-add-tests": "name-only",
-    "gsd-add-todo": "name-only",
-    "gsd-analyze-dependencies": "name-only",
-    "gsd-audit-fix": "name-only",
-    "gsd-audit-milestone": "name-only",
-    "gsd-audit-uat": "name-only",
-    "gsd-cleanup": "name-only",
-    "gsd-code-review-fix": "name-only",
-    "gsd-complete-milestone": "name-only",
-    "gsd-docs-update": "name-only",
-    "gsd-eval-review": "name-only",
-    "gsd-extract_learnings": "name-only",
-    "gsd-forensics": "name-only",
-    "gsd-from-gsd2": "name-only",
-    "gsd-graphify": "name-only",
-    "gsd-health": "name-only",
-    "gsd-import": "name-only",
-    "gsd-inbox": "name-only",
-    "gsd-ingest-docs": "name-only",
-    "gsd-insert-phase": "name-only",
-    "gsd-intel": "name-only",
-    "gsd-list-phase-assumptions": "name-only",
-    "gsd-list-workspaces": "name-only",
-    "gsd-manager": "name-only",
-    "gsd-milestone-summary": "name-only",
-    "gsd-new-workspace": "name-only",
-    "gsd-note": "name-only",
-    "gsd-pause-work": "name-only",
-    "gsd-plan-milestone-gaps": "name-only",
-    "gsd-plant-seed": "name-only",
-    "gsd-pr-branch": "name-only",
-    "gsd-profile-user": "name-only",
-    "gsd-reapply-patches": "name-only",
-    "gsd-remove-phase": "name-only",
-    "gsd-remove-workspace": "name-only",
-    "gsd-research-phase": "name-only",
-    "gsd-resume-work": "name-only",
-    "gsd-review-backlog": "name-only",
-    "gsd-review": "name-only",
-    "gsd-scan": "name-only",
-    "gsd-secure-phase": "name-only",
-    "gsd-session-report": "name-only",
-    "gsd-set-profile": "name-only",
-    "gsd-settings": "name-only",
-    "gsd-ship": "name-only",
-    "gsd-sketch-wrap-up": "name-only",
-    "gsd-spike-wrap-up": "name-only",
-    "gsd-stats": "name-only",
-    "gsd-thread": "name-only",
-    "gsd-ui-phase": "name-only",
-    "gsd-ui-review": "name-only",
-    "gsd-ultraplan-phase": "name-only",
-    "gsd-undo": "name-only",
-    "gsd-validate-phase": "name-only",
-    "gsd-verify-work": "name-only",
-    "gsd-workstreams": "name-only",
-    "compound-engineering:ce-riffrec-feedback-analysis": "name-only",
-    "compound-engineering:ce-product-pulse": "name-only",
+    "compound-engineering:ce-dhh-rails-reviewer": "name-only",
+    "compound-engineering:ce-kieran-python-reviewer": "name-only",
+    "compound-engineering:ce-kieran-rails-reviewer": "name-only",
+    "compound-engineering:ce-kieran-typescript-reviewer": "name-only",
+    "compound-engineering:ce-swift-ios-reviewer": "name-only",
+    "compound-engineering:ce-ankane-readme-writer": "name-only",
+    "compound-engineering:ce-figma-design-sync": "name-only",
+    "compound-engineering:ce-julik-frontend-races-reviewer": "name-only",
+    "compound-engineering:ce-data-migrations-reviewer": "name-only",
+    "compound-engineering:ce-schema-drift-detector": "name-only",
+    "compound-engineering:ce-slack-researcher": "name-only",
+    "compound-engineering:ce-deployment-verification-agent": "name-only",
+    "compound-engineering:ce-data-integrity-guardian": "name-only",
+    "compound-engineering:ce-data-migration-expert": "name-only",
     "compound-engineering:ce-dhh-rails-style": "name-only",
-    "compound-engineering:ce-gemini-imagegen": "name-only",
-    "compound-engineering:ce-strategy": "name-only",
-    "compound-engineering:ce-demo-reel": "name-only",
-    "compound-engineering:ce-test-browser": "name-only",
-    "compound-engineering:ce-compound-refresh": "name-only",
-    "compound-engineering:ce-session-extract": "name-only",
-    "compound-engineering:ce-session-inventory": "name-only",
-    "compound-engineering:ce-agent-native-architecture": "name-only",
-    "compound-engineering:ce-optimize": "name-only",
-    "compound-engineering:ce-frontend-design": "name-only",
-    "compound-engineering:ce-worktree": "name-only",
-    "compound-engineering:ce-proof": "name-only"
+    "compound-engineering:dhh-rails-style": "name-only",
+    "compound-engineering:dhh-rails-reviewer": "name-only",
+    "compound-engineering:andrew-kane-gem-writer": "name-only",
+    "compound-engineering:dspy-ruby": "name-only",
+    "compound-engineering:ce-test-xcode": "name-only",
+    "compound-engineering:test-xcode": "name-only",
+    "compound-engineering:figma-design-sync": "name-only",
+    "compound-engineering:julik-frontend-races-reviewer": "name-only",
+    "compound-engineering:data-migrations-reviewer": "name-only",
+    "compound-engineering:schema-drift-detector": "name-only",
+    "compound-engineering:data-integrity-guardian": "name-only",
+    "compound-engineering:data-migration-expert": "name-only",
+    "compound-engineering:slack-researcher": "name-only",
+    "compound-engineering:deployment-verification-agent": "name-only",
+    "compound-engineering:adversarial-reviewer": "name-only",
+    "compound-engineering:adversarial-document-reviewer": "name-only",
+    "compound-engineering:api-contract-reviewer": "name-only",
+    "compound-engineering:architecture-strategist": "name-only",
+    "compound-engineering:cli-agent-readiness-reviewer": "name-only",
+    "compound-engineering:cli-readiness-reviewer": "name-only",
+    "compound-engineering:code-simplicity-reviewer": "name-only",
+    "compound-engineering:coherence-reviewer": "name-only",
+    "compound-engineering:correctness-reviewer": "name-only",
+    "compound-engineering:design-implementation-reviewer": "name-only",
+    "compound-engineering:design-lens-reviewer": "name-only",
+    "compound-engineering:feasibility-reviewer": "name-only",
+    "compound-engineering:maintainability-reviewer": "name-only",
+    "compound-engineering:performance-reviewer": "name-only",
+    "compound-engineering:previous-comments-reviewer": "name-only",
+    "compound-engineering:product-lens-reviewer": "name-only",
+    "compound-engineering:project-standards-reviewer": "name-only",
+    "compound-engineering:reliability-reviewer": "name-only",
+    "compound-engineering:scope-guardian-reviewer": "name-only",
+    "compound-engineering:security-lens-reviewer": "name-only",
+    "compound-engineering:security-reviewer": "name-only",
+    "compound-engineering:testing-reviewer": "name-only",
+    "compound-engineering:agent-native-reviewer": "name-only",
+    "compound-engineering:agent-native-audit": "name-only",
+    "compound-engineering:best-practices-researcher": "name-only",
+    "compound-engineering:framework-docs-researcher": "name-only",
+    "compound-engineering:git-history-analyzer": "name-only",
+    "compound-engineering:issue-intelligence-analyst": "name-only",
+    "compound-engineering:learnings-researcher": "name-only",
+    "compound-engineering:pattern-recognition-specialist": "name-only",
+    "compound-engineering:performance-oracle": "name-only",
+    "compound-engineering:repo-research-analyst": "name-only",
+    "compound-engineering:security-sentinel": "name-only",
+    "compound-engineering:session-historian": "name-only",
+    "compound-engineering:spec-flow-analyzer": "name-only",
+    "compound-engineering:pr-comment-resolver": "name-only",
+    "compound-engineering:design-iterator": "name-only",
+    "compound-engineering:todo-create": "name-only",
+    "compound-engineering:todo-resolve": "name-only",
+    "compound-engineering:todo-triage": "name-only",
+    "compound-engineering:improvement-add": "name-only",
+    "compound-engineering:onboarding": "name-only",
+    "compound-engineering:deploy-docs": "name-only",
+    "compound-engineering:compress": "name-only"
   },
-  "effortLevel": "xhigh",
-  "editorMode": "vim",
-  "skillListingBudgetFraction": 0.5,
-  "skillListingMaxDescChars": 800,
-  "hooks": {
-    "SessionStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/auto-pull-global.js\"",
-            "timeout": 20,
-            "async": true
-          },
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/session-context-loader.js\"",
-            "timeout": 5
-          },
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/session-start-combined.js\"",
-            "timeout": 10
-          },
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/session-presence-start.js\"",
-            "timeout": 3
-          },
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/plugin-update-checker.js\"",
-            "timeout": 10,
-            "async": true
-          },
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/skill-upstream-checker.js\"",
-            "timeout": 10,
-            "async": true
-          },
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/tool-parity-check.js\"",
-            "timeout": 5,
-            "async": true
-          },
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/handoff-triage-gate.js\"",
-            "timeout": 5
-          },
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/per-prompt-overhead.js\"",
-            "timeout": 5,
-            "async": true
-          },
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/session-health-fast.js\"",
-            "timeout": 3
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/session-presence-track.js\"",
-            "timeout": 3,
-            "async": true
-          }
-        ],
-        "matcher": "Bash|Edit|Glob|Grep|MultiEdit|Read|TodoWrite|Write"
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/bandaid-loop-detector.js\"",
-            "timeout": 3
-          },
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/context-pressure-enforce.js\"",
-            "timeout": 3
-          }
-        ],
-        "matcher": "Bash|Edit|MultiEdit|Write"
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/todowrite-mirror.js\"",
-            "timeout": 3,
-            "async": true
-          }
-        ],
-        "matcher": "TodoWrite|write_todos"
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/post-write-sync.js\"",
-            "timeout": 5,
-            "if": "Write(*.claude/*)|Write(*.gemini/*)|Write(*CLAUDE.md)|Write(*GEMINI.md)|Write(*.ai-context/*)|Edit(*.claude/*)|Edit(*.gemini/*)|Edit(*CLAUDE.md)|Edit(*GEMINI.md)|Edit(*.ai-context/*)"
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/skill-invocation-logger.js\"",
-            "timeout": 3,
-            "async": true
-          }
-        ],
-        "matcher": "Bash|Skill"
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/memory-retrieval-logger.js\"",
-            "timeout": 3,
-            "async": true
-          }
-        ],
-        "matcher": "Bash|Read"
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/skill-drift-guard.js\"",
-            "timeout": 3
-          }
-        ],
-        "matcher": "Bash|Edit|Glob|Grep|Read|Write"
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/rule-enforcement-check.js\"",
-            "timeout": 5,
-            "async": true
-          }
-        ],
-        "matcher": "Agent|Skill"
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/skill-completion-correlator.js\"",
-            "timeout": 5,
-            "async": true
-          }
-        ],
-        "matcher": "Bash|Edit|Skill|Write"
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/research-lint.js\"",
-            "timeout": 3
-          }
-        ],
-        "matcher": "Edit|MultiEdit|Write"
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/handoff-auto-save.js\"",
-            "timeout": 5,
-            "async": true
-          }
-        ],
-        "matcher": "Bash|Edit|MultiEdit|TaskCreate|TaskUpdate|Write"
-      }
-    ],
-    "PreToolUse": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/agent-dependency-guard.js\"",
-            "timeout": 3
-          }
-        ],
-        "matcher": "Agent"
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/block-subagent-writes.js\"",
-            "timeout": 3
-          }
-        ],
-        "matcher": "Bash"
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/verifiedby-gate.js\"",
-            "timeout": 3
-          }
-        ],
-        "matcher": "TodoWrite|write_todos"
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/autosave-before-destructive.js\"",
-            "timeout": 8,
-            "if": "Bash(rm *) OR Bash(git reset*) OR Bash(git clean*) OR Bash(git checkout -- *)"
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/peer-conflict-check.js\"",
-            "timeout": 5,
-            "async": true
-          },
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/pre-write-combined-guard.js\"",
-            "timeout": 3
-          }
-        ],
-        "matcher": "Bash|Edit|MultiEdit|Write"
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/scrub-sentinel.js\"",
-            "timeout": 3
-          }
-        ],
-        "matcher": "Edit|MultiEdit|Write"
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/prefer-editing-nudge.js\"",
-            "timeout": 3
-          }
-        ],
-        "matcher": "Write"
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/block-subagent-non-bash-writes.js\"",
-            "timeout": 3
-          }
-        ],
-        "matcher": "Edit|MultiEdit|NotebookEdit|Write|mcp__.*"
-      }
-    ],
-    "ConfigChange": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/tool-parity-check.js\"",
-            "timeout": 5,
-            "async": true
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/session-presence-end.js\"",
-            "timeout": 3
-          },
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/todowrite-persist.js\"",
-            "timeout": 5
-          },
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/reflect-stop.js\"",
-            "timeout": 5
-          },
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/dream-auto.js\"",
-            "timeout": 5
-          },
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/auto-push-global.js\"",
-            "timeout": 20
-          },
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/track-skill-usage.js\"",
-            "timeout": 5,
-            "async": true
-          },
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/stop-sleep-consolidator.js\"",
-            "timeout": 5,
-            "async": true
-          },
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/meta-system-stop.js\"",
-            "timeout": 15
-          },
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/skill-auto-updater.js\"",
-            "timeout": 30,
-            "async": true
-          },
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/memory-rotate.js\"",
-            "timeout": 10,
-            "async": true
-          },
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/session-end-logger.js\"",
-            "timeout": 3
-          },
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/handoff-session-end.js\"",
-            "timeout": 10
-          }
-        ]
-      }
-    ],
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/prompt-item-tracker.js\"",
-            "timeout": 5,
-            "async": true
-          },
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/prompt-clarity-check.js\"",
-            "timeout": 3,
-            "async": true
-          },
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/slash-command-logger.js\"",
-            "timeout": 3,
-            "async": true
-          }
-        ]
-      }
-    ],
-    "Notification": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/notify-with-fallback.js\"",
-            "timeout": 5
-          }
-        ]
-      }
-    ],
-    "SubagentStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/subagent-harness-inject.js\"",
-            "timeout": 3
-          }
-        ]
-      }
-    ],
-    "SubagentStop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/subagent-quality-gate.js\"",
-            "timeout": 3
-          },
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/task-verification-gate.js\"",
-            "timeout": 3
-          }
-        ]
-      }
-    ],
-    "PreCompact": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/reflect-precompact.js\"",
-            "timeout": 5
-          }
-        ],
-        "matcher": "auto|manual"
-      }
-    ],
-    "PostCompact": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/memory-post-compact.js\"",
-            "timeout": 5
-          }
-        ]
-      }
-    ],
-    "CwdChanged": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/cwd-changed-watcher.js\"",
-            "timeout": 3
-          }
-        ]
-      }
-    ],
-    "FileChanged": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/file-changed-notify.js\"",
-            "timeout": 3
-          }
-        ],
-        "matcher": ".envrc|AGENTS.md|CLAUDE.md|GEMINI.md"
-      }
+  "worktree": {
+    "baseRef": "fresh"
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "bash $HOME/.claude/statusline.sh"
+  },
+  "sandbox": {},
+  "effortLevel": "high",
+  "skipAutoPermissionPrompt": true,
+  "autoMode": {
+    "hard_deny": [
+      "Bash(rm -rf /*)",
+      "Bash(rm -rf $HOME)",
+      "Bash(git push --force origin main)",
+      "Bash(git push --force origin master)"
     ]
   }
 }

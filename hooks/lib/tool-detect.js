@@ -44,7 +44,7 @@ function detectTool() {
 const EVENT_NAMES = {
   claude: { preTool: 'PreToolUse', postTool: 'PostToolUse', preCompact: 'PreCompact', sessionEnd: 'SessionEnd' },
   gemini: { preTool: 'BeforeTool', postTool: 'AfterTool',   preCompact: 'PreCompress', sessionEnd: 'SessionEnd' },
-  codex:  { preTool: 'PreToolUse', postTool: 'PostToolUse', preCompact: null, sessionEnd: null },
+  codex:  { preTool: 'PreToolUse', postTool: 'PostToolUse', preCompact: null, sessionEnd: 'Stop' },
   crush:    { preTool: 'PreToolUse', postTool: null,          preCompact: null, sessionEnd: null },
   opencode: { preTool: null,         postTool: null,          preCompact: null, sessionEnd: null },
 };

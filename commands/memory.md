@@ -1,6 +1,6 @@
 ---
 name: memory
-description: Search project memories by free-text query. Pure grep across .claude/memory/*.md (and .ai-context/memory/ if present). Zero deps, works on Win + Nix + WSL. Returns top matching files with one-line context, then offers to read the full memory.
+description: Search project memories by free-text query. Pure grep across .ai-context/memory/*.md (canonical). Also searches project-state and tool-specific memory dirs.. Zero deps, works on Win + Nix + WSL. Returns top matching files with one-line context, then offers to read the full memory.
 ---
 
 # /memory <query>
@@ -12,7 +12,7 @@ Search current project's memory files for a free-text query. Use when:
 
 ## Steps
 
-1. **Resolve memory dir.** Walk up from cwd looking for `.claude/memory/` then `.ai-context/memory/`. Use first match. If none, fall back to `~/.claude/projects/<sanitized-cwd>/memory/`.
+1. **Resolve memory dir.** Walk up from cwd looking for `.ai-context/memory/` (canonical). Use first match. If none, fall back to `~/.ai-context/memory/` (global).
 
 2. **Search.** Run cross-platform grep:
    ```bash

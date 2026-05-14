@@ -135,8 +135,6 @@ Use MCP tool `update_deferred` to add items, or write directly to the JSON file.
 }
 ```
 
-**3c. If GSD .planning/ is active**, also update STATE.md with current phase status.
-
 ## Step 4: Confirm to User
 
 Tell the user clearly:

@@ -1,62 +1,96 @@
 # Architecture
 
-## Canonical-source pattern
+## Directory layout
 
 ```
-~/.ai-context/
-├── AGENTS.md          ← one file
-├── memory/            ← plain markdown with v2 frontmatter
-├── skills/            ← tool-neutral skill files
-├── mcp/personal-context/server.js   ← stdio JSON-RPC, dep-free Node
-└── scripts/           ← install / bootstrap / health-check / snapshot
+~/.ai-context/                    (canonical source — single repo)
+├── AGENTS.md                     ← one file, symlinked to all 4 CLIs
+├── core/
+│   ├── memory/                   ← frontmatter + markdown, typed
+│   ├── commands/                 ← slash commands (markdown)
+│   └── skills/                   ← tool-neutral SKILL.md files
+├── modules/
+│   ├── hooks/
+│   │   ├── MANIFEST.yaml         ← single source of truth for hook registration
+│   │   ├── src/                  ← 15 hook files (pure Node, zero deps)
+│   │   └── lib/                  ← 28 shared helpers
+│   ├── skill-exclusions.yaml     ← centralized exclusion list
+│   └── tools/
+│       ├── claude/               ← capabilities.yaml, symlinks.yaml
+│       ├── gemini/
+│       ├── codex/
+│       └── pi/
+├── generated/configs/            ← machine-generated, never hand-edit
+│   ├── claude-settings.json
+│   ├── gemini-settings.json
+│   ├── codex-config.toml
+│   └── kachow-bridge.ts
+└── scripts/
+    ├── generate-settings.mjs     ← MANIFEST → per-tool configs
+    ├── verify.mjs                ← structure + sync verification
+    ├── test-hooks.mjs            ← hook runtime tests
+    ├── verify-symlinks.mjs       ← symlink health checker
+    └── scrub-for-publish.sh      ← private → public mirror pipeline
 ```
 
-Every AI tool symlinks into it:
+## Symlink architecture
+
+Every tool's home directory contains symlinks pointing into `~/.ai-context/`:
+
+| Target | Claude | Gemini | Codex | Pi |
+|---|---|---|---|---|
+| AGENTS.md | `~/.claude/CLAUDE.md` | `~/.gemini/GEMINI.md` | `~/.codex/AGENTS.md` | `~/.pi/agent/AGENTS.md` |
+| Settings | `~/.claude/settings.json` | `~/.gemini/settings.json` | `~/.codex/config.toml` | `~/.pi/agent/settings.json` |
+| Hooks | `~/.claude/hooks/` | `~/.gemini/hooks/` | `~/.codex/hooks/` | (generated bridge) |
+| Memory | `~/.claude/memory/` | `~/.gemini/memory/` | `~/.codex/memories/` | (via extension) |
+| Commands | `~/.claude/commands/` | `~/.gemini/commands/` | — | — |
+
+Pi is unique: no declarative hook system, so hooks are delivered via an auto-generated TypeScript extension (`kachow-bridge.ts`).
+
+## Config generation pipeline
 
 ```
-~/.claude/CLAUDE.md              → ~/.ai-context/AGENTS.md
-~/.gemini/GEMINI.md              → ~/.ai-context/AGENTS.md
-~/.codex/AGENTS.md               → ~/.ai-context/AGENTS.md
-~/.config/crush/crush.json       → ~/.ai-context/configs/crush.json
-~/.config/opencode/AGENTS.md     → ~/.ai-context/AGENTS.md
-~/.config/aider/AGENTS.md        → ~/.ai-context/AGENTS.md
+MANIFEST.yaml + capabilities.yaml + skill-exclusions.yaml
+                    │
+          generate-settings.mjs --apply
+                    │
+    ┌───────────────┼───────────────┬───────────────┐
+    ▼               ▼               ▼               ▼
+claude-settings  gemini-settings  codex-config    kachow-bridge
+    .json           .json           .toml           .ts
 ```
 
-## Hook registration (v0.7.0+)
+Each tool has a `capabilities.yaml` defining supported events, tool names, and timeout units. The generator translates canonical hook definitions to tool-specific format:
 
-Hooks are registered via `MANIFEST.yaml` — a single source of truth for all hook registrations across 5 tools.
+- Claude: JSON with `args[]` exec form, `continueOnBlock`
+- Gemini: JSON with millisecond timeouts, `mcp_.*` matchers
+- Codex: TOML with `[features] codex_hooks = true`
+- Pi: TypeScript extension with `pi.on()` event handlers
 
-```
-scripts/MANIFEST.yaml     ← declare hooks, events, tools, timeouts, matchers
-scripts/generate-settings.mjs --apply --all
-    → ~/.claude/settings.json   (Claude JSON format)
-    → ~/.gemini/settings.json   (Gemini JSON format, event name translation)
-    → ~/.codex/config.toml      (Codex TOML format)
-```
+## Skill exclusions
 
-Crush reads hooks via PreToolUse (Claude-compatible). OpenCode has no hook support — relies on MCP + AGENTS.md.
+`modules/skill-exclusions.yaml` is the centralized list. The generator distributes it to all 4 CLIs in their native format:
 
-## Hook lifecycle (Claude, Gemini, Codex, Crush)
+| CLI | Exclusion format |
+|---|---|
+| Claude | `skillOverrides: {"compound-engineering:name": "name-only"}` |
+| Gemini | `skills.disabled: ["name"]` |
+| Codex | `[[skills.config]]` with `enabled = false` |
+| Pi | `!~/.ai-context/.agents/skills/name` prefix |
 
-- **SessionStart**: auto-pull, load context, validate symlinks, check plugin updates
-- **PreToolUse**: safety guards (block-subagent-writes, autosave-before-destructive, verifiedby-gate, pre-write-combined-guard)
-- **PostToolUse**: sync hooks, loggers, drift detectors, pattern enforcement
-- **SubagentStart/Stop**: harness inject + quality gate
-- **Stop**: session-end ritual (presence, todowrite persist, ai-snapshot (excluded from public mirror — user-specific), reflect, dream-auto, meta-system, auto-push)
-- **PreCompact**: reflect-precompact if Claude is about to compact context
-- **Notification**: desktop/headless notification routing (notify-with-fallback)
-- **UserPromptSubmit** (Claude only): per-prompt overhead logging, prompt hashing, scope-drift tracking, slash-command logging
-- **CwdChanged / FileChanged** (Claude only): directory change tracking, external file change notification, post-compaction memory handling
+## Verification
 
-## MCP protocol
+- `node scripts/verify.mjs` — structure, MANIFEST, symlinks, kachow sync
+- `node scripts/test-hooks.mjs` — runs all 15 hooks with sample input
+- `node scripts/verify-symlinks.mjs` — validates all symlinks from `symlinks.yaml`
+- `node scripts/generate-settings.mjs --check` — critical hook presence in configs
 
-- Transport: stdio, JSON-RPC 2.0
-- Version: `2025-11-05`
-- Zero dependencies — only Node stdlib
-- Tools registered in each client's config file via `install-mcp.sh`
+## Public release pipeline
 
-## Memory v2 schema
+The scrub pipeline (`scrub-for-publish.sh`) takes the private source and produces a clean, portable framework:
 
-See [`memory/example.md`](../memory/example.md) for the full frontmatter spec.
-
-TTL rotation: `memory-rotate.js` Stop hook runs every 7d; moves expired to `memory/archive/` (never deletes).
+1. Whitelist filter — only portable hooks, commands, skills, lib files
+2. PII rewrite — forbidden tokens replaced via `scrub-config.json`
+3. Template generation — AGENTS.md and settings templates sanitized
+4. Scrub gate — final scan for any remaining forbidden tokens
+5. Output to `public/kachow-mirror/` (gitignored, regenerated on each run)

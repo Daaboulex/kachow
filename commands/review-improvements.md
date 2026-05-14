@@ -1,19 +1,19 @@
 ---
 name: review-improvements
-description: Review pending AI-system self-improvements detected by meta-system-stop. Shows each finding grouped by tier (BLOCKER/SUGGEST/OBSERVE) with evidence + proposal. User decides: accept (implement), reject (teaches suppression), defer (keep watching), skip (no-op). Queue at ~/.claude/self-improvements-pending.jsonl. Spec: .superpowers/specs/2026-04-14-self-improvement-handoff.md
+description: "Review pending AI-system self-improvements detected by meta-system-stop. Shows findings by tier (BLOCKER/SUGGEST/OBSERVE) with evidence. User decides accept/reject/defer/skip."
 ---
 
 # /review-improvements
 
 > **Note:** This command is Claude-only by design, not a missing feature. The `meta-system-stop.js` detector and `self-improvements-pending.jsonl` queue are Claude Code-specific. Gemini, Codex, Crush, and OpenCode do not generate self-improvement entries — they use the same hook files but lack the Stop-hook analysis pipeline that feeds this queue.
 
-Read `~/.claude/self-improvements-pending.jsonl` via `~/.claude/hooks/lib/self-improvement/queue.js`. For each entry, present to [user] for decision.
+Read `~/.ai-context/self-improvements-pending.jsonl` via `~/.claude/hooks/lib/self-improvement/queue.js`. For each entry, present to [user] for decision.
 
 ## Steps
 
 1. **Load queue:**
    ```js
-   const q = require('~/.claude/hooks/lib/self-improvement/queue.js');
+   const q = require('~/.ai-context/hooks/lib/self-improvement/queue.js');
    const pending = q.readPending();
    const summary = q.summary();
    ```
@@ -76,5 +76,5 @@ Pending: 9 SUGGEST, 1 OBSERVE
   [a]ccept  [r]eject  [d]efer  [s]kip
 
 > a
-Auto-applied: copied ~/.gemini/hooks/sync-claude-md.js → ~/.claude/hooks/
+Auto-applied: hooks are shared via symlinks — no manual copy
 ```

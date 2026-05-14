@@ -153,6 +153,6 @@ try {
   }));
   process.exit(0);
 } catch (e) {
-  try { process.stderr.write('block-subagent-non-bash-writes: ' + e.message + '\n'); } catch {}
+  try { require('./lib/hook-logger.js').logError('block-subagent-non-bash-writes', e); } catch {}
   passthrough();
 }

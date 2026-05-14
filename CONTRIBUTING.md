@@ -1,26 +1,29 @@
 # Contributing
 
-Thanks for considering a contribution.
-
 ## Before opening a PR
 
-1. Run `bash scripts/health-check.sh` — must pass.
-2. Run `node hooks/lib/hook-selftest.js` — must pass.
-3. Run `node hooks/lib/hook-topology.js` — no new collisions introduced.
-4. New hooks MUST add a `SPECS` entry in `hooks/lib/hook-selftest.js`.
-5. New memory files MUST use the v2 frontmatter schema (see `memory/example.md`).
+1. `node scripts/test-hooks.mjs` — all hooks must pass
+2. `node scripts/verify-symlinks.mjs` — all symlinks valid
+3. `node scripts/generate-settings.mjs --check` — critical hooks present
+4. `node scripts/verify.mjs` — full verification pass
+5. New hooks MUST be added to `modules/hooks/MANIFEST.yaml`
+6. New memory files MUST use v2 frontmatter schema
+
+## Adding a hook
+
+See [docs/ADDING-A-HOOK.md](./docs/ADDING-A-HOOK.md).
 
 ## Scope
 
-This framework is opinionated. PRs that:
-- Add a new hook solving a real class of problem → welcome
+PRs that:
+- Add a hook solving a real cross-tool problem → welcome
 - Improve cross-platform portability → welcome
-- Extend MCP server with a new tool that's useful across projects → welcome
+- Fix bugs in existing hooks → welcome
 
 PRs that:
 - Hard-code personal project structure → rejected
-- Introduce heavy deps (we are dependency-free by design) → rejected
-- Break the `bootstrap.sh` one-command flow → rejected
+- Introduce external dependencies (zero-dep by design) → rejected
+- Skip MANIFEST registration → rejected
 
 ## Licensing
 

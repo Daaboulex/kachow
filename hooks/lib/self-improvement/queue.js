@@ -8,17 +8,20 @@ const os = require('os');
 const crypto = require('crypto');
 
 const HOME = os.homedir();
+// Queue lives in shared runtime dir — accessible from all 4 CLIs (Claude, Gemini, Codex, Pi).
+// Legacy: was path.join(HOME, '.claude') — migrated 2026-05-12.
+const QUEUE_DIR = process.env.AI_CONTEXT_QUEUE_DIR || path.join(HOME, '.ai-context', 'runtime', 'self-improvement');
 const CLAUDE_DIR = process.env.CLAUDE_CONFIG_DIR || path.join(HOME, '.claude');
 // Per-machine filenames — prevents Syncthing conflicts between 2+ devices.
 // Mirrors observability-logger.js pattern (hostname-keyed JSONL).
 const HOST = os.hostname();
-const PENDING = path.join(CLAUDE_DIR, `self-improvements-pending-${HOST}.jsonl`);
-const RESOLVED = path.join(CLAUDE_DIR, `self-improvements-resolved-${HOST}.jsonl`);
+const PENDING = path.join(QUEUE_DIR, `self-improvements-pending-${HOST}.jsonl`);
+const RESOLVED = path.join(QUEUE_DIR, `self-improvements-resolved-${HOST}.jsonl`);
 const FEEDBACK = path.join(CLAUDE_DIR, 'memory', 'reference', 'self-improvement-feedback.md');
 
-// Legacy paths (pre-2026-04-14) — read-through for backward compat during transition
-const LEGACY_PENDING = path.join(CLAUDE_DIR, 'self-improvements-pending.jsonl');
-const LEGACY_RESOLVED = path.join(CLAUDE_DIR, 'self-improvements-resolved.jsonl');
+// Legacy paths (pre-2026-05-12) — read-through for backward compat during transition
+const LEGACY_PENDING = path.join(QUEUE_DIR, 'self-improvements-pending.jsonl');
+const LEGACY_RESOLVED = path.join(QUEUE_DIR, 'self-improvements-resolved.jsonl');
 
 const MAX_PENDING = 200;
 
@@ -102,7 +105,7 @@ function enqueue(finding) {
 
   // Skip if already resolved on any machine (cross-hostname sync)
   try {
-    const resolvedAll = _readAllJsonl(path.join(CLAUDE_DIR, 'self-improvements-resolved.jsonl'));
+    const resolvedAll = _readAllJsonl(path.join(QUEUE_DIR, 'self-improvements-resolved.jsonl'));
     if (fs.existsSync(LEGACY_RESOLVED)) resolvedAll.push(..._readJsonl(LEGACY_RESOLVED));
     if (resolvedAll.some(e => e.id === id)) return { suppressed: true, id, reason: 'resolved-cross-machine' };
   } catch {}
@@ -152,7 +155,7 @@ function enqueue(finding) {
 
 function readPending() {
   // Merge local + legacy + all hostname-keyed files for cross-machine view
-  const base = path.join(CLAUDE_DIR, 'self-improvements-pending.jsonl');
+  const base = path.join(QUEUE_DIR, 'self-improvements-pending.jsonl');
   const all = _readAllJsonl(base);
   // Also include legacy if present
   if (fs.existsSync(LEGACY_PENDING)) all.push(..._readJsonl(LEGACY_PENDING));
@@ -165,7 +168,7 @@ function readPending() {
   });
   // Cross-hostname resolution: filter out entries already resolved on ANY machine
   try {
-    const resolvedAll = _readAllJsonl(path.join(CLAUDE_DIR, 'self-improvements-resolved.jsonl'));
+    const resolvedAll = _readAllJsonl(path.join(QUEUE_DIR, 'self-improvements-resolved.jsonl'));
     if (fs.existsSync(LEGACY_RESOLVED)) resolvedAll.push(..._readJsonl(LEGACY_RESOLVED));
     const resolvedIds = new Set(resolvedAll.map(e => e.id));
     result = result.filter(e => !resolvedIds.has(e.id));

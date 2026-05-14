@@ -43,14 +43,14 @@ Rotation of TTL-expired memories is separately handled by `memory-rotate.js` Sto
 
 1. Read `MEMORY.md` index and count files
 2. Skim all memory file descriptions
-3. Note the project type: NixOS (.ai-context/) or Private (.claude/)
+3. Note the project type: NixOS (.ai-context/) or Private (.ai-context/ project-state)
 
 ## Phase 2: Gather Recent Signal
 
 1. Check if memories contradict the CURRENT codebase (grep the code, don't trust the memory)
 2. If needed, grep session transcripts narrowly:
    ```bash
-   grep -rn "<narrow term>" ~/.claude/projects/*/  --include="*.jsonl" | tail -50
+   grep -rn "<narrow term>" ~/.ai-context/project-state/*/  --include="*.jsonl" | tail -50
    ```
 3. Compare what memory claims vs what the code shows
 
@@ -74,7 +74,7 @@ It is additive — it does not replace any existing Phase 3 steps.
 
 **Step 1: Acquire Leader Election Lock**
 
-Run `~/.claude/hooks/lib/leader-election.js` `acquireLock()` on the `<memory_dir>/semantic` path:
+Run `~/.ai-context/hooks/lib/leader-election.js` `acquireLock()` on the `<memory_dir>/semantic` path:
 
 ```bash
 node -e "
@@ -289,9 +289,9 @@ grep -n "New-SimpleMakefile" build-system.ps1 | head -1
 - If a skill's step-by-step instructions produce errors when followed → flag it
 - Output: list of skills that need updating
 
-**Skill usage data** — check `~/.claude/skill-usage.json` if it exists:
+**Skill usage data** — check `~/.ai-context/skill-usage.json` if it exists:
 ```bash
-cat ~/.claude/skill-usage.json 2>/dev/null | jq '.sessions | length' # total tracked sessions
+cat ~/.ai-context/skill-usage.json 2>/dev/null | jq '.sessions | length' # total tracked sessions
 ```
 - Sessions with empty `skills_used` arrays are normal (hook logs sessions, /reflect populates skills)
 - Cross-reference with installed skills to identify skills never used across many sessions
@@ -351,7 +351,7 @@ Don't just count files — verify content health:
 
 ```bash
 # Count per project
-for dir in ~/.claude/projects/*/memory/; do
+for dir in ~/.ai-context/project-state/*/memory/; do
   project=$(basename "$(dirname "$dir")")
   count=$(ls "$dir"/*.md 2>/dev/null | wc -l)
   echo "$project: $count files"
@@ -361,7 +361,7 @@ done
 **Duplicate path detection:** Check if multiple project paths resolve to the same project:
 ```bash
 # Find paths that might be duplicates (same project, different sanitization)
-for dir in ~/.claude/projects/*/memory/; do
+for dir in ~/.ai-context/project-state/*/memory/; do
   [ -L "$dir" ] && echo "SYMLINK: $(basename $(dirname $dir)) → $(readlink $dir)"
 done
 ```
@@ -423,8 +423,6 @@ for f in ~/.claude/hooks/*.js; do
   echo "$result" | python3 -c "import json,sys; json.load(sys.stdin)" 2>/dev/null || echo "BAD OUTPUT: $(basename $f)"
 done
 ```
-GSD hooks may output nothing on empty input — that's expected. Flag hooks that output non-JSON.
-
 **4d-iii. Sync hook placement** — sync hooks MUST be PostToolUse/AfterTool, not Pre/Before:
 ```bash
 # Claude: sync hooks should be under PostToolUse
@@ -476,9 +474,9 @@ These should be roughly equal. A large imbalance means a pattern was added to on
 
 ### 4e. Skill Lineage — Evolution Health Check
 
-If `~/.claude/skill-lineage.json` exists, analyze it:
+If `~/.ai-context/skill-lineage.json` exists, analyze it:
 ```bash
-cat ~/.claude/skill-lineage.json 2>/dev/null | python3 -c "
+cat ~/.ai-context/skill-lineage.json 2>/dev/null | python3 -c "
 import json, sys
 d = json.load(sys.stdin)
 for name, s in d.get('skills', {}).items():

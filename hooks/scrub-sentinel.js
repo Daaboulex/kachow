@@ -41,7 +41,7 @@ try {
   // Only gate public-shareable roots
   const home = os.homedir();
   const PUBLIC_ROOTS = [
-    path.join(home, '.ai-context', 'kachow-mirror'),
+    path.join(home, '.ai-context', 'public', 'kachow-mirror'),
   ];
   let activeRoot = PUBLIC_ROOTS.find(r => filePath.startsWith(r + path.sep) || filePath === r) || null;
   // Also check for a .public-ship marker in the path's parent chain
@@ -160,6 +160,6 @@ try {
 
   passthrough();
 } catch (e) {
-  try { process.stderr.write('scrub-sentinel: ' + e.message + '\n'); } catch {}
+  try { require('./lib/hook-logger.js').logError('scrub-sentinel', e); } catch {}
   passthrough();
 }

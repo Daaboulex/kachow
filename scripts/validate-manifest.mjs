@@ -9,8 +9,8 @@ import { fileURLToPath } from 'url';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const { ALL_EVENTS, TOOL_EVENTS } = require(resolve(__dirname, '../hooks/lib/platform-map.js'));
-const HOOKS_DIR = resolve(__dirname, '../hooks');
+const { ALL_EVENTS, TOOL_EVENTS } = require(resolve(__dirname, '../modules/hooks/lib/platform-map.js'));
+const HOOKS_DIR = resolve(__dirname, '../modules/hooks/src');
 
 const VALID_TOOLS = ['claude', 'gemini', 'codex', 'crush', 'opencode'];
 const VALID_CATEGORIES = ['safety', 'lifecycle', 'observability', 'memory', 'sync', 'meta'];
@@ -299,7 +299,7 @@ function validate(hooks) {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 const args = process.argv.slice(2);
-let manifestPath = resolve(__dirname, 'MANIFEST.yaml');
+let manifestPath = resolve(__dirname, '../modules/hooks/MANIFEST.yaml');
 const fileIdx = args.indexOf('--file');
 if (fileIdx !== -1 && args[fileIdx + 1]) {
   manifestPath = resolve(args[fileIdx + 1]);

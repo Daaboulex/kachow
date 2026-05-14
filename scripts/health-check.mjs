@@ -133,6 +133,21 @@ for (const rel of ['.claude/memory', '.gemini/memory']) {
 
 // ────────────────────────────────────────────────────────────
 console.log('');
+console.log('── Managed paths ──');
+const reconcile = path.join(AI_CONTEXT, 'scripts', 'reconcile-managed-paths.mjs');
+if (fs.existsSync(reconcile)) {
+  const r = cp.spawnSync('node', [reconcile, '--global-only'], { encoding: 'utf8' });
+  if (r.status === 0) pass('global managed paths reconciled');
+  else {
+    fail('managed path drift — run: node ~/.ai-context/scripts/reconcile-managed-paths.mjs --apply --global-only');
+    (r.stdout || r.stderr || '').split('\n').slice(0, 12).filter(Boolean).forEach((l) => console.log('    ' + l));
+  }
+} else {
+  warn('reconcile-managed-paths.mjs not available — skipping managed path check');
+}
+
+// ────────────────────────────────────────────────────────────
+console.log('');
 console.log('── Recursive symlink audit ──');
 const auditor = path.join(HOME, '.claude/hooks/lib/symlink-audit.js');
 if (fs.existsSync(auditor)) {

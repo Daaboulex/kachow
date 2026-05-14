@@ -1,5 +1,5 @@
 ---
-name: deep-research
+name: cmd-deep-research
 description: "Formalize investigation-to-spec workflow: parse startup context, dispatch research agents, consolidate findings, generate spec. Use when starting a complex investigation session that needs structured research before implementation."
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent, AskUserQuestion, Skill
 ---

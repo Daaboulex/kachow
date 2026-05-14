@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 require(__dirname + "/lib/emit-simple-timing.js").start(__filename);
 'use strict';
-// Stop/SessionEnd hook: finalize session state + update project indices.
-// Handles retention: delete session JSON >30d, prose .md >90d.
-// Cleans up ephemeral files (.debounce-, .git-cache-, .current-session-).
+// Consolidated Stop hook: session finalization + triage awareness + retention
+// Absorbs: handoff-auto-save (finalization parts), handoff-triage-gate (awareness)
+// The incremental PostToolUse tracking from handoff-auto-save is removed (one of the
+// 49 dropped hooks). Session state is now captured at session end only.
 
 const fs = require('fs');
 const path = require('path');
@@ -29,6 +30,11 @@ try {
   const cwd = process.cwd();
   const sessionId = getSessionId(input, tool);
 
+  // Per-session dedup: Stop fires every turn, only write state once per session
+  const marker = path.join(os.tmpdir(), `handoff-${sessionId}-done`);
+  try { if (fs.existsSync(marker)) { passthrough(); } } catch {}
+
+  // ── Read or create session state ──
   let state = readState(sessionId);
   if (!state) {
     const proj = deriveProjectKeyCached(cwd);
@@ -37,7 +43,19 @@ try {
 
   state.ended_at = new Date().toISOString();
 
-  // Generate summary
+  // ── Triage awareness (from handoff-triage-gate) ──
+  // Check for stale deferred items — include in session summary if any exist.
+  try {
+    const { readItems, computeStaleness } = require('./lib/deferred-items.js');
+    const proj = deriveProjectKeyCached(cwd);
+    const deferred = readItems('deferred');
+    const { stale } = computeStaleness(deferred.items, proj.key, sessionId);
+    if (stale.length > 0) {
+      state.stale_deferred_count = stale.length;
+    }
+  } catch {}
+
+  // ── Generate summary ──
   const completedTasks = (state.tasks || []).filter(t => t.status === 'completed').map(t => t.subject);
   const fileCount = (state.files_changed || []).length;
   if (completedTasks.length > 0) {
@@ -55,7 +73,7 @@ try {
 
   writeState(sessionId, state);
 
-  // Update project indices
+  // ── Update project indices ──
   for (const projectKey of (state.projects_touched || [])) {
     try {
       appendSession(projectKey, {
@@ -67,13 +85,12 @@ try {
         summary: state.summary,
         has_prose: state.has_prose_handoff,
         files_touched: fileCount,
-        deferred_added: 0,
-        deferred_resolved: 0,
+        stale_deferred: state.stale_deferred_count || 0,
       });
     } catch {}
   }
 
-  // Retention: clean old session files
+  // ── Retention: clean old session files ──
   try {
     const sessionsDir = path.join(HANDOFFS_ROOT, 'sessions');
     const now = Date.now();
@@ -88,12 +105,9 @@ try {
         const age = now - fs.statSync(fp).mtimeMs;
         if (f.endsWith('.json') && age > THIRTY_DAYS) {
           const sid = f.replace('.json', '');
-          // Remove from all project indices before deleting
           try {
             for (const pf of fs.readdirSync(projectsDir)) {
-              if (pf.endsWith('.json')) {
-                removeSessionEntry(pf.replace('.json', ''), sid);
-              }
+              if (pf.endsWith('.json')) removeSessionEntry(pf.replace('.json', ''), sid);
             }
           } catch {}
           fs.unlinkSync(fp);
@@ -104,15 +118,17 @@ try {
     }
   } catch {}
 
-  // Clean up ephemeral files for this session
+  // ── Clean up ephemeral files ──
   const sessionsDir = path.join(HANDOFFS_ROOT, 'sessions');
   for (const prefix of ['.debounce-', '.git-cache-']) {
     try { fs.unlinkSync(path.join(sessionsDir, prefix + sessionId)); } catch {}
   }
   try { fs.unlinkSync(path.join(sessionsDir, '.current-session-' + tool + '.json')); } catch {}
 
+  try { fs.writeFileSync(marker, ''); } catch {}
   passthrough();
 } catch (e) {
-  try { process.stderr.write('[handoff-session-end] ' + e.message + '\n'); } catch {}
+  const { logError } = require('./lib/hook-logger.js');
+  logError('handoff-session-end', e);
   passthrough();
 }

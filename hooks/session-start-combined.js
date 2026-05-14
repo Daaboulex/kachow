@@ -1,688 +1,81 @@
 #!/usr/bin/env node
 require(__dirname + '/lib/safety-timeout.js');
-// Combined SessionStart hook: merges 7 lightweight hooks into 1 process
-// Replaces: reflect-enabled, consolidate-memory-session-counter, stale-task-cleanup,
-//           sync-hook-versions, ensure-portable-memory, sync-memory-dirs, session-catchup
-// Reason: 13 parallel Node processes at session start crashed KDE Wayland compositor
-// All original logic preserved — just runs sequentially in one process.
+// Modular SessionStart side-effects — runs lifecycle checks, counters, cleanup.
+// Can be called standalone OR imported by session-context-loader.
+// When imported: exports runSections(ctx) which appends to ctx.messages.
+// When standalone: reads stdin, outputs JSON (backward compat).
 
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-
-const TIMER_START = process.hrtime.bigint();
-const _sectionTimings = {};
-function _startSection(name) { _sectionTimings[name] = process.hrtime.bigint(); }
-function _endSection(name) { if (_sectionTimings[name]) _sectionTimings[name] = Number(process.hrtime.bigint() - _sectionTimings[name]) / 1e6; }
 const { detectTool, toolHomeDir } = require('./lib/tool-detect.js');
-const home = os.homedir();
-const claudeDir = path.join(home, '.claude'); // Legacy — only for Claude-specific paths (plugins, file-history)
-const geminiDir = path.join(home, '.gemini');
-const tool = detectTool();
-const configDir = toolHomeDir();
-const projectDir = process.cwd();
 
-let raw = '';
-try { raw = fs.readFileSync(0, 'utf8'); } catch { raw = '{}'; }
-let input;
-try { input = JSON.parse(raw); } catch { input = {}; }
+const SECTIONS = [
+  ['reflect-enabled', './lib/session-start/reflect-enabled'],
+  ['stale-lock-cleanup', './lib/session-start/stale-lock-cleanup'],
+  ['consolidate-counter', './lib/session-start/consolidate-counter'],
+  ['handoff-retention', './lib/session-start/handoff-retention'],
+  ['stale-task-cleanup', './lib/session-start/stale-task-cleanup'],
+  ['project-provisioning', './lib/session-start/project-provisioning'],
+  ['session-catchup', './lib/session-start/session-catchup'],
+  ['version-change', './lib/session-start/version-change'],
+  ['research-counter', './lib/session-start/research-counter'],
+  ['settings-drift', './lib/session-start/settings-drift'],
+  ['symlink-integrity', './lib/session-start/symlink-integrity'],
+];
 
-const messages = [];
-const errors = [];
-
-// Observability: emit session-start event
-try {
-  const obs = require('./lib/observability-logger.js');
-  obs.logEvent(projectDir, { type: 'session_start', source: 'session-start-combined', agent: tool });
-} catch {}
-
-// Stale-marker sweep (SEC-3 hygiene 2026-04-23): delete subagent markers
-// older than 24h. Prevents SEC-3 MCP write gate from false-blocking on
-// abandoned subagents. Shared marker dir between Claude + Gemini.
-try {
-  const markerDir = path.join(configDir, 'cache', 'subagent-active');
-  const cutoff = Date.now() - (24 * 60 * 60 * 1000);
-  for (const name of fs.readdirSync(markerDir)) {
-    if (!name.endsWith('.json')) continue;
-    const p = path.join(markerDir, name);
-    try { if (fs.statSync(p).mtimeMs < cutoff) fs.unlinkSync(p); } catch {}
-  }
-} catch {}
-
-// ── 1. Reflect-enabled (touch marker file) ──
-_startSection('reflect');
-try {
-  const enabledFile = path.join(configDir, '.reflect-enabled');
-  if (!fs.existsSync(enabledFile)) fs.writeFileSync(enabledFile, '');
-  _endSection('reflect');
-} catch (e) {
-  errors.push({ section: 'reflect-enabled', error: e.message, stack: e.stack?.split('\n')[1]?.trim() });
-}
-
-// ── 1b. Stale lock cleanup (RC-003: prevents .dream-lock from blocking all future consolidations) ──
-_startSection('stale-lock');
-try {
-  const { DREAM_LOCK_STALE_MS, TEMP_FILE_STALE_MS } = require('./lib/constants.js');
-  const dreamLockFile = path.join(configDir, '.dream-lock');
+function runSections(ctx) {
+  // Stale subagent marker sweep
   try {
-    const lockAge = Date.now() - fs.statSync(dreamLockFile).mtimeMs;
-    if (lockAge >= DREAM_LOCK_STALE_MS) fs.unlinkSync(dreamLockFile);
-  } catch {}
-
-  // Also clean up stale /tmp files from previous sessions (LC-001)
-  const tmpDir = os.tmpdir();
-  try {
-    const now = Date.now();
-    for (const f of fs.readdirSync(tmpDir)) {
-      if (f.startsWith('claude-ctx-') && (f.endsWith('.json'))) {
-        const fp = path.join(tmpDir, f);
-        try {
-          if (now - fs.statSync(fp).mtimeMs >= TEMP_FILE_STALE_MS) fs.unlinkSync(fp);
-        } catch {}
-      }
-    }
-    // Also clean stale skill-log-*.jsonl orphans in configDir (RC-002)
-    for (const f of fs.readdirSync(configDir)) {
-      if (f.startsWith('.skill-log-') && f.endsWith('.jsonl')) {
-        const fp = path.join(configDir, f);
-        try {
-          if (now - fs.statSync(fp).mtimeMs >= TEMP_FILE_STALE_MS) fs.unlinkSync(fp);
-        } catch {}
+    const markerDir = path.join(ctx.configDir, 'cache', 'subagent-active');
+    if (fs.existsSync(markerDir)) {
+      const cutoff = Date.now() - 86400000;
+      for (const name of fs.readdirSync(markerDir)) {
+        if (!name.endsWith('.json')) continue;
+        const p = path.join(markerDir, name);
+        try { if (fs.statSync(p).mtimeMs < cutoff) fs.unlinkSync(p); } catch {}
       }
     }
   } catch {}
-  _endSection('stale-lock');
-} catch (e) {
-  errors.push({ section: 'stale-state-cleanup', error: e.message, stack: e.stack?.split('\n')[1]?.trim() });
-}
 
-// ── 2. Consolidate-memory session counter (RC-001: atomic increment) ──
-_startSection('consolidate-counter');
-try {
-  const { incrementCounter } = require('./lib/atomic-counter.js');
-  const { DREAM_COOLDOWN_MS, DREAM_MIN_SESSIONS } = require('./lib/constants.js');
-  const countFile = path.join(configDir, '.dream-session-count');
-  const lastFile = path.join(configDir, '.dream-last');
-  const lockFile = path.join(configDir, '.dream-lock');
-  const COOLDOWN_MS = DREAM_COOLDOWN_MS;
-  const MIN_SESSIONS = DREAM_MIN_SESSIONS;
-
-  const count = incrementCounter(countFile);
-
-  let lastTime = 0;
-  try { lastTime = fs.statSync(lastFile).mtimeMs; } catch {}
-  const elapsed = Date.now() - lastTime;
-
-  if (count >= MIN_SESSIONS && elapsed >= COOLDOWN_MS && !fs.existsSync(lockFile)) {
-    fs.writeFileSync(lockFile, '');
-    const memDir = [
-      path.join(projectDir, '.ai-context', 'memory'),
-      path.join(projectDir, '.claude', 'memory'),
-    ].find(d => fs.existsSync(path.join(d, 'MEMORY.md')));
-    if (memDir) {
-      const memCount = fs.readdirSync(memDir).filter(f => f.endsWith('.md')).length;
-      messages.push(`[consolidate-memory] Run /consolidate-memory on ${memDir} (${memCount} memory files, ${count} sessions since last consolidation). After consolidation, reset counters: write '0' to ${countFile}, touch ${lastFile}, delete ${lockFile}`);
-      try { require('./lib/observability-logger.js').logEvent(projectDir, { type: 'dream_trigger', source: 'session-start-combined', meta: { memCount, sessionCount: count } }); } catch {}
-    }
-  }
-  _endSection('consolidate-counter');
-} catch (e) {
-  errors.push({ section: 'consolidate-memory-counter', error: e.message, stack: e.stack?.split('\n')[1]?.trim() });
-}
-
-// ── 2b. Handoff retention (added 2026-04-17) ──
-// Enforces CLAUDE.md rule: versioned handoffs >7d archived, pointer >14d archived, keep 3 newest.
-// Scans all known handoff locations (cwd root, .claude/, .ai-context/).
-_startSection('handoff-retention');
-try {
-  const VERSIONED_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
-  const POINTER_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
-  const KEEP_NEWEST = 3;
-
-  for (const handoffDir of [projectDir, path.join(projectDir, '.ai-context'), path.join(projectDir, '.claude')]) {
-    if (!fs.existsSync(handoffDir)) continue;
-
-    const archiveDir = path.join(handoffDir, 'handoff-archive');
-    const now = Date.now();
-
+  for (const [name, modPath] of SECTIONS) {
     try {
-      const entries = fs.readdirSync(handoffDir, { withFileTypes: true });
-
-      // Versioned handoffs: .session-handoff-<label>-<ts>.md
-      const versioned = entries
-        .filter(e => e.isFile() && /^\.session-handoff-.+\.md$/.test(e.name))
-        .map(e => ({ name: e.name, path: path.join(handoffDir, e.name), mtime: fs.statSync(path.join(handoffDir, e.name)).mtimeMs }))
-        .sort((a, b) => b.mtime - a.mtime);
-
-      // Archive versioned >7d, EXCEPT keep 3 newest regardless
-      for (let i = KEEP_NEWEST; i < versioned.length; i++) {
-        const v = versioned[i];
-        if (now - v.mtime >= VERSIONED_MAX_AGE_MS) {
-          try {
-            fs.mkdirSync(archiveDir, { recursive: true });
-            fs.renameSync(v.path, path.join(archiveDir, v.name));
-          } catch {}
-        }
-      }
-
-      // Archive pointer (.session-handoff.md) if >14d old
-      const pointerPath = path.join(handoffDir, '.session-handoff.md');
-      try {
-        const pointerAge = now - fs.statSync(pointerPath).mtimeMs;
-        if (pointerAge >= POINTER_MAX_AGE_MS) {
-          fs.mkdirSync(archiveDir, { recursive: true });
-          const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-          fs.renameSync(pointerPath, path.join(archiveDir, `pointer-${ts}.md`));
-        }
-      } catch {}
-      // Archive size cap: keep newest 20, delete older
-      if (fs.existsSync(archiveDir)) {
-        try {
-          const archived = fs.readdirSync(archiveDir)
-            .filter(f => f.startsWith('.session-handoff') && f.endsWith('.md'))
-            .map(f => ({ path: path.join(archiveDir, f), mtime: fs.statSync(path.join(archiveDir, f)).mtimeMs }))
-            .sort((a, b) => b.mtime - a.mtime);
-          for (const old of archived.slice(20)) {
-            try { fs.unlinkSync(old.path); } catch {}
-          }
-        } catch {}
-      }
-    } catch {}
+      require(modPath)(ctx);
+    } catch (e) {
+      ctx.errors = ctx.errors || [];
+      ctx.errors.push({ section: name, error: e.message });
+    }
   }
-  _endSection('handoff-retention');
-} catch (e) {
-  errors.push({ section: 'handoff-retention', error: e.message, stack: e.stack?.split('\n')[1]?.trim() });
+
+  if (ctx.errors && ctx.errors.length > 0) {
+    ctx.messages.push(`[session-start] ${ctx.errors.length} section(s) failed: ${ctx.errors.map(e => e.section).join(', ')}`);
+  }
 }
 
-// ── 3. Stale task cleanup ──
-_startSection('stale-task');
-try {
-  const MAX_AGE_DAYS = 14;
-  const now = Date.now();
-  for (const tasksPath of [
-    path.join(projectDir, '.claude', 'AI-tasks.json'),
-    path.join(projectDir, '.gemini', 'AI-tasks.json'),
-    path.join(projectDir, 'AI-tasks.json'),
-    path.join(projectDir, '.ai-context', 'AI-tasks.json'),
-  ]) {
-    if (!fs.existsSync(tasksPath)) continue;
-    try {
-      const data = JSON.parse(fs.readFileSync(tasksPath, 'utf8'));
-      const tasks = data.tasks || [];
-      const completedLog = data.completed_log || [];
-      let changed = false;
-      let staleCount = 0;
+// Export for use by session-context-loader
+module.exports = { runSections };
 
-      // TTL cleanup for in_progress tasks (v0.9.5 W4-FIX2)
-      for (let i = tasks.length - 1; i >= 0; i--) {
-        const t = tasks[i];
-        if (t.status !== 'in_progress') continue;
-        const updatedMs = new Date(t.updated || t.created).getTime();
-        const ageMs = now - updatedMs;
-        const ttlMs = t.owner_session ? 2 * 3600000 : 24 * 3600000;
-        if (ageMs > ttlMs) {
-          t.status = 'stale-expired';
-          t.verifiedBy = 'auto-stale-ttl';
-          t.completedDate = new Date().toISOString();
-          completedLog.push(t);
-          tasks.splice(i, 1);
-          staleCount++;
-          changed = true;
-        }
-      }
+// Standalone mode: if run directly (not require'd)
+if (require.main === module) {
+  let raw = '';
+  try { raw = fs.readFileSync(0, 'utf8'); } catch { raw = '{}'; }
 
-      // TTL cleanup for blocked tasks without trigger
-      for (let i = tasks.length - 1; i >= 0; i--) {
-        const t = tasks[i];
-        if (t.status !== 'blocked') continue;
-        if (t.trigger_after && new Date(t.trigger_after).getTime() < now) {
-          t.status = 'in_progress';
-          changed = true;
-          continue;
-        }
-        const updatedMs = new Date(t.updated || t.created).getTime();
-        if (!t.trigger_after && (now - updatedMs) > 7 * 86400000) {
-          t.status = 'stale-expired';
-          t.verifiedBy = 'auto-stale-ttl';
-          tasks.splice(i, 1);
-          completedLog.push(t);
-          staleCount++;
-          changed = true;
-        }
-      }
+  const ctx = {
+    home: os.homedir(),
+    tool: detectTool(),
+    configDir: toolHomeDir(),
+    projectDir: process.cwd(),
+    messages: [],
+    errors: [],
+  };
 
-      // Existing: remove old done tasks
-      data.tasks = tasks.filter(t => {
-        if (t.status === 'done' && t.completedDate) {
-          const age = now - new Date(t.completedDate).getTime();
-          if (age > MAX_AGE_DAYS * 86400000) { changed = true; return false; }
-        }
-        return true;
-      });
-      data.completed_log = completedLog.slice(0, 50);
-      if (staleCount > 0) messages.push(`[stale-tasks] Expired ${staleCount} abandoned task(s)`);
-      if (changed) fs.writeFileSync(tasksPath, JSON.stringify(data, null, 2));
-    } catch {}
-    break;
+  try { require('./lib/observability-logger.js').logEvent(ctx.projectDir, { type: 'session_start', source: 'session-start-combined', agent: ctx.tool }); } catch {}
+
+  runSections(ctx);
+
+  if (ctx.messages.length > 0) {
+    process.stdout.write(JSON.stringify({ continue: true, systemMessage: ctx.messages.join('\n') }));
+  } else {
+    process.stdout.write('{"continue":true}');
   }
-  _endSection('stale-task');
-} catch (e) {
-  errors.push({ section: 'stale-task-cleanup', error: e.message, stack: e.stack?.split('\n')[1]?.trim() });
-}
-
-// [removed v0.9.5] Section 4: GSD sync-hook-versions — dead code, references hooks that no longer exist (enhanced-statusline.js, sync-hook-versions.js)
-
-// ── 5. Proactive project-state provisioning ──
-// On EVERY session: ensure project-state/<key>/memory/ exists + symlinked from tool dirs.
-// This replaces the old reactive "ensure-portable-memory" that only worked on session N+1.
-_startSection('portable-memory');
-try {
-  const agentRelDir = path.relative(home, configDir);
-  const sanitized = projectDir.replace(/^\//, '').replace(/[/\\]/g, '-').replace(/^([A-Z]):/i, '$1');
-  const dashSanitized = projectDir.replace(/[/\\]/g, '-').replace(/^([A-Z]):/i, '$1');
-
-  // Step 1: Derive project key (skip internal/tmp dirs)
-  const SKIP_DIRS = ['.ai-context', '.claude', '.gemini', '.codex', '.crush', '.opencode', '.config', 'tmp'];
-  const isInternalDir = SKIP_DIRS.some(d => projectDir.includes(path.sep + d + path.sep) || projectDir.endsWith(path.sep + d));
-  const isTmpDir = projectDir.startsWith(os.tmpdir()) || projectDir.startsWith('/tmp');
-
-  let projectKey;
-  if (!isInternalDir && !isTmpDir) {
-    try {
-      const pk = require('./lib/project-key.js');
-      const result = typeof pk.deriveProjectKey === 'function' ? pk.deriveProjectKey(projectDir) : null;
-      projectKey = result?.key || null;
-    } catch {}
-    if (!projectKey) {
-      const parts = projectDir.split(path.sep).filter(Boolean);
-      projectKey = parts[parts.length - 1] || null;
-    }
-  }
-
-  // Step 2: Ensure project-state/<key>/memory/ exists (proactive — only for real projects)
-  const projectStateMemory = projectKey
-    ? path.join(home, '.ai-context', 'project-state', projectKey, 'memory')
-    : null;
-  if (projectStateMemory && !fs.existsSync(projectStateMemory)) {
-    fs.mkdirSync(projectStateMemory, { recursive: true });
-    fs.writeFileSync(path.join(projectStateMemory, 'MEMORY.md'),
-      `# Memory Index — ${projectDir}\n\n_Auto-provisioned ${new Date().toISOString().split('T')[0]}_\n`);
-  }
-
-  // Step 3: Helpers
-  function isSymlinked(dir) {
-    try { return fs.lstatSync(dir).isSymbolicLink(); } catch { return false; }
-  }
-  function isRealDirWithContent(dir) {
-    try {
-      const stat = fs.lstatSync(dir);
-      if (!stat.isDirectory() || stat.isSymbolicLink()) return false;
-      return fs.readdirSync(dir).some(f => f.endsWith('.md') && f !== 'MEMORY.md');
-    } catch { return false; }
-  }
-  function atomicMigrate(srcDir, targetDir) {
-    const copyErrors = [];
-    for (const f of fs.readdirSync(srcDir)) {
-      const s = path.join(srcDir, f);
-      const d = path.join(targetDir, f);
-      try {
-        if (fs.existsSync(d)) {
-          // Conflict: same filename in target. Compare content hash, not just size.
-          const srcBuf = fs.readFileSync(s);
-          const dstBuf = fs.readFileSync(d);
-          if (!srcBuf.equals(dstBuf)) {
-            const conflict = d.replace(/\.md$/, '.migrate-conflict.md');
-            fs.copyFileSync(s, conflict);
-          }
-        } else {
-          if (fs.statSync(s).isDirectory()) fs.cpSync(s, d, { recursive: true });
-          else fs.copyFileSync(s, d);
-        }
-      } catch (e) { copyErrors.push({ file: f, error: e.message }); }
-    }
-    // Abort if any copy failed — don't delete source
-    if (copyErrors.length > 0) return;
-    const backup = srcDir + '.migrating-' + Date.now();
-    fs.renameSync(srcDir, backup);
-    return backup; // caller deletes after verifying symlink succeeded
-  }
-  function createSymlinkSafe(target, linkPath) {
-    // Guard: linkPath parent must resolve inside configDir/projects (prevent symlink traversal)
-    try {
-      const parentReal = fs.realpathSync(path.dirname(path.dirname(linkPath)));
-      const projectsRoot = fs.realpathSync(path.join(configDir, 'projects'));
-      if (!parentReal.startsWith(projectsRoot)) return;
-    } catch {} // parent doesn't exist yet — mkdirSync below creates it safely
-    try {
-      const existing = fs.lstatSync(linkPath);
-      if (existing.isSymbolicLink()) {
-        if (fs.readlinkSync(linkPath) === target) return;
-        fs.unlinkSync(linkPath);
-      } else if (existing.isDirectory() && fs.readdirSync(linkPath).length === 0) {
-        fs.rmdirSync(linkPath);
-      } else {
-        return; // non-empty real dir — handled by atomicMigrate first
-      }
-    } catch {}
-    fs.mkdirSync(path.dirname(linkPath), { recursive: true });
-    fs.symlinkSync(target, linkPath, os.platform() === 'win32' ? 'junction' : undefined);
-  }
-
-  // Step 4: For both sanitized variants, ensure symlink → project-state
-  // Also check project-local .ai-context/memory (existing projects like nix, [user])
-  // C-003: Use .ai-context/memory when dir exists (even without MEMORY.md — fresh provision)
-  const projectLocalMemory = ['.ai-context/memory', '.claude/memory'].map(c => path.join(projectDir, c)).find(p => {
-    try { return fs.lstatSync(p).isDirectory() || fs.lstatSync(p).isSymbolicLink(); } catch { return false; }
-  });
-  const target = projectLocalMemory || projectStateMemory;
-
-  if (target) {
-    for (const san of [sanitized, dashSanitized]) {
-      const toolMemDir = path.join(home, agentRelDir, 'projects', san, 'memory');
-      if (isSymlinked(toolMemDir)) continue;
-      let migrationBackup;
-      if (isRealDirWithContent(toolMemDir)) migrationBackup = atomicMigrate(toolMemDir, target);
-      createSymlinkSafe(target, toolMemDir);
-      if (migrationBackup) {
-        try {
-          if (fs.lstatSync(toolMemDir).isSymbolicLink()) {
-            try { fs.rmSync(migrationBackup, { recursive: true }); } catch {}
-          } else {
-            fs.renameSync(migrationBackup, toolMemDir); // restore — symlink failed
-          }
-        } catch {
-          fs.renameSync(migrationBackup, toolMemDir); // lstat failed — restore
-        }
-      }
-    }
-  }
-  // Step 5: Auto-create .ai-context symlink in project dir (if git repo + not already present)
-  if (projectKey && projectStateMemory) {
-    const aiCtxLink = path.join(projectDir, '.ai-context');
-    const projectStateDir = path.dirname(projectStateMemory); // project-state/<key>
-    if (!fs.existsSync(aiCtxLink)) {
-      // Only for git repos or dirs with >5 files (skip random tmp dirs)
-      const isGit = fs.existsSync(path.join(projectDir, '.git'));
-      const hasContent = !isGit && (() => { try { return fs.readdirSync(projectDir).length > 5; } catch { return false; } })();
-      if (isGit || hasContent) {
-        try { fs.symlinkSync(projectStateDir, aiCtxLink); } catch {}
-      }
-    }
-    // Step 5b: Ensure cwd CLAUDE.md/GEMINI.md → .ai-context/<name> (first-run chicken-and-egg fix C-005b)
-    if (fs.existsSync(aiCtxLink)) {
-      for (const name of ['CLAUDE.md', 'GEMINI.md']) {
-        const cwdFile = path.join(projectDir, name);
-        const aiCtxFile = path.join(aiCtxLink, name);
-        if (!fs.existsSync(cwdFile) && fs.existsSync(aiCtxFile)) {
-          try { fs.symlinkSync(path.join('.ai-context', name), cwdFile); } catch {}
-        }
-      }
-    }
-    // Step 6: Ensure instruction file symlinks in project-state (CLAUDE.md, GEMINI.md, AGENTS.md → project-rules.md)
-    const rulesFile = path.join(projectStateDir, 'project-rules.md');
-    if (fs.existsSync(rulesFile)) {
-      for (const name of ['CLAUDE.md', 'GEMINI.md', 'AGENTS.md']) {
-        const psLink = path.join(projectStateDir, name);
-        if (!fs.existsSync(psLink)) {
-          try { fs.symlinkSync('project-rules.md', psLink); } catch {}
-        }
-      }
-    }
-    // Step 7: If cwd has a real CLAUDE.md (not symlink), migrate to project-rules.md
-    const cwdClaude = path.join(projectDir, 'CLAUDE.md');
-    try {
-      if (fs.existsSync(cwdClaude) && !fs.lstatSync(cwdClaude).isSymbolicLink() && !fs.existsSync(rulesFile)) {
-        fs.copyFileSync(cwdClaude, rulesFile);
-        for (const name of ['CLAUDE.md', 'GEMINI.md', 'AGENTS.md']) {
-          const psLink = path.join(projectStateDir, name);
-          if (!fs.existsSync(psLink)) fs.symlinkSync('project-rules.md', psLink);
-        }
-      }
-    } catch {}
-    // Step 8: Ensure AGENTS.md → CLAUDE.md in cwd (so all tools find it)
-    const cwdAgents = path.join(projectDir, 'AGENTS.md');
-    if (!fs.existsSync(cwdAgents) && fs.existsSync(cwdClaude)) {
-      try { fs.symlinkSync('CLAUDE.md', cwdAgents); } catch {}
-    }
-  }
-
-  // Step 9: Skill auto-discovery (daily cooldown)
-  const SKILL_SYNC_COOLDOWN = 24 * 60 * 60 * 1000;
-  const skillMarker = path.join(configDir, '.skill-sync-last');
-  try {
-    const skillAge = Date.now() - (fs.existsSync(skillMarker) ? fs.statSync(skillMarker).mtimeMs : 0);
-    if (skillAge > SKILL_SYNC_COOLDOWN) {
-      const canonSkills = path.join(home, '.ai-context', 'skills');
-      if (fs.existsSync(canonSkills)) {
-        for (const s of fs.readdirSync(canonSkills, { withFileTypes: true })) {
-          if (!s.isDirectory()) continue;
-          const src = path.join(canonSkills, s.name);
-          const dest = path.join(configDir, 'skills', s.name);
-          if (!fs.existsSync(dest)) {
-            fs.mkdirSync(path.dirname(dest), { recursive: true });
-            try { fs.symlinkSync(src, dest); } catch {}
-          }
-        }
-      }
-      try { fs.writeFileSync(skillMarker, ''); } catch {}
-    }
-  } catch {}
-
-  _endSection('portable-memory');
-} catch (e) {
-  errors.push({ section: 'ensure-portable-memory', error: e.message, stack: e.stack?.split('\n')[1]?.trim(), critical: true });
-}
-
-// [removed v0.9.5] Section 6: sync-memory-dirs — redundant with one-brain symlinks (all tool memory dirs point to ~/.ai-context/memory/)
-
-// ── 7. Session catchup (missed reflect detection) ──
-_startSection('catchup');
-try {
-  const historyFile = path.join(configDir, 'history.jsonl');
-  const lastReflect = path.join(configDir, '.reflect-last');
-  const catchupFile = path.join(configDir, '.catchup-done');
-
-  let historyMtime = 0, reflectMtime = 0, catchupMtime = 0;
-  try { historyMtime = fs.statSync(historyFile).mtimeMs; } catch {}
-  try { reflectMtime = fs.statSync(lastReflect).mtimeMs; } catch {}
-  try { catchupMtime = fs.statSync(catchupFile).mtimeMs; } catch {}
-
-  if (catchupMtime < historyMtime) {
-    // Check handoff
-    let handoffRecent = false;
-    for (const hp of [
-      path.join(projectDir, '.ai-context', '.session-handoff.md'),
-      path.join(projectDir, '.claude', '.session-handoff.md'),
-      path.join(home, '.claude', '.session-handoff.md'),
-    ]) {
-      try {
-        if (historyMtime - fs.statSync(hp).mtimeMs < 10 * 60 * 1000) { handoffRecent = true; break; }
-      } catch {}
-    }
-
-    fs.writeFileSync(catchupFile, '');
-
-    if (!handoffRecent && (historyMtime - reflectMtime) >= 5 * 60 * 1000) {
-      const memDir = ['.ai-context/memory', '.claude/memory'].find(d =>
-        fs.existsSync(path.join(projectDir, d, 'MEMORY.md'))
-      );
-      if (memDir) {
-        messages.push(`[catch-up] Previous session missed reflection. Scan for unsaved corrections/patterns → ${path.join(projectDir, memDir)}/. Silent if nothing.`);
-        try { require('./lib/observability-logger.js').logEvent(projectDir, { type: 'catchup_trigger', source: 'session-start-combined' }); } catch {}
-      }
-    }
-  }
-  _endSection('catchup');
-} catch (e) {
-  errors.push({ section: 'session-catchup', error: e.message, stack: e.stack?.split('\n')[1]?.trim(), critical: true });
-}
-
-// ── 8. Version-change detector (REQ-08-01) ──
-_startSection('version-change');
-try {
-  const versionFile = path.join(configDir, '.last-known-version');
-
-  // Extract version from CLAUDE_CODE_EXECPATH (CLAUDE_CODE_VERSION does NOT exist)
-  // e.g. /nix/store/...-claude-code-2.1.104/bin/.claude-unwrapped
-  function getCurrentVersion() {
-    const execPath = process.env.CLAUDE_CODE_EXECPATH || '';
-    const match = execPath.match(/claude-code-(\d+\.\d+\.\d+)/);
-    if (match) return match[1];
-    // Fallback: parse claude --version
-    try {
-      const { execSync } = require('child_process');
-      const out = execSync('claude --version', { encoding: 'utf8', timeout: 3000, stdio: ['pipe', 'pipe', 'ignore'] });
-      const m = out.match(/(\d+\.\d+\.\d+)/);
-      return m ? m[1] : null;
-    } catch { return null; }
-  }
-
-  const currentVersion = getCurrentVersion();
-  if (currentVersion) {
-    let lastVersion = null;
-    try { lastVersion = fs.readFileSync(versionFile, 'utf8').trim(); } catch {}
-
-    if (lastVersion && lastVersion !== currentVersion) {
-      // [v0.9.5] Version changed — detect + log only, no network fetch (release notes fetched by async hooks if needed)
-      const today = new Date().toISOString().slice(0, 10);
-      const memPath = path.join(home, '.ai-context', 'memory',
-        `project_${today}_claude-code-v${currentVersion}.md`);
-      try {
-        const frontmatter = `---\nname: Claude Code ${lastVersion}→${currentVersion} upgrade\ndescription: Version change detected ${today}. Check release notes manually or wait for async fetch.\ntype: project\n---\n\n# Upgrade ${lastVersion} → ${currentVersion}\n\nDetected: ${today}\n`;
-        if (!fs.existsSync(memPath)) fs.writeFileSync(memPath, frontmatter);
-      } catch {}
-      try {
-        require('./lib/observability-logger.js').logEvent(projectDir, {
-          type: 'version_change',
-          source: 'session-start-combined',
-          meta: { from: lastVersion, to: currentVersion }
-        });
-      } catch {}
-      // Write epoch marker for telemetry baseline reset (v0.9.5)
-      try {
-        const epochDirs = [path.join(home, '.ai-context', 'memory', 'episodic')];
-        if (canonicalDir) epochDirs.push(path.join(canonicalDir, 'memory', 'episodic'));
-        const epochHostname = require('os').hostname();
-        const epochDate = new Date().toISOString().slice(0, 10);
-        const epochEvent = JSON.stringify({ ts: new Date().toISOString(), type: 'epoch_marker', source: 'version-change', payload: { from: lastVersion, to: currentVersion } }) + '\n';
-        for (const ed of epochDirs) {
-          try { if (fs.existsSync(ed)) fs.appendFileSync(path.join(ed, `${epochDate}-${epochHostname}.jsonl`), epochEvent); } catch {}
-        }
-      } catch {}
-      const signalNote = memPath ? ` — notes saved to ${memPath}` : '';
-      messages.push(`[version-change] Claude Code ${lastVersion} → ${currentVersion}${signalNote}`);
-    }
-
-    // Always update version file (creates on first run)
-    fs.writeFileSync(versionFile, currentVersion);
-  }
-  _endSection('version-change');
-} catch (e) {
-  errors.push({ section: 'version-change-detector', error: e.message, stack: e.stack?.split('\n')[1]?.trim() });
-}
-
-// ── 9. Research session counter (REQ-08-03 — gate fires in meta-system-stop.js; RC-001: atomic) ──
-_startSection('research-counter');
-try {
-  const { incrementCounter } = require('./lib/atomic-counter.js');
-  const researchCountFile = path.join(configDir, '.research-session-count');
-  incrementCounter(researchCountFile);
-
-  // Auto-init .research-last baseline if missing (prevents gate 1 from always firing on fresh install)
-  const researchLastFile = path.join(configDir, '.research-last');
-  try {
-    fs.statSync(researchLastFile);
-  } catch {
-    // File missing — create with current timestamp so 30-day cooldown starts from first session
-    try { fs.writeFileSync(researchLastFile, ''); } catch {}
-  }
-
-  // Also auto-init .dream-last if missing (same reason — cooldown starts from first session)
-  const dreamLastFile = path.join(configDir, '.dream-last');
-  try {
-    fs.statSync(dreamLastFile);
-  } catch {
-    try { fs.writeFileSync(dreamLastFile, ''); } catch {}
-  }
-  _endSection('research-counter');
-} catch (e) {
-  errors.push({ section: 'research-session-counter', error: e.message, stack: e.stack?.split('\n')[1]?.trim() });
-}
-
-// ── 11. Settings schema drift detection ──
-_startSection('settings-drift');
-try {
-  const settingsPath = path.join(configDir, 'settings.json');
-  if (fs.existsSync(settingsPath)) {
-    const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
-    const { findDrift } = require('./lib/settings-schema.js');
-    const drift = findDrift(settings);
-    const issues = [];
-    if (drift.managedOnly.length > 0) {
-      issues.push(`managed-only keys in user settings (will trigger schema error): ${drift.managedOnly.join(', ')}`);
-    }
-    if (drift.deprecated.length > 0) {
-      issues.push(`deprecated: ${drift.deprecated.join(', ')}`);
-    }
-    if (drift.unknown.length > 3) {
-      issues.push(`${drift.unknown.length} unknown keys (review for current version): ${drift.unknown.slice(0, 5).join(', ')}${drift.unknown.length > 5 ? '...' : ''}`);
-    }
-    if (issues.length > 0) {
-      messages.push(`[settings-drift] ${issues.join(' | ')}`);
-    }
-  }
-  _endSection('settings-drift');
-} catch (e) {
-  errors.push({ section: 'settings-drift', error: e.message, stack: e.stack?.split('\n')[1]?.trim() });
-}
-
-// ── 10. Symlink integrity (merged from validate-symlinks.js) ──
-_startSection('symlink-audit');
-try {
-  const audit = require('./lib/symlink-audit.js');
-  const report = audit.auditAll();
-  const broken = report.broken_live || [];
-  const loops = report.loops || [];
-  if (broken.length > 0 || loops.length > 0) {
-    const summary = [];
-    if (broken.length > 0) summary.push(`${broken.length} broken live symlink(s): ${broken.slice(0, 3).map(b => b.path).join(', ')}${broken.length > 3 ? '...' : ''}`);
-    if (loops.length > 0) summary.push(`${loops.length} loop(s)`);
-    messages.push(`[symlink-integrity] ${summary.join('; ')}. Run 'node ~/.claude/hooks/lib/symlink-audit.js' for full list.`);
-  }
-  _endSection('symlink-audit');
-} catch (e) {
-  errors.push({ section: 'symlink-integrity', error: e.message, stack: e.stack?.split('\n')[1]?.trim() });
-}
-
-// ── Error aggregation (SF-001: surface ANY error, not just 3+) ──
-if (errors.length > 0) {
-  try {
-    const obs = require('./lib/observability-logger.js');
-    obs.logEvent(projectDir, { type: 'hook_errors', source: 'session-start-combined', errors, severity: errors.some(e => e.critical) ? 'critical' : (errors.length > 2 ? 'warning' : 'info') });
-  } catch {}
-  // Previously suppressed errors unless count > 2 or critical. Now: surface everything
-  // so silent failures become visible. Users can mute via settings if noisy.
-  messages.push(`[hook-error-aggregation] ${errors.length} sub-function(s) failed in session-start-combined: ${errors.map(e => e.section).join(', ')}`);
-}
-
-// ── Hook timing telemetry ──
-try {
-  const total_ms = Number(process.hrtime.bigint() - TIMER_START) / 1e6;
-  require('./lib/observability-logger.js').logEvent(projectDir, {
-    type: 'hook_timing',
-    source: 'session-start-combined',
-    meta: {
-      total_ms: +total_ms.toFixed(3),
-      error_count: errors.length,
-      message_count: messages.length,
-      section_timings: _sectionTimings,
-    },
-  });
-} catch {}
-
-// ── Output ──
-if (messages.length > 0) {
-  process.stdout.write(JSON.stringify({ continue: true, systemMessage: messages.join('\n') }));
-} else {
-  process.stdout.write('{"continue":true}');
 }

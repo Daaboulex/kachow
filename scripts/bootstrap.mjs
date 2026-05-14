@@ -5,7 +5,7 @@
 //   1. Verify AI_CONTEXT (canonical source) is present + has AGENTS.md
 //   2. Normalize $HOME in installed settings.json files (Windows safety)
 //   3. Run install-adapters.mjs — AGENTS.md symlinks per tool
-//   4. Run install-mcp.mjs — register MCP server in every installed tool
+//   4. Run generate-settings.mjs — generate per-tool configs from MANIFEST
 //   5. Link memory/ + per-skill into ~/.claude/ + ~/.gemini/
 //   6. Run health-check.mjs — verify everything before declaring done
 //
@@ -77,8 +77,13 @@ function runNode(scriptPath, label) {
 }
 runNode(path.join(SCRIPTS, 'install-adapters.mjs'), 'Installing AGENTS.md adapters');
 
-// ── 4. MCP registration ──
-runNode(path.join(SCRIPTS, 'install-mcp.mjs'), 'Registering MCP server');
+// ── 4. Generate configs from MANIFEST ──
+console.log('');
+console.log('── Generating tool configs ──');
+{
+  const r = cp.spawnSync('node', [path.join(SCRIPTS, 'generate-settings.mjs'), '--apply'], { stdio: 'inherit' });
+  if (r.status !== 0) { console.error('✗ Config generation failed'); process.exit(r.status || 1); }
+}
 
 // ── 5. Memory + per-skill symlinks ──
 console.log('');

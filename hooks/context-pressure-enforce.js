@@ -2,7 +2,7 @@
 require(__dirname + "/lib/emit-simple-timing.js").start(__filename);
 // PostToolUse hook: Enforces context pressure thresholds documented in CLAUDE.md.
 //
-// gsd-context-monitor.js WARNS at 35%/25% remaining. This hook ENFORCES
+// ENFORCES context pressure thresholds
 // at 20%/15%/8% remaining (80%/85%/92% used), matching the rule:
 //   "At 80% context: advance notice (early warn)"
 //   "At 85% context: run /handoff (soft-pause, suggest save)"
@@ -84,7 +84,7 @@ try {
     const msg = handoffRecent
       ? `[CONTEXT 92%+ USED] Handoff exists (${Math.round(remaining)}% remaining). Compaction imminent — consider /wrap-up now.`
       : `[CONTEXT 92%+ USED — HARD STOP] Only ${Math.round(remaining)}% remaining. RUN /handoff NOW before any more tool calls. Set CLAUDE_SKIP_CONTEXT_ENFORCE=1 to override.`;
-    process.stderr.write(msg);
+    try { require('./lib/hook-logger.js').logError('context-pressure-enforce', msg); } catch {}
     try { fs.writeFileSync(fireFile, String(Date.now())); } catch {}
     if (!handoffRecent) process.exit(2);  // Block
     passthrough();  // Already saved, don't block
@@ -98,7 +98,7 @@ try {
     process.stdout.write(JSON.stringify({ continue: true, systemMessage: msg }));
     process.exit(0);
   } else if (remaining <= EARLY_THRESHOLD) {
-    // EARLY NOTICE — low-key, infrequent (once per 5 min). Absorbed from gsd-context-monitor.
+    // EARLY NOTICE — low-key, infrequent (once per 5 min).
     if (Date.now() - lastFire < 5 * 60 * 1000) passthrough();
     try { fs.writeFileSync(fireFile, String(Date.now())); } catch {}
     const msg = `[context ${Math.round(remaining)}% remaining] Wrap up current task soon — /handoff at 20%.`;

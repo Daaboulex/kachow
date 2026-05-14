@@ -150,24 +150,43 @@ function rebuildIndex(dir) {
   const groups = { user: [], feedback: [], project: [], reference: [], procedure: [], unknown: [] };
   for (const e of entries) (groups[e.type] || groups.unknown).push(e);
   for (const k of Object.keys(groups)) groups[k].sort((a, b) => a.ageDays - b.ageDays);
-  const lines = [];
+
+  // Preserve pinned section above AUTO-INDEX sentinels
+  const indexPath = path.join(dir, 'MEMORY.md');
+  let pinned = '';
+  if (fs.existsSync(indexPath)) {
+    const existing = fs.readFileSync(indexPath, 'utf8');
+    const startMarker = existing.indexOf('<!-- AUTO-INDEX:START -->');
+    if (startMarker > 0) {
+      pinned = existing.slice(0, startMarker).trimEnd();
+    }
+  }
+
   const cwdLabel = path.basename(path.dirname(dir)) === 'memory' ? path.dirname(path.dirname(dir)) : dir;
-  lines.push(`# Memory Index — ${cwdLabel}`);
-  lines.push('');
-  lines.push(`_${entries.length} entries, refreshed ${new Date().toISOString().slice(0, 10)} (host: ${os.hostname()})_`);
-  lines.push('');
-  const titles = { user: '## User preferences', feedback: '## Feedback (behavior guidance)', project: '## Project (current work context)', reference: '## Reference (external system pointers)', procedure: '## Procedure (how-tos)', unknown: '## Other' };
+  if (!pinned) {
+    pinned = `# Memory Index — ${cwdLabel}\n\n_${entries.length} entries, refreshed ${new Date().toISOString().slice(0, 10)} (host: ${os.hostname()})_`;
+  } else {
+    // Update entry count in pinned header if present
+    pinned = pinned.replace(/_\d+ entries,/, `_${entries.length} entries,`);
+    pinned = pinned.replace(/refreshed \d{4}-\d{2}-\d{2}/, `refreshed ${new Date().toISOString().slice(0, 10)}`);
+  }
+
+  // Build compact auto-index: 4 links per line, grouped by type
+  const LINKS_PER_LINE = 4;
+  const autoLines = [];
+  const titles = { user: 'User', feedback: 'Feedback', project: 'Project', reference: 'Reference', procedure: 'Procedure', unknown: 'Other' };
   for (const [k, label] of Object.entries(titles)) {
     if (!groups[k].length) continue;
-    lines.push(label);
-    for (const e of groups[k]) {
-      const stale = (e.ttl !== 'permanent' && e.ageDays > parseInt(e.ttl || '90', 10)) ? ' ⚠stale' : '';
-      lines.push(`- [${e.name}](${e.file}) — ${e.ageDays}d${stale} — ${e.description}`);
+    autoLines.push(`### ${label} (${groups[k].length})`);
+    const links = groups[k].map(e => `[${e.name}](${e.file})`);
+    for (let i = 0; i < links.length; i += LINKS_PER_LINE) {
+      autoLines.push(links.slice(i, i + LINKS_PER_LINE).join('; '));
     }
-    lines.push('');
+    autoLines.push('');
   }
-  const out = lines.join('\n');
-  fs.writeFileSync(path.join(dir, 'MEMORY.md'), out);
+
+  const out = pinned + '\n\n<!-- AUTO-INDEX:START -->\n' + autoLines.join('\n') + '<!-- AUTO-INDEX:END -->\n';
+  fs.writeFileSync(indexPath, out);
   return { entries: entries.length, stale: entries.filter(e => e.ttl !== 'permanent' && e.ageDays > parseInt(e.ttl || '90', 10)).length };
 }
 

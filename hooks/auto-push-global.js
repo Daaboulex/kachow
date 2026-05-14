@@ -66,7 +66,7 @@ function autoCommit(dir, label) {
   const status = run('git status --porcelain', dir) || '';
   const credFiles = status.split('\n').filter(line => {
     const fname = line.replace(/^.{3}/, '').trim().split('/').pop();
-    return /^(\.credentials|oauth_creds|auth|\.env|\.secret|api[_-]?key)/i.test(fname);
+    return /^(\.credentials|oauth_creds|auth|\.env|\.secret|api[_-]?key|.*\.pem|id_rsa|kubeconfig)/i.test(fname);
   });
   if (credFiles.length > 0) {
     warnings.push(`${label}: SKIPPED — credential file detected: ${credFiles.map(f => f.trim().split('/').pop()).join(', ')}`);
@@ -75,8 +75,8 @@ function autoCommit(dir, label) {
 
   // GPG-sign intentionally bypassed — see AGENTS.md "GPG sign exception"
   const TRACKED = ['AGENTS.md', 'AGENTS-*.md', 'CHANGELOG.md', 'VERSION', 'README.md',
-    'hooks/', 'memory/', 'skills/', 'scripts/', 'configs/', 'mcp/',
-    '.superpowers/', 'project-state/', 'instances/', 'handoffs/', 'docs/',
+    'modules/', 'core/', 'generated/', 'projects/', 'scripts/', 'mcp/',
+    '.superpowers/', 'public/', 'docs/', 'handoffs/', '.agents/',
     '.gitignore', '.pre-commit-scrub.sh'];
   run(`git add ${TRACKED.join(' ')}`, dir);
   const committed = run(`git commit -m "chore: auto-sync from session end" --no-gpg-sign`, dir);
@@ -133,11 +133,14 @@ try {
   let raw = '';
   try { raw = fs.readFileSync(0, 'utf8'); } catch { raw = '{}'; }
 
+  let aiContextCommitted = false; // hoisted for observability log
+  let shouldPush = false;         // hoisted for observability log
+
   if (!acquireGitLock()) {
     warnings.push('git lock acquisition timed out — skipping commit/push (another session may be pushing)');
   } else {
     try {
-      const aiContextCommitted = AI_CONTEXT_AUTOCOMMIT
+      aiContextCommitted = AI_CONTEXT_AUTOCOMMIT
         ? autoCommit(aiContextDir, '~/.ai-context')
         : false;
 
@@ -146,7 +149,7 @@ try {
       const cooldownElapsed = (Date.now() - lastTime) >= PUSH_COOLDOWN_MS;
 
       const aiContextUnpushed = AI_CONTEXT_AUTOPUSH && isGitRepo(aiContextDir) && hasUnpushedCommits(aiContextDir);
-      const shouldPush = cooldownElapsed || aiContextUnpushed;
+      shouldPush = cooldownElapsed || aiContextUnpushed;
 
       if (shouldPush) {
         if (AI_CONTEXT_AUTOPUSH && isGitRepo(aiContextDir)) {
@@ -164,6 +167,19 @@ try {
 
   try { require('./lib/observability-logger.js').logEvent(process.cwd(), { type: 'auto_push', source: 'auto-push-global', success: warnings.length === 0, meta: { aiContextCommitted, pushed: shouldPush, warnings } }); } catch {}
 
+  // Session export — convert transcript to HTML (idempotent, marker-file dedup)
+  try {
+    const exportScript = path.join(tp.aiContextDir || path.join(home, '.ai-context'), 'scripts', 'export-session.mjs');
+    if (fs.existsSync(exportScript)) {
+      const tool = tp.tool || 'claude';
+      const { execSync: exportExec } = require('child_process');
+      exportExec(`node "${exportScript}" --tool ${tool} --quiet`, {
+        timeout: 15000, stdio: 'pipe',
+        env: { ...process.env, AI_TOOL: tool }
+      });
+    }
+  } catch {}
+
   if (warnings.length > 0) {
     __emitTiming(0); process.stdout.write(JSON.stringify({
       continue: true,
@@ -173,6 +189,6 @@ try {
     __emitTiming(0); process.stdout.write('{"continue":true}');
   }
 } catch (e) {
-  process.stderr.write('auto-push-global: ' + e.message + '\n');
+  try { require('./lib/hook-logger.js').logError('auto-push-global', e); } catch {}
   __emitTiming(0); process.stdout.write('{"continue":true}');
 }

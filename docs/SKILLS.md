@@ -2,124 +2,53 @@
 
 Skills package reusable AI workflows — each is a directory containing a `SKILL.md` with frontmatter and a body. An AI invokes the skill by name and the body becomes its playbook.
 
-**The format is not identical across AI tools.** A skill that works on Claude Code may need adaptation for Gemini CLI, Codex CLI, or Cursor. This doc explains the differences and how kachow handles them.
+## Skill format
 
-## Shipped skill
-
-kachow ships one example skill to demonstrate the format: `skills/debt-tracker/SKILL.md`. It tracks technical debt per repo via a `DEBT.md` file. Every tool that understands SKILL.md frontmatter can invoke it.
-
-## Compatibility matrix
-
-| Tool | Location | Invocation | Frontmatter keys read |
-|---|---|---|---|
-| **Claude Code** | `~/.claude/skills/<name>/SKILL.md` (or `~/.ai-context/skills/<name>/SKILL.md` via symlink) | `Skill` tool with `skill: "<name>"` — user types `/<name>` in the prompt | `name`, `description` |
-| **Gemini CLI** | `~/.gemini/skills/<name>/SKILL.md` (symlink target) | `activate_skill` tool — the model selects based on description matching | `name`, `description` |
-| **Codex CLI** | `~/.codex/skills/<name>/SKILL.md` (plugin work-in-progress) | not yet standardized — treat skills as read-only reference docs for now | `name`, `description` |
-| **OpenCode** | reads `AGENTS.md`; skills as inline body sections | no dedicated skill invocation | — |
-| **Aider** | same — reads AGENTS.md only | — | — |
-| **Cursor** | `.cursor/rules/*.mdc` per repo | auto-activates by glob match | its own frontmatter (`description`, `globs`, `alwaysApply`) |
-
-Key consequence: **a SKILL.md that's behaviorally correct for Claude may be silently ignored by Gemini** (because Gemini's `activate_skill` uses semantic match on description; a terse description gets skipped). Write descriptions assuming semantic retrieval.
-
-## Authoring a skill
-
-Every shipped skill MUST:
-
-1. Live in its own directory: `skills/<name>/SKILL.md`.
-2. Start with YAML frontmatter containing `name` + `description`.
-3. Keep the description **specific**. It's the retrieval signal. Bad: "help with tests". Good: "Generate Jest tests for a React component, mocking fetch and preserving existing snapshots."
-4. Put the playbook in the body, in whatever Markdown structure makes sense (headings / lists / code examples).
-
-Minimal template:
-
-```markdown
----
-name: your-skill-name
-description: One sentence explaining WHEN to activate it — specific enough that the retrieval layer finds it for the right tasks but skips it for unrelated ones.
----
-
-# Your skill name
-
-## When to use
-
-- Concrete trigger condition 1
-- Concrete trigger condition 2
-
-## Steps
-
-1. Read X
-2. Check Y
-3. Write Z
-
-## Anti-patterns
-
-- Thing to avoid
+```
+core/skills/commands/<name>/SKILL.md
 ```
 
-## Handling per-AI differences
-
-kachow symlinks `~/.ai-context/skills/<name>/` into each tool's skill directory. The SAME file serves every tool. If a tool needs a slightly different body, you add it as additional sections under per-tool headings inside the SKILL.md:
-
-```markdown
-## Claude-specific notes
-
-Use the `Skill` tool with argument `{}`...
-
-## Gemini-specific notes
-
-When invoked via `activate_skill`, the tool ID is ...
-```
-
-**Planned for a future release:** per-AI skill adapters. `skills/<name>/SKILL.md` stays the source of truth, and `install-adapters.sh` generates:
-
-- `~/.claude/skills/<name>/SKILL.md` — Claude-formatted
-- `~/.gemini/skills/<name>/SKILL.md` — Gemini-formatted (frontmatter translated via `lib/platform-map.js`)
-- `.cursor/rules/<name>.mdc` — Cursor-formatted (if a `.cursor/` dir exists in the project)
-
-Until then, if you author a skill that behaves differently across tools, use the per-tool heading convention above.
-
-## Validating a skill
-
-CI (`.github/workflows/ci.yml`) validates every shipped skill:
-
-1. `name` and `description` present in frontmatter.
-2. `description` is ≥ 20 characters (retrievers need signal).
-3. Name matches directory name (so `skills/foo/SKILL.md` declares `name: foo`).
-4. No orphan skills (referenced in hooks/commands but no directory).
-5. No straggler directories (skill dir with empty or malformed SKILL.md).
-
-Run the validator locally:
-
-```bash
-node scripts/validate-skills.js
-```
-
-Exit code 0 = all skills valid; non-zero = see output for the mismatch.
-
-## Upstream-tracking built-in hooks
-
-- `skill-upstream-checker` (SessionStart) — checks subscribed upstream skill repos for new versions on a 7-day cooldown.
-- `skill-invocation-logger` (PostToolUse on `Skill`) — records which skills were actually used.
-- `track-skill-usage` (Stop) — aggregates into `~/.claude/skill-usage.json`. `/consolidate-memory` reads this to identify under-used skills for pruning.
-
-Together these give you a feedback loop: which skills does your workflow actually invoke, which get stale, which need updates upstream.
-
-## Adding your own skill
-
-```bash
-mkdir -p ~/.ai-context/skills/my-skill
-cat > ~/.ai-context/skills/my-skill/SKILL.md <<'EOF'
+Frontmatter:
+```yaml
 ---
-name: my-skill
-description: One concrete sentence about when to activate this skill.
+name: skill-name      # must match directory basename
+description: ...      # triggers activation — be specific
 ---
-
-# My skill
-
-...
-EOF
-
-bash scripts/bootstrap.sh       # re-runs install-adapters to symlink into all tools
 ```
 
-The new skill lands in every installed tool's skill directory on next session start.
+Body: markdown instructions the AI follows when the skill activates.
+
+## Shipped skills
+
+kachow ships 15 command skills (slash-invoked):
+
+| Skill | Purpose |
+|---|---|
+| `/memory <query>` | Search memory files by topic |
+| `/handoff` | Fast session state save at context pressure |
+| `/wrap-up` | End-of-session reflect + verify + index refresh |
+| `/reflect` | Session reflection with auto toggle |
+| `/consolidate-memory` | 3-tier memory maintenance pass |
+| `/compress-memory` | Compress old/large memory files |
+| `/deep-research` | Formalized investigation workflow |
+| `/distill <path>` | Lossless document compression |
+| `/shard-doc <path>` | Split oversize docs into indexed sections |
+| `/review-adversarial` | Enforced-minimum-findings code review |
+| `/review-improvements` | Triage self-improvement findings |
+| `/platform-audit` | CLI release + hook parity audit |
+| `/verify-sync` | Cross-CLI drift detection |
+| `/sync-all` | Sync all context artifacts across CLIs |
+| `/preview <path>` | Terminal image preview via chafa |
+
+## Per-tool compatibility
+
+| Tool | Skill location | Invocation |
+|---|---|---|
+| **Claude Code** | `~/.agents/skills/` (via plugin system) | `Skill` tool — user types `/<name>` |
+| **Gemini CLI** | `~/.agents/skills/` (auto-discovery) | `activate_skill` — model matches by description |
+| **Codex CLI** | `~/.agents/skills/` (auto-discovery) | Progressive disclosure — loads on match |
+| **Pi** | `~/.agents/skills/` (via settings.json paths) | `/skill-name` or auto-match |
+
+## Skill exclusions
+
+Skills irrelevant to your stack can be excluded via `modules/skill-exclusions.yaml`. The generator distributes exclusions to all 4 CLIs in their native format. See [ARCHITECTURE.md](./ARCHITECTURE.md) for details.

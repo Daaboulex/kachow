@@ -1,11 +1,36 @@
-// detectors.js — 10 detection rules for self-improvement queue.
+// detectors.js — detection rules for self-improvement queue.
 // Each detector: (ctx) → Finding[]. Pure (reads files, never writes).
-// Ctx provides: cwd, configDir, readEvents (from observability-logger)
+// Ctx provides: cwd, configDir, readEvents (from observability-logger), tool (string: claude|gemini|codex|pi)
 // Spec R1-R10: [spec-ref] 2026-04-14-self-improvement-handoff.md
 
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+
+// ── Detector applicability matrix ──
+// Controls which detectors run on which CLIs. Prevents false positives from
+// platform-specific assumptions (e.g. TOML config on Codex vs JSON on Claude/Gemini).
+// Values: array of tool names that this detector supports.
+// If ctx.tool is not in the array, the detector is silently skipped.
+// 'all' shorthand → ['claude', 'gemini', 'codex', 'pi']
+const DETECTOR_APPLICABILITY = {
+  R1:  ['claude', 'gemini', 'codex'],      // hook_timeout_streak — all CLIs have hooks
+  R2:  ['claude', 'gemini', 'codex'],      // hook_error_recurring — all CLIs have hooks
+  R3:  ['claude', 'gemini'],               // orphan_hook — reads settings.json (JSON); Codex uses TOML
+  R4:  ['claude'],                          // skill_zero_invocations — reads ~/.claude/skill-usage.json
+  R6:  ['claude', 'gemini', 'codex', 'pi'], // memory_hot_unpromoted — reads episodic events (cross-CLI)
+  R8:  ['claude'],                          // settings_drift — compares Claude↔Gemini; only meaningful from Claude
+  R9:  ['claude'],                          // cross_platform_asymmetry — reads both hook dirs; run once from Claude
+  R10: ['claude', 'gemini'],               // dead_lib_module — inspects hooks/lib/; not present in Codex
+  R11: ['claude', 'gemini', 'codex', 'pi'], // memory_cold_by_retrieval — merged multi-CLI logs
+  R12: ['claude', 'gemini', 'codex', 'pi'], // memory_hot_for_promotion — merged multi-CLI logs
+  R13: ['claude', 'gemini', 'codex', 'pi'], // memory_fact_expired — reads frontmatter (tool-neutral)
+  R14: ['claude', 'gemini', 'codex', 'pi'], // memory_active_forgetting — merged multi-CLI logs
+  R15: ['claude', 'gemini', 'codex'],       // session_start_p95_regression — needs timing events
+  R17: ['claude', 'gemini'],               // skill_followed_by_bandaid_loop — needs skill_invoke events
+  R18: ['claude', 'gemini', 'codex'],      // tool_call_p95_regression — needs hook_timing events
+  R19: ['claude', 'gemini'],               // async_blocks_output — reads settings.json hooks
+};
 
 function getTelemetryEpochMs(configDir) {
   try {
@@ -139,27 +164,76 @@ function detectOrphanHooks(ctx) {
   return findings;
 }
 
-// ── R4: skill_zero_invocations ──
-// Skill not invoked in 30d (read skill-usage.json if present)
+// ── R4: skill_zero_invocations / skill_regression ──
+// Real schema: { sessions: [{timestamp, session_id, project, skills_used, note}], stats: {}, total_sessions: N }
+// Extracts per-skill counts from sessions[].skills_used. Detects:
+//   (a) skills with 0 uses in 30d → SUGGEST archive
+//   (b) skills with declining counts (last-14d vs prior-14d < 50%) → OBSERVE regression
 function detectSkillZeroInvocations(ctx) {
   const findings = [];
   try {
     const skillUsageFile = path.join(ctx.configDir, 'skill-usage.json');
     if (!fs.existsSync(skillUsageFile)) return findings;
     const usage = JSON.parse(fs.readFileSync(skillUsageFile, 'utf8'));
+    const sessions = usage.sessions;
+    if (!Array.isArray(sessions) || sessions.length === 0) return findings;
+
     const now = Date.now();
-    const cutoff = now - 30 * 24 * 60 * 60 * 1000;
-    // Skill usage schema assumed: { skills: { <name>: { last_invoked, count_30d, ... } } }
-    if (!usage.skills) return findings;
-    for (const [skill, data] of Object.entries(usage.skills)) {
-      const last = data.last_invoked ? new Date(data.last_invoked).getTime() : 0;
-      if (last === 0 || last < cutoff) {
+    const cutoff30 = now - 30 * 24 * 60 * 60 * 1000;
+    const cutoff14 = now - 14 * 24 * 60 * 60 * 1000;
+    const cutoff28 = now - 28 * 24 * 60 * 60 * 1000;
+
+    // Aggregate per-skill counts across time windows
+    const counts30 = {};   // skills_used in last 30d
+    const counts14 = {};   // last 14d (recent)
+    const countsPrior14 = {}; // 14-28d ago (baseline)
+    const lastSeen = {};   // most recent session timestamp per skill
+
+    for (const s of sessions) {
+      const ts = Date.parse(s.timestamp || '');
+      if (!Number.isFinite(ts)) continue;
+      const skills = Array.isArray(s.skills_used) ? s.skills_used : [];
+      for (const skill of skills) {
+        if (!skill) continue;
+        if (ts >= cutoff30) counts30[skill] = (counts30[skill] || 0) + 1;
+        if (ts >= cutoff14) counts14[skill] = (counts14[skill] || 0) + 1;
+        if (ts >= cutoff28 && ts < cutoff14) countsPrior14[skill] = (countsPrior14[skill] || 0) + 1;
+        if (!lastSeen[skill] || ts > lastSeen[skill]) lastSeen[skill] = ts;
+      }
+    }
+
+    // Collect all known skills (seen in any window or known from 30d)
+    const allSkills = new Set([...Object.keys(counts30), ...Object.keys(countsPrior14)]);
+
+    for (const skill of allSkills) {
+      const recent = counts14[skill] || 0;
+      const prior = countsPrior14[skill] || 0;
+      const total30 = counts30[skill] || 0;
+      const lastTs = lastSeen[skill] || 0;
+      const daysSilent = Math.round((now - lastTs) / (24 * 60 * 60 * 1000));
+
+      // (a) Zero invocations in 30d
+      if (total30 === 0) {
         findings.push({
           rule: 'skill_zero_invocations',
           tier: 'SUGGEST',
           target: { type: 'skill', path: skill },
-          evidence: { last_invoked: data.last_invoked || 'never', days_silent: Math.round((now - last) / (24 * 60 * 60 * 1000)) },
-          proposal: `Skill '${skill}' hasn't been invoked in 30+ days. Keep (rare but critical) or archive?`,
+          evidence: { last_seen: lastTs ? new Date(lastTs).toISOString() : 'never', days_silent: daysSilent, count_30d: 0 },
+          proposal: `Skill '${skill}' has 0 invocations in 30d (last seen: ${daysSilent}d ago). Keep (rare but critical) or archive?`,
+          auto_applicable: false,
+          fingerprint_class: 'skill_stale'
+        });
+        continue; // don't double-fire regression for same skill
+      }
+
+      // (b) Regression: prior14 had uses, recent14 dropped > 50%
+      if (prior >= 3 && recent < prior * 0.5) {
+        findings.push({
+          rule: 'skill_regression',
+          tier: 'OBSERVE',
+          target: { type: 'skill', path: skill },
+          evidence: { count_14d: recent, count_prior_14d: prior, drop_pct: Math.round((1 - recent / prior) * 100) },
+          proposal: `Skill '${skill}' usage dropped ${Math.round((1 - recent / prior) * 100)}% (${prior}→${recent} uses) in last 14d vs prior 14d. Regression or workflow change?`,
           auto_applicable: false,
           fingerprint_class: 'skill_stale'
         });
@@ -217,41 +291,66 @@ function detectMemoryHotUnpromoted(ctx) {
 // (Placeholder — needs project memory enumeration + ref check. Implement in Phase 4.)
 function detectMemoryCold() { return []; }
 
+// ── Shared helper: collect retrieval-log-*.jsonl from ALL tool cache dirs ──
+// Tools write logs to their own cache dir; we merge for a unified cross-CLI view.
+function _collectAllRetrievalLogs(home, cutoffMs) {
+  const toolCacheDirs = [
+    path.join(home, '.claude', 'cache'),
+    path.join(home, '.gemini', 'cache'),
+    path.join(home, '.codex', 'cache'),
+  ];
+  const retrieved = new Set();
+  let oldestLogBirthtimeMs = Infinity;
+  let totalLogsFound = 0;
+
+  for (const cacheDir of toolCacheDirs) {
+    if (!fs.existsSync(cacheDir)) continue;
+    let logs;
+    try { logs = fs.readdirSync(cacheDir).filter(f => /^retrieval-log-.+\.jsonl$/.test(f)); }
+    catch { continue; }
+    for (const lf of logs) {
+      const logPath = path.join(cacheDir, lf);
+      try {
+        const st = fs.statSync(logPath);
+        if (st.birthtimeMs < oldestLogBirthtimeMs) oldestLogBirthtimeMs = st.birthtimeMs;
+        totalLogsFound++;
+        const raw = fs.readFileSync(logPath, 'utf8');
+        for (const line of raw.split('\n')) {
+          if (!line.trim()) continue;
+          try {
+            const entry = JSON.parse(line);
+            const ts = Date.parse(entry.ts || '');
+            if (!ts || (cutoffMs && ts < cutoffMs)) continue;
+            const base = path.basename(entry.file || entry.abs || '');
+            if (base) retrieved.add(base);
+          } catch {}
+        }
+      } catch {}
+    }
+  }
+  return { retrieved, totalLogsFound, oldestLogBirthtimeMs };
+}
+
 // ── R11: memory_cold_by_retrieval ──
 // Memory file enumerated under .claude/memory/ but 0 reads in retrieval-log-<host>.jsonl for 90d.
-// Source of truth: ~/.claude/cache/retrieval-log-<host>.jsonl (written by memory-retrieval-logger.js).
-// Per Rule M9 (2026-04-14-memory-architecture-v2.md Phase 3).
+// Source of truth: retrieval-log-<host>.jsonl files across ALL tool cache dirs.
+// Per Rule M9 (2026-04-14-memory-architecture-v2.md Phase 3). Updated 2026-05-12 for multi-CLI.
 function detectMemoryColdByRetrieval(ctx) {
   const findings = [];
   try {
     const home = process.env.HOME || process.env.USERPROFILE || os.homedir();
-    const host = os.hostname();
-    const logFile = path.join(home, '.claude', 'cache', `retrieval-log-${host}.jsonl`);
-    if (!fs.existsSync(logFile)) return findings; // no history yet — never fire false positives
-
-    // Build retrieval count by memory basename (relative paths vary by cwd, basenames stable)
     const cutoff90 = Date.now() - 90 * 24 * 60 * 60 * 1000;
-    const retrieved = new Set();
-    const raw = fs.readFileSync(logFile, 'utf8');
-    for (const line of raw.split('\n')) {
-      if (!line.trim()) continue;
-      try {
-        const entry = JSON.parse(line);
-        const ts = Date.parse(entry.ts || '');
-        if (!ts || ts < cutoff90) continue;
-        const base = path.basename(entry.file || entry.abs || '');
-        if (base) retrieved.add(base);
-      } catch {}
-    }
+    const { retrieved, totalLogsFound, oldestLogBirthtimeMs } = _collectAllRetrievalLogs(home, cutoff90);
+
+    if (totalLogsFound === 0) return findings; // no history yet — never fire false positives
 
     // Enumerate project memory files
     const memDir = path.join(ctx.cwd, '.claude', 'memory');
     if (!fs.existsSync(memDir)) return findings;
     const files = fs.readdirSync(memDir).filter(f => f.endsWith('.md') && f !== 'MEMORY.md');
 
-    // Only fire when retrieval log has enough history (>= 14 days of data)
-    const stat = fs.statSync(logFile);
-    const logAgeDays = (Date.now() - stat.birthtimeMs) / (24 * 60 * 60 * 1000);
+    // Only fire when oldest log has enough history (>= 14 days of data)
+    const logAgeDays = oldestLogBirthtimeMs === Infinity ? 0 : (Date.now() - oldestLogBirthtimeMs) / (24 * 60 * 60 * 1000);
     if (logAgeDays < 14) return findings;
 
     for (const f of files) {
@@ -264,8 +363,8 @@ function detectMemoryColdByRetrieval(ctx) {
           rule: 'memory_cold_by_retrieval',
           tier: 'SUGGEST',
           target: { type: 'memory', path: path.join(memDir, f) },
-          evidence: { retrievals_90d: 0, last_edited_days_ago: ageDays, log_age_days: Math.round(logAgeDays) },
-          proposal: `Memory '${f}' has 0 retrievals in 90d and was last edited ${ageDays}d ago. Archive to memory/archive/?`,
+          evidence: { retrievals_90d: 0, last_edited_days_ago: ageDays, log_age_days: Math.round(logAgeDays), logs_checked: totalLogsFound },
+          proposal: `Memory '${f}' has 0 retrievals in 90d across ${totalLogsFound} log(s) and was last edited ${ageDays}d ago. Archive to memory/archive/?`,
           auto_applicable: false,
           fingerprint_class: 'memory_cold'
         });
@@ -311,41 +410,20 @@ function detectMemoryFactExpired(ctx) {
 // Cross-host retrieval aggregation: if a memory has 0 reads in ANY host's log for 180+ days
 // AND is not type=user/standard (opinionated keepers) AND hasn't been edited in 14d,
 // SUGGEST archive. Requires retrieval log with >=30d of history (else too noisy for young memories).
+// Updated 2026-05-12: reads from ALL tool cache dirs (Claude, Gemini, Codex) via _collectAllRetrievalLogs.
 function detectMemoryActiveForgetting(ctx) {
   const findings = [];
   try {
     const home = process.env.HOME || process.env.USERPROFILE || os.homedir();
-    const cacheDir = path.join(home, '.claude', 'cache');
-    if (!fs.existsSync(cacheDir)) return findings;
 
-    // Aggregate retrievals across ALL retrieval-log-<host>.jsonl files
-    const logs = fs.readdirSync(cacheDir).filter(f => /^retrieval-log-.+\.jsonl$/.test(f));
-    if (logs.length === 0) return findings;
+    // Aggregate retrievals across ALL tool cache dirs (no cutoff — full history for forgetting detection)
+    const { retrieved, totalLogsFound, oldestLogBirthtimeMs } = _collectAllRetrievalLogs(home, null);
+    if (totalLogsFound === 0) return findings;
 
     // Gate: require >=30d of history on at least one log (birthtime-based)
-    let hasMatureLog = false;
-    for (const lf of logs) {
-      try {
-        const st = fs.statSync(path.join(cacheDir, lf));
-        if ((Date.now() - st.birthtimeMs) / 86400000 >= 30) { hasMatureLog = true; break; }
-      } catch {}
-    }
+    const hasMatureLog = oldestLogBirthtimeMs !== Infinity &&
+      (Date.now() - oldestLogBirthtimeMs) / 86400000 >= 30;
     if (!hasMatureLog) return findings;
-
-    const retrieved = new Set();
-    for (const lf of logs) {
-      try {
-        const raw = fs.readFileSync(path.join(cacheDir, lf), 'utf8');
-        for (const line of raw.split('\n')) {
-          if (!line.trim()) continue;
-          try {
-            const entry = JSON.parse(line);
-            const base = path.basename(entry.file || entry.abs || '');
-            if (base) retrieved.add(base);
-          } catch {}
-        }
-      } catch {}
-    }
 
     const memDir = path.join(ctx.cwd, '.claude', 'memory');
     if (!fs.existsSync(memDir)) return findings;
@@ -375,8 +453,8 @@ function detectMemoryActiveForgetting(ctx) {
           rule: 'memory_active_forgetting',
           tier: 'SUGGEST',
           target: { type: 'memory', path: fp },
-          evidence: { retrievals_all_hosts: 0, last_edited_days_ago: ageDays, type, logs_checked: logs.length },
-          proposal: `Memory '${f}' (type:${type}, age:${ageDays}d) has 0 retrievals across ${logs.length} host(s) in cumulative log. Archive to memory/archive/?`,
+          evidence: { retrievals_all_hosts: 0, last_edited_days_ago: ageDays, type, logs_checked: totalLogsFound },
+          proposal: `Memory '${f}' (type:${type}, age:${ageDays}d) has 0 retrievals across ${totalLogsFound} log(s) in cumulative log. Archive to memory/archive/?`,
           auto_applicable: false,
           fingerprint_class: 'memory_active_forgetting'
         });
@@ -388,26 +466,40 @@ function detectMemoryActiveForgetting(ctx) {
 
 // ── R12: memory_hot_for_promotion ──
 // Memory file retrieved ≥10 times in 30d AND not type:user → suggest promotion.
+// Updated 2026-05-12: reads from ALL tool cache dirs (Claude, Gemini, Codex).
 function detectMemoryHotForPromotion(ctx) {
   const findings = [];
   try {
     const home = process.env.HOME || process.env.USERPROFILE || os.homedir();
-    const host = os.hostname();
-    const logFile = path.join(home, '.claude', 'cache', `retrieval-log-${host}.jsonl`);
-    if (!fs.existsSync(logFile)) return findings;
-
     const cutoff30 = Date.now() - 30 * 24 * 60 * 60 * 1000;
+
+    // Collect all retrieval-log-*.jsonl from all tool cache dirs, counting per file basename
+    const toolCacheDirs = [
+      path.join(home, '.claude', 'cache'),
+      path.join(home, '.gemini', 'cache'),
+      path.join(home, '.codex', 'cache'),
+    ];
     const counts = {};
-    const raw = fs.readFileSync(logFile, 'utf8');
-    for (const line of raw.split('\n')) {
-      if (!line.trim()) continue;
-      try {
-        const entry = JSON.parse(line);
-        const ts = Date.parse(entry.ts || '');
-        if (!ts || ts < cutoff30) continue;
-        const base = path.basename(entry.file || entry.abs || '');
-        if (base) counts[base] = (counts[base] || 0) + 1;
-      } catch {}
+    for (const cacheDir of toolCacheDirs) {
+      if (!fs.existsSync(cacheDir)) continue;
+      let logs;
+      try { logs = fs.readdirSync(cacheDir).filter(f => /^retrieval-log-.+\.jsonl$/.test(f)); }
+      catch { continue; }
+      for (const lf of logs) {
+        try {
+          const raw = fs.readFileSync(path.join(cacheDir, lf), 'utf8');
+          for (const line of raw.split('\n')) {
+            if (!line.trim()) continue;
+            try {
+              const entry = JSON.parse(line);
+              const ts = Date.parse(entry.ts || '');
+              if (!ts || ts < cutoff30) continue;
+              const base = path.basename(entry.file || entry.abs || '');
+              if (base) counts[base] = (counts[base] || 0) + 1;
+            } catch {}
+          }
+        } catch {}
+      }
     }
 
     const memDir = path.join(ctx.cwd, '.claude', 'memory');
@@ -505,7 +597,6 @@ function detectCrossPlatformAsymmetry(ctx) {
       // 2026-04-22: Claude-local orchestration tools (not meaningful on Gemini):
       'mirror-kachow.js',       // mirrors canonical hooks to kachow-mirror/ (scrubbed public)
       'ai-snapshot-stop.js',    // filesystem-specific snapshot logic
-      'gsd-check-update.js',    // GSD plugin version check (Claude plugins only)
       'post-commit-sync-reminder.js', // monorepo dual-remote nudge (user's [tooling-dir])
       'repomap-refresh.js',     // calls user's [tooling-dir] tooling
       // 2026-05-01: Claude-only events (PostCompact, CwdChanged, FileChanged not in Gemini/Codex):
@@ -772,7 +863,7 @@ function detectToolCallP95Regression(ctx) {
       'track-skill-usage', 'todowrite-persist', 'stop-sleep-consolidator', 'memory-rotate',
       'ai-snapshot-stop', 'session-presence-start', 'session-presence-end', 'enhanced-statusline',
       'plugin-update-checker', 'skill-upstream-checker', 'validate-instructions-sync',
-      'gsd-check-update', 'auto-pull-global', 'skill-auto-updater', 'handoff-session-end',
+      'auto-pull-global', 'skill-auto-updater', 'handoff-session-end',
       'notify-with-fallback', 'memory-post-compact', 'cwd-changed-watcher', 'file-changed-notify',
     ]);
     const postToolTimings = events
@@ -851,6 +942,9 @@ function detectAsyncBlocksOutput(ctx) {
 
 function runAllDetectors(ctx) {
   const allFindings = [];
+  // ctx.tool: 'claude' | 'gemini' | 'codex' | 'pi' — defaults to 'claude' if not set
+  const tool = (ctx.tool || 'claude').toLowerCase();
+
   const detectors = [
     { name: 'R1', fn: detectHookTimeoutStreak },
     { name: 'R2', fn: detectHookErrorRecurring },
@@ -873,6 +967,9 @@ function runAllDetectors(ctx) {
     { name: 'R19', fn: detectAsyncBlocksOutput }
   ];
   for (const { name, fn } of detectors) {
+    // Applicability check: skip silently if this tool is not in the supported list
+    const applicable = DETECTOR_APPLICABILITY[name];
+    if (applicable && !applicable.includes(tool)) continue;
     try { allFindings.push(...fn(ctx)); }
     catch (e) { allFindings.push({ rule: '_detector_error', tier: 'OBSERVE', target: { type: 'detector', path: name }, evidence: { error: e.message } }); }
   }
@@ -880,6 +977,7 @@ function runAllDetectors(ctx) {
 }
 
 module.exports = {
+  DETECTOR_APPLICABILITY,
   detectHookTimeoutStreak,
   detectHookErrorRecurring,
   detectOrphanHooks,

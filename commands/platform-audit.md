@@ -86,7 +86,7 @@ jq '{
   autocompact: .env.CLAUDE_AUTOCOMPACT_PCT_OVERRIDE,
   telemetry: .env.DISABLE_TELEMETRY,
   attribution: .attribution
-}' ~/.claude/settings.json
+}' ~/.ai-context/configs/claude-settings.json
 ```
 
 Known good values (as of 2026-03):
@@ -102,11 +102,11 @@ Known good values (as of 2026-03):
 ### 2a. File Existence (all tools — hooks live in `~/.ai-context/hooks/`, symlinked into tool dirs)
 ```bash
 echo "=== Claude hooks ==="
-jq -r '.hooks[][] | .hooks[]? | .command' ~/.claude/settings.json | grep -o '[^ "]*\.js' | while read f; do
-  [ -f "$HOME/.claude/hooks/$f" ] && echo "  ✓ $f" || echo "  ✗ MISSING: $f"
+jq -r '.hooks[][] | .hooks[]? | .command' ~/.ai-context/configs/claude-settings.json | grep -o '[^ "]*\.js' | while read f; do
+  [ -f "$HOME/.ai-context/hooks/$f" ] && echo "  ✓ $f" || echo "  ✗ MISSING: $f"
 done
 echo "=== Gemini hooks ==="
-jq -r '.hooks[][] | .hooks[]? | .command' ~/.gemini/settings.json | grep -o '[^ "]*\.js' | while read f; do
+jq -r '.hooks[][] | .hooks[]? | .command' ~/.ai-context/configs/gemini-settings.json | grep -o '[^ "]*\.js' | while read f; do
   [ -f "$HOME/.gemini/hooks/$f" ] && echo "  ✓ $f" || echo "  ✗ MISSING: $f"
 done
 echo "=== Codex/Crush hooks (shared via ~/.ai-context/hooks/ symlinks) ==="
@@ -116,23 +116,21 @@ ls ~/.ai-context/hooks/*.js 2>/dev/null | wc -l | xargs -I{} echo "  {} hook fil
 ### 2b. Output Format Validation
 Run each hook with empty input and verify valid JSON output:
 ```bash
-for f in ~/.claude/hooks/*.js; do
+for f in ~/.ai-context/hooks/*.js; do
   result=$(echo '{}' | timeout 3 node "$f" 2>/dev/null)
   if [ -n "$result" ]; then
     echo "$result" | python3 -c "import json,sys; json.load(sys.stdin)" 2>/dev/null || echo "BAD JSON: $(basename $f): $result"
   fi
 done
 ```
-GSD hooks outputting nothing on empty input is expected (they need GSD context).
-
 ### 2c. Sync Hook Placement (CRITICAL)
 Sync hooks MUST be PostToolUse (Claude) / AfterTool (Gemini). NEVER Pre/Before.
 ```bash
-jq -r '.hooks.PreToolUse[]?.hooks[]?.command' ~/.claude/settings.json 2>/dev/null | grep -i sync && echo "BUG: Claude sync under PreToolUse"
-jq -r '.hooks.BeforeTool[]?.hooks[]?.command' ~/.gemini/settings.json 2>/dev/null | grep -i sync && echo "BUG: Gemini sync under BeforeTool"
+jq -r '.hooks.PreToolUse[]?.hooks[]?.command' ~/.ai-context/configs/claude-settings.json 2>/dev/null | grep -i sync && echo "BUG: Claude sync under PreToolUse"
+jq -r '.hooks.BeforeTool[]?.hooks[]?.command' ~/.ai-context/configs/gemini-settings.json 2>/dev/null | grep -i sync && echo "BUG: Gemini sync under BeforeTool"
 echo "Guard hooks (should be Pre/Before):"
-jq -r '.hooks.PreToolUse[]?.hooks[]?.command' ~/.claude/settings.json 2>/dev/null | grep -i 'guard\|safety\|halt'
-jq -r '.hooks.BeforeTool[]?.hooks[]?.command' ~/.gemini/settings.json 2>/dev/null | grep -i 'guard\|safety\|halt'
+jq -r '.hooks.PreToolUse[]?.hooks[]?.command' ~/.ai-context/configs/claude-settings.json 2>/dev/null | grep -i 'guard\|safety\|halt'
+jq -r '.hooks.BeforeTool[]?.hooks[]?.command' ~/.ai-context/configs/gemini-settings.json 2>/dev/null | grep -i 'guard\|safety\|halt'
 ```
 
 ### 2d. Agent Frontmatter Validation
@@ -148,12 +146,12 @@ done
 ### 2e. Hook File Parity
 Hooks live in `~/.ai-context/hooks/` — tool dirs symlink there. Check that symlinks are intact and source files exist:
 ```bash
-for f in ~/.claude/hooks/*.js; do
+for f in ~/.ai-context/hooks/*.js; do
   name=$(basename "$f"); gemini=~/.gemini/hooks/$name
   [ -f "$gemini" ] && ! diff -q "$f" "$gemini" > /dev/null 2>&1 && echo "DIFFERS: $name"
 done
 # Verify symlinks point to ~/.ai-context/hooks/
-ls -la ~/.claude/hooks/ | grep -v "^total" | head -5
+ls -la ~/.ai-context/hooks/ | grep -v "^total" | head -5
 ```
 
 Expected differences (NOT bugs):
@@ -180,8 +178,8 @@ Verify each tool's settings.json uses correct platform-specific event names (Cla
 | Context compress | `PreCompact` | `PreCompress` | Using `PreCompact` in Gemini |
 
 ```bash
-echo "Claude events:" && jq -r '.hooks | keys[]' ~/.claude/settings.json
-echo "Gemini events:" && jq -r '.hooks | keys[]' ~/.gemini/settings.json
+echo "Claude events:" && jq -r '.hooks | keys[]' ~/.ai-context/configs/claude-settings.json
+echo "Gemini events:" && jq -r '.hooks | keys[]' ~/.ai-context/configs/gemini-settings.json
 ```
 
 Flag any event name that doesn't belong to its platform.
@@ -190,9 +188,9 @@ Flag any event name that doesn't belong to its platform.
 Claude: seconds. Gemini: milliseconds.
 ```bash
 echo "Gemini timeouts that look like seconds (should be ms):"
-jq -r '[.hooks[][] | .hooks[]? | .timeout // empty] | map(select(. < 100))' ~/.gemini/settings.json
+jq -r '[.hooks[][] | .hooks[]? | .timeout // empty] | map(select(. < 100))' ~/.ai-context/configs/gemini-settings.json
 echo "Claude timeouts that look like milliseconds (should be seconds):"
-jq -r '[.hooks[][] | .hooks[]? | .timeout // empty] | map(select(. > 1000))' ~/.claude/settings.json
+jq -r '[.hooks[][] | .hooks[]? | .timeout // empty] | map(select(. > 1000))' ~/.ai-context/configs/claude-settings.json
 ```
 
 ### 3c. Tool Matcher Check
@@ -201,16 +199,16 @@ Gemini uses: `write_file`, `replace`, `run_shell_command`, `read_file`, `activat
 
 ```bash
 echo "Gemini matchers using Claude tool names (BUG):"
-jq -r '.hooks[][] | .matcher // empty' ~/.gemini/settings.json | grep -E 'Write|Edit|Bash|Read(?!_)|Skill(?!s)' | grep -v 'write_file'
+jq -r '.hooks[][] | .matcher // empty' ~/.ai-context/configs/gemini-settings.json | grep -E 'Write|Edit|Bash|Read(?!_)|Skill(?!s)' | grep -v 'write_file'
 echo "Claude matchers using Gemini tool names (BUG):"
-jq -r '.hooks[][] | .matcher // empty' ~/.claude/settings.json | grep -E 'write_file|replace|run_shell|read_file|activate_skill'
+jq -r '.hooks[][] | .matcher // empty' ~/.ai-context/configs/claude-settings.json | grep -E 'write_file|replace|run_shell|read_file|activate_skill'
 ```
 
 ### 3d. Conditional `if` Field Check (v2.1.85+)
 If Claude Code supports the `if` field, verify it's applied to reduce process spawning:
 ```bash
-echo "Hooks with if field:" && jq -r '.hooks[][] | select(.if) | .if' ~/.claude/settings.json 2>/dev/null
-echo "Hooks without if field that could benefit:" && jq -r '.hooks.PostToolUse[] | select(.if == null) | .hooks[0].command' ~/.claude/settings.json 2>/dev/null | grep -o '[^/]*\.js"' | tr -d '"'
+echo "Hooks with if field:" && jq -r '.hooks[][] | select(.if) | .if' ~/.ai-context/configs/claude-settings.json 2>/dev/null
+echo "Hooks without if field that could benefit:" && jq -r '.hooks.PostToolUse[] | select(.if == null) | .hooks[0].command' ~/.ai-context/configs/claude-settings.json 2>/dev/null | grep -o '[^/]*\.js"' | tr -d '"'
 ```
 
 ---
@@ -245,8 +243,8 @@ Should have 4 patterns (2 Claude→Gemini + 2 Gemini→Claude).
 Commands live in `~/.ai-context/commands/` (symlinked into tool dirs). Verify all 5 tools can see them:
 ```bash
 echo "Commands source:" && ls ~/.ai-context/commands/*.md | sed 's|.*/||;s|\.md||' | sort
-echo "Claude commands:" && ls ~/.claude/commands/*.md | sed 's|.*/||;s|\.md||' | sort
-echo "Gemini root skills:" && ls -d ~/.gemini/skills/*/ 2>/dev/null | sed 's|.*/\(.*\)/|\1|' | grep -v gsd | sort
+echo "Claude commands:" && ls ~/.ai-context/commands/*.md | sed 's|.*/||;s|\.md||' | sort
+echo "Gemini root skills:" && ls -d ~/.gemini/skills/*/ 2>/dev/null | sed 's|.*/\(.*\)/|\1|' | sort
 ```
 
 ---
@@ -271,7 +269,7 @@ done
 
 ### 5c. Plugin Health
 ```bash
-jq -r '.enabledPlugins[]' ~/.claude/settings.json 2>/dev/null
+jq -r '.enabledPlugins[]' ~/.ai-context/configs/claude-settings.json 2>/dev/null
 # Codex/Crush/OpenCode: no plugin system — skip
 ```
 

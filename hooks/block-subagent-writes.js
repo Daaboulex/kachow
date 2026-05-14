@@ -153,6 +153,6 @@ try {
 
   passthrough();
 } catch (e) {
-  try { process.stderr.write('block-subagent-writes: ' + e.message + '\n'); } catch {}
+  try { require('./lib/hook-logger.js').logError('block-subagent-writes', e); } catch {}
   passthrough();
 }

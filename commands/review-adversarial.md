@@ -10,7 +10,7 @@ description: >
 ## Parameters
 - `path` — file or directory to review (default: all uncommitted changes)
 - `--min N` — minimum findings required (default: 5)
-- `--scope` — review scope: `files` (specific files), `phase` (current GSD phase), `pr` (PR diff)
+- `--scope` — review scope: `files` (specific files), `pr` (PR diff)
 
 ## Process
 
@@ -41,6 +41,3 @@ description: >
 - **P2 (Minor):** Edge case, suboptimal pattern, missing bounds check
 - **P3 (Nit):** Style, naming, minor readability (don't count toward minimum)
 
-## Integration with GSD
-- `/gsd:verify-work` can optionally invoke this as a pre-merge quality gate
-- Use `--scope phase` when reviewing a completed GSD phase

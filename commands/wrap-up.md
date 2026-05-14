@@ -44,10 +44,7 @@ DIRTY_CWD=$(git status --porcelain 2>/dev/null | wc -l)
 RISKY_CHANGES=0
 git -C ~/.ai-context log --since="12 hours ago" --name-only --pretty=format: 2>/dev/null | grep -qE "hooks/|skills/|commands/" && RISKY_CHANGES=1
 
-# Signal 5: phase just completed (check for recent VERIFICATION.md or state transition)
-PHASE_COMPLETED=$(find .planning/phases -name "*-VERIFICATION.md" -newer .planning/STATE.md 2>/dev/null | head -1)
-
-# Signal 6: corrections/errors in recent episodic events
+# Signal 5: corrections/errors in recent episodic events
 CORRECTION_EVENTS=$(find ~/.ai-context/memory/episodic/*.jsonl 2>/dev/null -mtime -1 -exec grep -h "hook_errors\|correction" {} \; 2>/dev/null | wc -l)
 ```
 
@@ -59,8 +56,7 @@ CORRECTION_EVENTS=$(find ~/.ai-context/memory/episodic/*.jsonl 2>/dev/null -mtim
 | **B. Read-only session** | `TOTAL_COMMITS == 0` AND `DIRTY_GLOBAL == 0` AND `DIRTY_CWD == 0` | Skip wrap-up entirely. Report "Nothing to persist." |
 | **C. Light session** | `TOTAL_COMMITS` 1-4 AND `RISKY_CHANGES == 0` | Mini wrap-up: Steps 1 + 2 (skip 3/verify-sync unless dirty global) |
 | **D. Full session** | `TOTAL_COMMITS` ≥ 5 OR `RISKY_CHANGES == 1` OR `DIRTY_GLOBAL > 0` | Full wrap-up: Steps 0-4 including verify-sync (checks all 5 tools) |
-| **E. Phase completion** | `PHASE_COMPLETED` is non-empty | Full wrap-up + milestone audit check: `/gsd:audit-uat` after Step 3 |
-| **F. Correction-heavy** | `CORRECTION_EVENTS` ≥ 3 | Full wrap-up with priority on Step 2 (reflect) — prompt for each correction explicitly |
+| **E. Correction-heavy** | `CORRECTION_EVENTS` ≥ 3 | Full wrap-up with priority on Step 2 (reflect) — prompt for each correction explicitly |
 
 ### Announce the route
 
@@ -99,10 +95,10 @@ console.log(JSON.stringify(results, null, 2));
 
 | Type | Detection | Layers to check |
 |------|-----------|-----------------|
-| **NixOS config** | Has `.ai-context/` with symlinked `.claude/`/`.gemini/` inside | Project root + `.ai-context/` submodule + global |
-| **Monorepo** | Has `.claude/` + multiple `Development-*/` dirs | Monorepo root + current sub-project + global |
+| **NixOS config** | Has `.ai-context/` symlink to project-state | Project root + `.ai-context/` submodule + global |
+| **Monorepo** | Has `.ai-context/` + multiple `Development-*/` dirs | Monorepo root + current sub-project + global |
 | **Sub-repo** | CWD is inside a `repos/` dir of a parent project | Sub-repo + parent project root + global |
-| **Standalone project** | Has `.claude/` or `.gemini/` but none of the above | Project root + global |
+| **Standalone project** | Has `.ai-context/` but none of the above | Project root + global |
 | **Global** | CWD is `~/Documents` or `~/` or no project markers found | Global only |
 
 **0c. For sub-repos (NixOS repos/ or monorepo sub-projects), identify the parent:**
@@ -149,7 +145,7 @@ What changed?
 - [ ] settings.json edited (global)
 - [ ] Memory files created/updated (project)
 - [ ] New rules created (project)
-- [ ] Global repos (.claude/ or .gemini/) modified
+- [ ] Global repos (.ai-context/ or .ai-context/) modified
 - [ ] Sub-repo(s) modified (if in monorepo/NixOS config)
 ```
 
@@ -251,8 +247,8 @@ function countSubdirFiles(dir, filePattern) {
     }).length;
   } catch(e) { return 0; }
 }
-const cc = countFiles(/\.md$/, path.join(home, '.claude/commands'));
-const gs = countSubdirFiles(path.join(home, '.gemini/skills'), 'SKILL.md');
+const cc = countFiles(/\.md$/, path.join(home, '.ai-context/commands'));
+const gs = countSubdirFiles(path.join(home, '.ai-context/skills'), 'SKILL.md');
 console.log('Claude commands: ' + cc);
 console.log('Gemini skills: ' + gs);
 if (cc !== gs) console.log('WARNING: count mismatch — check for missing skill sync');
@@ -270,12 +266,12 @@ function countMd(dir) {
 }
 // Adjust PROJECT_ROOT to the project root from Step 0
 const root = process.cwd();
-const cr = path.join(root, '.claude/rules');
-const gr = path.join(root, '.gemini/rules');
-const cm = path.join(root, '.claude/memory');
-const gm = path.join(root, '.gemini/memory');
-const cs = path.join(root, '.claude/skills');
-const gs = path.join(root, '.gemini/skills');
+const cr = path.join(root, '.ai-context/rules');
+const gr = path.join(root, '.ai-context/rules');
+const cm = path.join(root, '.ai-context/memory');
+const gm = path.join(root, '.ai-context/memory');
+const cs = path.join(root, '.ai-context/skills');
+const gs = path.join(root, '.ai-context/skills');
 const crn = countMd(cr), grn = countMd(gr);
 const cmn = countMd(cm), gmn = countMd(gm);
 console.log('Project rules (Claude): ' + crn + ' | (Gemini): ' + grn + (crn !== grn ? ' WARNING: mismatch' : ''));
@@ -297,10 +293,10 @@ const fs = require('fs'), path = require('path');
 // Adjust AI_CTX to the .ai-context/ path from Step 0
 const aiCtx = 'AI_CONTEXT_PATH';
 const links = [
-  ['.claude/claude-progress.json', '../AI-progress.json'],
-  ['.claude/claude-tasks.json', '../AI-tasks.json'],
-  ['.gemini/gemini-progress.json', '../AI-progress.json'],
-  ['.gemini/gemini-tasks.json', '../AI-tasks.json'],
+  ['.ai-context/claude-progress.json', '../AI-progress.json'],
+  ['.ai-context/claude-tasks.json', '../AI-tasks.json'],
+  ['.ai-context/gemini-progress.json', '../AI-progress.json'],
+  ['.ai-context/gemini-tasks.json', '../AI-tasks.json'],
 ];
 links.forEach(([rel, expected]) => {
   const full = path.join(aiCtx, rel);
@@ -320,8 +316,8 @@ links.forEach(([rel, expected]) => {
 node -e "
 const fs = require('fs'), path = require('path');
 const home = require('os').homedir();
-const claudeHooks = path.join(home, '.claude/hooks');
-const geminiHooks = path.join(home, '.gemini/hooks');
+const claudeHooks = path.join(home, '.ai-context/hooks');
+const geminiHooks = path.join(home, '.ai-context/hooks');
 const claudeOnly = new Set(['sync-gemini-md.js','sync-gemini-skills.js','reflect-stop.js','reflect-stop-failure.js','validate-instructions-sync.js','plugin-update-checker.js','enhanced-statusline.js','sync-hook-versions.js']);
 const geminiOnly = new Set(['sync-claude-md.js','sync-claude-skills.js']);
 const expectedDiff = new Set(['claude-gemini-json-sync.js']);
@@ -353,7 +349,7 @@ node -e "
 const fs = require('fs'), path = require('path');
 const home = require('os').homedir();
 try {
-  const gemini = JSON.parse(fs.readFileSync(path.join(home, '.gemini/settings.json'), 'utf8'));
+  const gemini = JSON.parse(fs.readFileSync(path.join(home, '.ai-context/settings.json'), 'utf8'));
   const bt = gemini.hooks && gemini.hooks.BeforeTool || [];
   bt.forEach(h => {
     const cmds = (h.hooks || []).map(x => x.command || '').join(' ');
@@ -361,7 +357,7 @@ try {
   });
 } catch(e) {}
 try {
-  const claude = JSON.parse(fs.readFileSync(path.join(home, '.claude/settings.json'), 'utf8'));
+  const claude = JSON.parse(fs.readFileSync(path.join(home, '.ai-context/settings.json'), 'utf8'));
   const ptu = claude.hooks && claude.hooks.PreToolUse || [];
   ptu.forEach(h => {
     const cmds = (h.hooks || []).map(x => x.command || '').join(' ');
@@ -379,8 +375,8 @@ node -e "
 const fs = require('fs'), path = require('path');
 const home = require('os').homedir();
 try {
-  const fwd = fs.readFileSync(path.join(home, '.claude/hooks/sync-gemini-md.js'), 'utf8');
-  const rev = fs.readFileSync(path.join(home, '.gemini/hooks/sync-claude-md.js'), 'utf8');
+  const fwd = fs.readFileSync(path.join(home, '.ai-context/hooks/sync-gemini-md.js'), 'utf8');
+  const rev = fs.readFileSync(path.join(home, '.ai-context/hooks/sync-claude-md.js'), 'utf8');
   const fwdCount = (fwd.match(/\.replace\(/g) || []).length;
   const revCount = (rev.match(/\.replace\(/g) || []).length;
   console.log('Forward: ' + fwdCount + ' patterns');

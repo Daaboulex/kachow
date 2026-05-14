@@ -35,7 +35,11 @@ const SURFACES = [
   path.join(HOME, '.claude'),
   path.join(HOME, '.gemini'),
   path.join(HOME, '.codex'),
+  path.join(HOME, '.crush'),
+  path.join(HOME, '.agents'),
+  path.join(HOME, '.pi'),
   path.join(HOME, '.config', 'opencode'),
+  path.join(HOME, '.config', 'crush'),
   path.join(HOME, '.config', 'aider'),
 ];
 
@@ -44,7 +48,7 @@ const SURFACES = [
 const ARCHIVED_SEGMENTS = [
   '/projects/.archive-',   // per-cwd session archives
   '/memory/archive/',
-  '/hooks/archive/',
+  '/.backup/',
   '/archive/',
 ];
 
@@ -64,7 +68,6 @@ const SKIP_SEGMENTS = [
   '/.venv/',
   '/projects/',
   '/data/',
-  '/get-shit-done/',
   '/marketplaces/',
 ];
 

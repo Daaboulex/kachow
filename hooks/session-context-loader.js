@@ -60,13 +60,15 @@ try {
   // Behavioral rules summary (Layer C) — inject ALL feedback-type memory rule names.
   // Ensures every behavioral rule is visible every session regardless of FULL_N.
   try {
+    const tp = require('./lib/tool-paths.js');
     const memDirs = [
-      path.join(os.homedir(), '.ai-context', 'memory'),
+      path.join(os.homedir(), '.ai-context', 'core', 'memory'),
       path.join(cwd, '.ai-context', 'memory'),
       path.join(cwd, '.claude', 'memory'),
+      path.join(cwd, '.gemini', 'memory'),
     ];
     const sanitized = cwd.replace(/^\//, '').replace(/[/\\]/g, '-').replace(/^([A-Z]):/i, '$1');
-    const globalMemDir = path.join(os.homedir(), '.claude', 'projects', sanitized, 'memory');
+    const globalMemDir = path.join(tp.configDir, 'projects', sanitized, 'memory');
     memDirs.push(globalMemDir);
 
     for (const memDir of memDirs) {
@@ -272,8 +274,10 @@ try {
     let walkDir = cwd;
     const root = path.parse(walkDir).root;
     while (walkDir && walkDir !== root) {
+      memoryPaths.push(path.join(walkDir, '.ai-context', 'core', 'memory', 'MEMORY.md'));
       memoryPaths.push(path.join(walkDir, '.ai-context', 'memory', 'MEMORY.md'));
       memoryPaths.push(path.join(walkDir, '.claude', 'memory', 'MEMORY.md'));
+      memoryPaths.push(path.join(walkDir, '.gemini', 'memory', 'MEMORY.md'));
       const parent = path.dirname(walkDir);
       if (parent === walkDir) break;
       walkDir = parent;
@@ -296,10 +300,20 @@ try {
       if (fs.existsSync(memPath)) {
         try {
           const content = fs.readFileSync(memPath, 'utf8');
-          // Extract memory entries (lines starting with "- [")
-          let allEntries = content.split('\n')
-            .filter(l => l.trim().startsWith('- ['))
-            .map(l => l.trim().replace(/^- /, ''));
+          // Extract memory entries: accept multiple formats
+          //   "- [title](file.md) — desc"  (canonical)
+          //   "- file.md — desc"            (simplified)
+          //   "[title](file.md); [title2]"  (compact multi-entry lines)
+          let allEntries = [];
+          for (const line of content.split('\n')) {
+            const t = line.trim();
+            if (t.startsWith('- [') || t.startsWith('- feedback_') || t.startsWith('- project_') || t.startsWith('- reference_') || t.startsWith('- user_') || t.startsWith('- semantic_')) {
+              allEntries.push(t.replace(/^- /, ''));
+            } else if (t.startsWith('[') && t.includes('](') && t.includes('.md)')) {
+              const matches = t.match(/\[([^\]]+)\]\(([^)]+\.md)\)/g) || [];
+              for (const m of matches) allEntries.push(m);
+            }
+          }
 
           // ── Temporal-frontmatter filter (v3 Phase A) — uses frontmatter cache ──
           // Drop memories marked `superseded_by:` or past `valid_until:`.
@@ -438,7 +452,7 @@ try {
           parts.push(
             `Memory awareness: ${totalCount} total entries (${catSummary})` +
             (relevantCount > 0 ? `, ${relevantCount} cwd-relevant` : '') +
-            `. Run \`/memory <topic>\` to search, \`Read .claude/memory/<file>.md\` for full content.`
+            `. Run \`/memory <topic>\` to search, \`Read .ai-context/core/memory/<file>.md\` for full content.`
           );
 
           if (topFull.length > 0) {
@@ -458,6 +472,7 @@ try {
     const semanticDirs = [
       path.join(cwd, '.ai-context', 'memory', 'semantic'),
       path.join(cwd, '.claude', 'memory', 'semantic'),
+      path.join(cwd, '.gemini', 'memory', 'semantic'),
     ];
     let semDir = null;
     for (const d of semanticDirs) { if (fs.existsSync(d)) { semDir = d; break; } }
@@ -567,6 +582,7 @@ try {
       path.join(cwd, '.superpowers'),
       path.join(cwd, '.ai-context', '.superpowers'),
       path.join(cwd, '.claude', '.superpowers'),
+      path.join(cwd, '.gemini', '.superpowers'),
       path.join(os.homedir(), 'Documents', '.superpowers'),  // global fallback
     ];
     for (const spDir of spDirs) {
@@ -591,25 +607,6 @@ try {
         const relDir = path.relative(cwd, spDir) || spDir;
         parts.push(`Superpowers — ${spParts.join(', ')}. Read at ${relDir}/.`);
         break;  // Only use first matching dir
-      }
-    }
-  } catch {}
-
-  // GSD milestone status (added 2026-04-17): .planning/STATE.md has current milestone.
-  // Surface one-liner so agent knows which milestone/phase is active.
-  try {
-    const stateFile = path.join(cwd, '.planning', 'STATE.md');
-    if (fs.existsSync(stateFile)) {
-      const content = fs.readFileSync(stateFile, 'utf8');
-      const milestoneMatch = content.match(/(?:^|\n)#+\s*(?:Current|Active)[:\s]+(.+?)(?:\n|$)/i)
-                          || content.match(/milestone[:\s]+([^\n]+)/i);
-      const phaseMatch = content.match(/(?:^|\n)#+\s*Phase[:\s]+(.+?)(?:\n|$)/i)
-                      || content.match(/current[_\s-]*phase[:\s]+([^\n]+)/i);
-      const hints = [];
-      if (milestoneMatch) hints.push(`milestone: ${milestoneMatch[1].trim().slice(0, 60)}`);
-      if (phaseMatch) hints.push(`phase: ${phaseMatch[1].trim().slice(0, 60)}`);
-      if (hints.length > 0) {
-        parts.push(`GSD — ${hints.join(', ')}. Run /gsd:progress for details.`);
       }
     }
   } catch {}
@@ -692,7 +689,7 @@ try {
 
   // Stale memory warning (added 2026-04-17): if MEMORY.md hasn't been updated in 14+ days.
   try {
-    for (const memDir of [path.join(cwd, '.ai-context', 'memory'), path.join(cwd, '.claude', 'memory')]) {
+    for (const memDir of [path.join(cwd, '.ai-context', 'memory'), path.join(cwd, '.claude', 'memory'), path.join(cwd, '.gemini', 'memory')]) {
       const memIndex = path.join(memDir, 'MEMORY.md');
       if (!fs.existsSync(memIndex)) continue;
       const ageDays = Math.round((Date.now() - fs.statSync(memIndex).mtimeMs) / (86400 * 1000));
@@ -796,6 +793,23 @@ try {
       };
       fs.appendFileSync(logPath, JSON.stringify(entry) + '\n');
     } catch { /* never break the loader */ }
+    // Merge session-start-combined modules into single output
+    try {
+      const { runSections } = require('./session-start-combined.js');
+      const startCtx = {
+        home: os.homedir(),
+        tool: require('./lib/tool-detect.js').detectTool(),
+        configDir: require('./lib/tool-detect.js').toolHomeDir(),
+        projectDir: cwd,
+        messages: [],
+        errors: [],
+      };
+      runSections(startCtx);
+      if (startCtx.messages.length > 0) {
+        msg += '\n' + startCtx.messages.join('\n') + ' [session-start-combined]';
+      }
+    } catch {}
+
     process.stdout.write(JSON.stringify({
       continue: true,
       systemMessage: msg
@@ -804,6 +818,6 @@ try {
     process.stdout.write('{"continue":true}');
   }
 } catch (e) {
-  process.stderr.write('session-context-loader: ' + e.message + '\n');
+  try { require('./lib/hook-logger.js').logError('session-context-loader', e); } catch {}
   process.stdout.write('{"continue":true}');
 }

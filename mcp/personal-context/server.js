@@ -152,6 +152,31 @@ function slugifyName(name) {
     .replace(/^_+|_+$/g, '');
 }
 
+function _deriveProjectKeyLite(cwd) {
+  const resolved = canonicalizeCwd(cwd);
+  if (!resolved) return null;
+  const home = os.homedir();
+  const specials = { [path.join(home, '.claude')]: 'dot-claude', [path.join(home, '.gemini')]: 'dot-gemini',
+    [path.join(home, '.codex')]: 'dot-codex', [path.join(home, '.ai-context')]: 'dot-ai-context' };
+  for (const [dir, key] of Object.entries(specials)) {
+    try { const r = fs.realpathSync(dir); if (resolved === r || resolved.startsWith(r + path.sep)) return key; } catch {}
+  }
+  for (const sub of ['.ai-context', '.claude']) {
+    try {
+      const d = JSON.parse(fs.readFileSync(path.join(resolved, sub, 'project-identity.json'), 'utf8'));
+      if (d.project || d.identity) return (d.project || d.identity).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    } catch {}
+  }
+  let cur = resolved;
+  while (true) {
+    try { fs.statSync(path.join(cur, '.git')); return path.basename(cur).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''); } catch {}
+    const parent = path.dirname(cur);
+    if (parent === cur) break;
+    cur = parent;
+  }
+  return path.basename(resolved).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+}
+
 // SEC-1: get_skill name must stay inside SKILLS_DIR. path.join accepts
 // .. segments which escape. Apply slugifyName (allow a-z0-9_-) then
 // verify containment.
@@ -256,20 +281,28 @@ const TOOLS = {
     description: 'List all memory files with name, type, and one-line description from frontmatter.',
     inputSchema: {
       type: 'object',
-      properties: { type: { type: 'string', description: 'Optional filter: user|feedback|project|reference' } },
+      properties: {
+        type: { type: 'string', description: 'Optional filter: user|feedback|project|reference' },
+        limit: { type: 'integer', description: 'Max files to return (default 100, max 500)' },
+        offset: { type: 'integer', description: 'Files to skip (default 0)' },
+      },
     },
-    handler: ({ type } = {}) => {
+    handler: ({ type, limit = 100, offset = 0 } = {}) => {
+      limit = Math.min(Math.max(Number(limit) || 100, 1), 500);
+      offset = Math.max(Number(offset) || 0, 0);
       const files = [];
       for (const d of getMemoryDirs()) walkMarkdown(d, files);
-      const list = [];
+      const matched = [];
       for (const f of files) {
         try {
           const { meta } = extractFrontmatter(fs.readFileSync(f, 'utf8'));
           if (type && meta.type !== type) continue;
-          list.push(`- [${meta.type || '?'}] ${meta.name || path.basename(f, '.md')} — ${meta.description || '(no description)'}\n    ${f}`);
+          matched.push(`- [${meta.type || '?'}] ${meta.name || path.basename(f, '.md')} — ${meta.description || '(no description)'}\n    ${f}`);
         } catch {}
       }
-      return { content: [{ type: 'text', text: list.join('\n') || 'no memories found' }] };
+      const page = matched.slice(offset, offset + limit);
+      const header = `total: ${matched.length}, showing: ${offset}-${offset + page.length}, has_more: ${offset + limit < matched.length}`;
+      return { content: [{ type: 'text', text: header + '\n\n' + (page.join('\n') || 'no memories found') }] };
     },
   },
 
@@ -331,44 +364,112 @@ const TOOLS = {
   },
 
   read_handoff: {
-    description: 'Read the latest session handoff document for a project (walks up from cwd to find .claude/ or .ai-context/, then reads .session-handoff.md).',
+    description: 'Read the latest session handoff for a project. Reads from handoffs/sessions/ (JSON) or falls back to legacy .session-handoff.md files.',
     inputSchema: {
       type: 'object',
       properties: { cwd: { type: 'string', description: 'Optional starting directory (default: server cwd)' } },
     },
     handler: ({ cwd } = {}) => {
+      const handoffsDir = path.join(AI_CONTEXT, 'handoffs');
+      const projectKey = _deriveProjectKeyLite(cwd);
+
+      // Try project-scoped sessions first
+      if (projectKey) {
+        const projFile = path.join(handoffsDir, 'projects', `${projectKey}.json`);
+        try {
+          if (fs.existsSync(projFile)) {
+            const proj = JSON.parse(fs.readFileSync(projFile, 'utf8'));
+            const sessions = (proj.sessions || [])
+              .filter(s => s.ended_at)
+              .sort((a, b) => (b.ended_at || '').localeCompare(a.ended_at || ''));
+            if (sessions.length > 0) {
+              const sessionFile = path.join(handoffsDir, 'sessions', `${sessions[0].session_id}.json`);
+              if (fs.existsSync(sessionFile)) {
+                return { content: [{ type: 'text', text: fs.readFileSync(sessionFile, 'utf8') }] };
+              }
+            }
+          }
+        } catch {}
+      }
+
+      // Fallback: latest session JSON by mtime
+      const sessionsDir = path.join(handoffsDir, 'sessions');
+      try {
+        const files = fs.readdirSync(sessionsDir)
+          .filter(f => f.endsWith('.json') && !f.startsWith('.'))
+          .map(f => ({ f, mt: fs.statSync(path.join(sessionsDir, f)).mtimeMs }))
+          .sort((a, b) => b.mt - a.mt);
+        if (files.length > 0) {
+          return { content: [{ type: 'text', text: fs.readFileSync(path.join(sessionsDir, files[0].f), 'utf8') }] };
+        }
+      } catch {}
+
+      // Legacy fallback: .session-handoff.md
       const canonical = findCanonicalDir(cwd);
-      if (!canonical) return { content: [{ type: 'text', text: 'no .claude/ or .ai-context/ found walking up from ' + (cwd || process.cwd()) }] };
-      const p = path.join(canonical, '.session-handoff.md');
-      if (!fs.existsSync(p)) return { content: [{ type: 'text', text: `no handoff at ${p}` }] };
-      return { content: [{ type: 'text', text: fs.readFileSync(p, 'utf8') }] };
+      if (canonical) {
+        const p = path.join(canonical, '.session-handoff.md');
+        if (fs.existsSync(p)) return { content: [{ type: 'text', text: fs.readFileSync(p, 'utf8') }] };
+      }
+
+      return { content: [{ type: 'text', text: 'no session handoffs found' }] };
     },
   },
 
   list_handoffs: {
-    description: 'List all historical session handoff files (.session-handoff-*.md) for a project.',
+    description: 'List all historical session handoff files for a project.',
     inputSchema: {
       type: 'object',
       properties: { cwd: { type: 'string', description: 'Optional starting directory' } },
     },
     handler: ({ cwd } = {}) => {
-      const canonical = findCanonicalDir(cwd);
-      if (!canonical) return { content: [{ type: 'text', text: 'no canonical dir found' }] };
+      const handoffsDir = path.join(AI_CONTEXT, 'handoffs');
+      const sessionsDir = path.join(handoffsDir, 'sessions');
+      const results = [];
+
+      // JSON sessions
       try {
-        const files = fs.readdirSync(canonical)
-          .filter(f => /^\.session-handoff.*\.md$/.test(f))
+        const files = fs.readdirSync(sessionsDir)
+          .filter(f => f.endsWith('.json') && !f.startsWith('.'))
           .map(f => {
-            const full = path.join(canonical, f);
+            const full = path.join(sessionsDir, f);
             const stat = fs.statSync(full);
-            return { file: f, mtime: stat.mtime.toISOString(), size: stat.size };
+            try {
+              const d = JSON.parse(fs.readFileSync(full, 'utf8'));
+              return {
+                id: d.session_id || f,
+                tool: d.tool || '?',
+                project: d.project_key || '?',
+                started: d.started_at || '',
+                ended: d.ended_at || '',
+                files: (d.files_changed || []).length,
+                mtime: stat.mtimeMs,
+              };
+            } catch { return null; }
           })
-          .sort((a, b) => b.mtime.localeCompare(a.mtime));
-        if (files.length === 0) return { content: [{ type: 'text', text: 'no handoffs found' }] };
-        const out = files.map(f => `- ${f.file} (${f.mtime}, ${f.size}B)`).join('\n');
-        return { content: [{ type: 'text', text: out }] };
-      } catch (e) {
-        return { content: [{ type: 'text', text: 'error: ' + e.message }], isError: true };
-      }
+          .filter(Boolean)
+          .sort((a, b) => b.mtime - a.mtime)
+          .slice(0, 20);
+        for (const s of files) {
+          results.push(`- [${s.tool}] ${s.project} | ${s.started.slice(0, 16)} → ${s.ended.slice(0, 16)} | ${s.files} files | ${s.id}`);
+        }
+      } catch {}
+
+      // Legacy .session-handoff*.md in archive
+      try {
+        const archiveDir = path.join(handoffsDir, 'archive');
+        const walkArchive = (dir) => {
+          for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+            if (entry.isDirectory()) walkArchive(path.join(dir, entry.name));
+            else if (entry.name.includes('session-handoff') && entry.name.endsWith('.md')) {
+              results.push(`- [legacy] ${entry.name}`);
+            }
+          }
+        };
+        if (fs.existsSync(archiveDir)) walkArchive(archiveDir);
+      } catch {}
+
+      if (results.length === 0) return { content: [{ type: 'text', text: 'no handoffs found' }] };
+      return { content: [{ type: 'text', text: results.join('\n') }] };
     },
   },
 
@@ -507,24 +608,53 @@ const TOOLS = {
       required: ['query'],
     },
     handler: ({ query, cwd }) => {
-      const canonical = findCanonicalDir(cwd);
-      if (!canonical) return { content: [{ type: 'text', text: 'no canonical dir found' }] };
       const q = String(query).toLowerCase();
+      const handoffsDir = path.join(AI_CONTEXT, 'handoffs');
+      const hits = [];
+
+      // Search JSON sessions
+      const sessionsDir = path.join(handoffsDir, 'sessions');
       try {
-        const files = fs.readdirSync(canonical).filter(f => /^\.session-handoff.*\.md$/.test(f));
-        const hits = [];
-        for (const f of files) {
-          const full = path.join(canonical, f);
+        for (const f of fs.readdirSync(sessionsDir)) {
+          if (!f.endsWith('.json') || f.startsWith('.')) continue;
+          const full = path.join(sessionsDir, f);
           const c = fs.readFileSync(full, 'utf8');
           if (!c.toLowerCase().includes(q)) continue;
-          const lines = c.split('\n');
-          const matches = lines.map((l, i) => ({ i, l })).filter(({ l }) => l.toLowerCase().includes(q)).slice(0, 3);
-          hits.push(`### ${f}\n` + matches.map(({ i, l }) => `L${i + 1}: ${l.trim().slice(0, 160)}`).join('\n'));
+          try {
+            const d = JSON.parse(c);
+            const searchable = [d.summary, d.project_key, d.tool, d.host,
+              ...(d.files_changed || []).map(fc => fc.path),
+              ...(d.errors || []),
+            ].filter(Boolean).join(' ');
+            if (searchable.toLowerCase().includes(q)) {
+              hits.push(`### ${f} (${d.project_key || '?'}, ${(d.started_at || '').slice(0, 16)})\n${(d.summary || '').slice(0, 200)}`);
+            }
+          } catch {
+            hits.push(`### ${f}\n(matched raw content)`);
+          }
+          if (hits.length >= 10) break;
         }
-        return { content: [{ type: 'text', text: hits.join('\n\n') || `no matches for "${q}"` }] };
-      } catch (e) {
-        return { content: [{ type: 'text', text: 'error: ' + e.message }], isError: true };
-      }
+      } catch {}
+
+      // Search legacy archive .md files
+      const archiveDir = path.join(handoffsDir, 'archive');
+      try {
+        const walkSearch = (dir) => {
+          for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+            if (entry.isDirectory()) { walkSearch(path.join(dir, entry.name)); continue; }
+            if (!entry.name.endsWith('.md')) continue;
+            const full = path.join(dir, entry.name);
+            const c = fs.readFileSync(full, 'utf8');
+            if (!c.toLowerCase().includes(q)) continue;
+            const lines = c.split('\n');
+            const matches = lines.map((l, i) => ({ i, l })).filter(({ l }) => l.toLowerCase().includes(q)).slice(0, 3);
+            hits.push(`### ${entry.name} [legacy]\n` + matches.map(({ i, l }) => `L${i + 1}: ${l.trim().slice(0, 160)}`).join('\n'));
+          }
+        };
+        if (fs.existsSync(archiveDir)) walkSearch(archiveDir);
+      } catch {}
+
+      return { content: [{ type: 'text', text: hits.join('\n\n') || `no matches for "${q}"` }] };
     },
   },
 };

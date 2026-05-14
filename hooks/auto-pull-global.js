@@ -163,6 +163,6 @@ try {
     process.stdout.write('{"continue":true}');
   }
 } catch (e) {
-  process.stderr.write('auto-pull-global: ' + e.message + '\n');
+  try { require('./lib/hook-logger.js').logError('auto-pull-global', e); } catch {}
   process.stdout.write('{"continue":true}');
 }

@@ -8,9 +8,8 @@ const os = require('os');
 //
 // Guards:
 //   1. Safety-critical file guard (advisory) — warns on edits to paths listed in KACHOW_SAFETY_PATHS
-//   2. GSD prompt injection guard (advisory) — scans .planning/ writes for injection patterns
-//   3. GSD workflow guard (advisory) — nudges toward /gsd:fast when editing outside GSD (opt-in)
-//   4. Git identity guard (HARD BLOCK) — enforces per-project allow/deny rules from
+//   2. Prompt injection guard (advisory) — scans writes for injection patterns
+//   3. Git identity guard (HARD BLOCK) — enforces per-project allow/deny rules from
 //      <repo>/.claude/project-identity.json. Prevents pushing <project-name> to GitHub, etc.
 //      Logs every fire (block or allow) to episodic JSONL for Tier 3 self-improvement.
 
@@ -63,7 +62,7 @@ try {
         }
       }
     } catch (e) {
-      process.stderr.write('pre-write-combined-guard[bash]: ' + e.message + '\n');
+      try { require('./lib/hook-logger.js').logError('pre-write-combined-guard', e); } catch {}
     }
     process.stdout.write('{"continue":true}');
     process.exit(0);
@@ -121,7 +120,7 @@ try {
     errors.push({ section: 'safety-critical-guard', error: e.message, stack: e.stack?.split('\n')[1]?.trim(), critical: true });
   }
 
-  // ── 2. GSD prompt injection guard ──
+  // ── 2. Prompt injection guard ──
   try {
     if (normalized.includes('.planning/')) {
       const content = data.tool_input?.content || data.tool_input?.new_string || '';
@@ -161,35 +160,10 @@ try {
     errors.push({ section: 'injection-guard', error: e.message, stack: e.stack?.split('\n')[1]?.trim(), critical: true });
   }
 
-  // ── 3. GSD workflow guard (opt-in via .planning/config.json) ──
-  try {
-    if (toolName === 'Write' || toolName === 'Edit') {
-      const isPlanning = normalized.includes('.planning/');
-      const allowedPatterns = [/\.gitignore$/, /\.env/, /CLAUDE\.md$/, /AGENTS\.md$/, /GEMINI\.md$/, /settings\.json$/];
-      const isAllowed = allowedPatterns.some(p => p.test(filePath));
-
-      if (!isPlanning && !isAllowed) {
-        const cwd = data.cwd || process.cwd();
-        const configPath = path.join(cwd, '.planning', 'config.json');
-        if (fs.existsSync(configPath)) {
-          const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-          if (config.hooks?.workflow_guard) {
-            advisories.push(
-              `WORKFLOW ADVISORY: You're editing ${path.basename(filePath)} directly without a GSD command. ` +
-              'This edit will not be tracked in STATE.md. Consider using /gsd:fast or /gsd:quick.'
-            );
-          }
-        }
-      }
-    }
-  } catch (e) {
-    errors.push({ section: 'workflow-guard', error: e.message, stack: e.stack?.split('\n')[1]?.trim(), critical: true });
-  }
-
-  // ── 5. Settings validation guard (merged from validate-settings-on-write.js v0.9.5 W2-FIX3) ──
+  // ── 3. Settings validation guard (merged from validate-settings-on-write.js v0.9.5 W2-FIX3) ──
   try {
     if (process.env.SKIP_SETTINGS_VALIDATOR !== '1' && toolName === 'Write') {
-      const settingsMatch = /settings(\.local)?\.json$/.test(filePath) || normalized.includes('ai-context/configs/');
+      const settingsMatch = /settings(\.local)?\.json$/.test(filePath) || normalized.includes('ai-context/generated/configs/');
       if (settingsMatch) {
         const newContent = (data.tool_input || {}).content || '';
         if (newContent.trim()) {
@@ -205,7 +179,7 @@ try {
           if (parsed.cleanupPeriodDays === 0) {
             settingsIssues.push('cleanupPeriodDays is 0 — Claude Code v2.1.110+ rejects this. Set to positive value or omit.');
           }
-          const isClaude = normalized.includes('/.claude/') || normalized.includes('ai-context/configs/claude-settings');
+          const isClaude = normalized.includes('/.claude/') || normalized.includes('ai-context/generated/configs/claude-settings');
           if (isClaude) {
             try {
               const { findDrift } = require('./lib/settings-schema.js');
@@ -295,6 +269,6 @@ try {
     process.stdout.write('{"continue":true}');
   }
 } catch (e) {
-  process.stderr.write('pre-write-combined-guard: ' + e.message + '\n');
+  try { require('./lib/hook-logger.js').logError('pre-write-combined-guard', e); } catch {}
   process.stdout.write('{"continue":true}');
 }
