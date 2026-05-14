@@ -46,7 +46,11 @@ jobs:
           for f in hooks/*.js; do
             [ -f "$f" ] || continue
             name=$(basename "$f")
-            result=$(echo '{}' | timeout 10 node "$f" 2>/dev/null || true)
+            if command -v timeout >/dev/null 2>&1; then
+              result=$(echo '{}' | timeout 10 node "$f" 2>/dev/null || true)
+            else
+              result=$(echo '{}' | node "$f" 2>/dev/null || true)
+            fi
             if echo "$result" | python3 -c "import json,sys; d=json.load(sys.stdin); assert 'continue' in d" 2>/dev/null; then
               PASS=$((PASS + 1))
             else
