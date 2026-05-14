@@ -75,7 +75,27 @@ jobs:
       - name: Validate skills
         shell: bash
         run: |
-          node scripts/validate-skills.mjs --dir skills
+          # validate-skills.mjs uses require() — needs CommonJS compat
+          node --input-type=commonjs -e "
+            const fs = require('fs');
+            const path = require('path');
+            const skillsDir = 'skills';
+            let errors = 0;
+            for (const dir of fs.readdirSync(skillsDir)) {
+              const skillMd = path.join(skillsDir, dir, 'SKILL.md');
+              if (!fs.existsSync(skillMd)) { console.log('MISSING: ' + skillMd); errors++; continue; }
+              const content = fs.readFileSync(skillMd, 'utf8');
+              const fm = content.match(/^---\n([\s\S]*?)\n---/);
+              if (!fm) { console.log('NO FRONTMATTER: ' + skillMd); errors++; continue; }
+              const nameMatch = fm[1].match(/^name:\s*(.+)/m);
+              if (!nameMatch) { console.log('NO NAME: ' + skillMd); errors++; continue; }
+              const descMatch = fm[1].match(/^description:/m);
+              if (!descMatch) { console.log('NO DESCRIPTION: ' + skillMd); errors++; continue; }
+              console.log('OK: ' + dir);
+            }
+            if (errors > 0) { console.log(errors + ' issues found'); process.exit(1); }
+            console.log('All skills valid');
+          "
 
       - name: Scrub-gate (no personal tokens in public repo)
         shell: bash
